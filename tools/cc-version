@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : cc-version
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Display repository version information.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+case "${1:-}" in
+    --help|-h)
+        echo "Usage: tools/cc-version"
+        echo
+        echo "Displays Captain Cronos Shell Toolkit version information."
+        exit 0
+        ;;
+esac
+
+cc_version
