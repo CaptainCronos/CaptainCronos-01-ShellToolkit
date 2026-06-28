@@ -213,13 +213,16 @@ unalias lstree 2>/dev/null
 
 # @name lstree
 # @group Filesystem
-# @desc Display a tree view of a mounted USB drive, jump drive, or directory.
-# @usage lstree [drive-label-or-path]
+# @desc Display a clean tree view of a mounted USB drive, jump drive, repository, or directory.
+# @usage lstree [--all|--git|--depth N|--dirs|--help] [drive-label-or-path]
 # @example lstree
+# @example lstree .
+# @example lstree --depth 2 .
+# @example lstree --git ~/GitHub/CaptainCronos-01-ShellToolkit
 # @example lstree Ventoy
-# @example lstree /timeshift-usb
 lstree() {
-    local root target
+    local root target path="" show_git="no" show_all="no" dirs_only="no" depth=""
+    local tree_args ignore_pattern repo_root repo_name branch commit
 
     if ! command -v tree >/dev/null 2>&1; then
         echo "Missing dependency: tree"
@@ -227,30 +230,132 @@ lstree() {
         return 1
     fi
 
-    if [ "$#" -eq 0 ]; then
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --help|-h)
+                cat <<'EOF_HELP'
+lstree v2
+=========
+
+Usage:
+  lstree [options] [drive-label-or-path]
+
+Options:
+  --all           Show all hidden files. Default still hides noisy development/cache files.
+  --git           Include .git and .github directories.
+  --depth N       Limit tree depth.
+  --dirs          Show directories only.
+  --help, -h      Show this help.
+
+Examples:
+  lstree
+  lstree .
+  lstree --depth 2 .
+  lstree --git ~/GitHub/CaptainCronos-01-ShellToolkit
+  lstree Ventoy
+
+Default exclusions:
+  .git, .github, __pycache__, .pytest_cache, node_modules, .cache,
+  *.pyc, *.pyo, *.swp, *~, .DS_Store, Thumbs.db
+EOF_HELP
+                return 0
+                ;;
+            --git)
+                show_git="yes"
+                shift
+                ;;
+            --all)
+                show_all="yes"
+                shift
+                ;;
+            --dirs)
+                dirs_only="yes"
+                shift
+                ;;
+            --depth|-L)
+                shift
+                if [ -z "${1:-}" ]; then
+                    echo "Usage: lstree --depth <number> [path]"
+                    return 1
+                fi
+                depth="$1"
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -* )
+                echo "Unknown option: $1"
+                echo "Try: lstree --help"
+                return 1
+                ;;
+            *)
+                path="$1"
+                shift
+                ;;
+        esac
+    done
+
+    if [ -z "$path" ] && [ "$#" -gt 0 ]; then
+        path="$1"
+    fi
+
+    tree_args=(-C -h --dirsfirst)
+    [ "$show_all" = "yes" ] && tree_args=(-a "${tree_args[@]}")
+    [ "$dirs_only" = "yes" ] && tree_args=("${tree_args[@]}" -d)
+    [ -n "$depth" ] && tree_args=("${tree_args[@]}" -L "$depth")
+
+    ignore_pattern='__pycache__|.pytest_cache|*.pyc|*.pyo|*.swp|*~|node_modules|.cache|.DS_Store|Thumbs.db'
+    if [ "$show_git" != "yes" ]; then
+        ignore_pattern=".git|.github|$ignore_pattern"
+    fi
+    tree_args=("${tree_args[@]}" -I "$ignore_pattern")
+
+    _lstree_one() {
+        local p="$1"
+
+        if [ -d "$p/.git" ] && command -v git >/dev/null 2>&1; then
+            repo_root="$(cd "$p" && git rev-parse --show-toplevel 2>/dev/null || true)"
+            if [ -n "$repo_root" ]; then
+                repo_name="$(basename "$repo_root")"
+                branch="$(cd "$repo_root" && git branch --show-current 2>/dev/null || true)"
+                commit="$(cd "$repo_root" && git rev-parse --short HEAD 2>/dev/null || true)"
+                echo "Captain Cronos Repository Tree"
+                echo "=============================="
+                echo "Repository : $repo_name"
+                echo "Branch     : ${branch:-unknown}"
+                echo "Commit     : ${commit:-none}"
+                echo
+            fi
+        fi
+
+        tree "${tree_args[@]}" "$p"
+    }
+
+    if [ -z "$path" ]; then
         for root in "/media/$USER" "/run/media/$USER"; do
-            [ -d "$root" ] && tree -a -C -h --dirsfirst "$root"
+            [ -d "$root" ] && _lstree_one "$root"
         done
         return
     fi
 
-    if [ -d "$1" ]; then
-        tree -a -C -h --dirsfirst "$1"
+    if [ -d "$path" ]; then
+        _lstree_one "$path"
         return
     fi
 
     for root in "/media/$USER" "/run/media/$USER"; do
-        target="$root/$1"
+        target="$root/$path"
         if [ -d "$target" ]; then
-            tree -a -C -h --dirsfirst "$target"
+            _lstree_one "$target"
             return
         fi
     done
 
-    echo "Drive or directory not found: $1"
+    echo "Drive or directory not found: $path"
     return 1
 }
-
 
 # =============================
 # GIT / GITHUB HELPERS
@@ -1257,21 +1362,62 @@ showfunc() {
 
 # @name helpme
 # @group Shell
-# @desc Show Captain Cronos Toolkit help, command details, search results, or stats.
-# @usage helpme [command|search <term>|stats|aliases|functions|github]
+# @desc Show Captain Cronos Toolkit help, command details, search results, engineering tools, docs, standards, or stats.
+# @usage helpme [command|search <term>|stats|aliases|functions|github|engineering|install|docs|standards|version]
 # @example helpme
 # @example helpme lstree
+# @example helpme engineering
 # @example helpme search backup
 # @example helpme stats
-# @example helpme github
+# @example helpme version
 helpme() {
-    local cmd term
+    local cmd term repo version_file
+
+    _cc_help_version() {
+        repo="${CAPTAIN_CRONOS_REPO:-$HOME/GitHub/CaptainCronos-01-ShellToolkit}"
+        version_file="$repo/VERSION"
+        if [ -f "$version_file" ]; then
+            # shellcheck disable=SC1090
+            . "$version_file"
+        fi
+        echo "Captain Cronos Shell Toolkit"
+        echo "Version : ${TOOLKIT_VERSION:-unknown}"
+        echo "Codename: ${TOOLKIT_CODENAME:-unknown}"
+        echo
+    }
+
+    _cc_help_engineering() {
+        echo "Engineering Commands"
+        echo "--------------------"
+        printf "%-22s %s\n" "cc-version" "Display toolkit version information."
+        printf "%-22s %s\n" "cc-doctor" "Run repository health checks."
+        printf "%-22s %s\n" "install/verify.sh" "Verify repository structure and Bash syntax."
+        printf "%-22s %s\n" "install/update.sh" "Pull latest changes and reinstall toolkit."
+        printf "%-22s %s\n" "install/create-baseline.sh" "Capture operating-system baseline shell files."
+        printf "%-22s %s\n" "install/promote-defaults.sh" "Promote active bash files to defaults/v1."
+    }
+
+    _cc_help_docs() {
+        echo "Documentation"
+        echo "-------------"
+        printf "%-28s %s\n" "docs/user/" "User documentation."
+        printf "%-28s %s\n" "docs/developer/" "Developer documentation and standards."
+        printf "%-28s %s\n" "README.md" "Project overview."
+        printf "%-28s %s\n" "ROADMAP.md" "Project roadmap."
+        printf "%-28s %s\n" "CHANGELOG.md" "Change history."
+    }
+
+    _cc_help_standards() {
+        echo "Standards"
+        echo "---------"
+        printf "%-16s %s\n" "CC-STD-001" "Script Header Standard"
+        echo
+        echo "Standards location: docs/developer/"
+    }
 
     case "${1:-}" in
         ""|list)
-            echo "Captain Cronos Command Toolkit"
-            echo "=============================="
-            echo
+            _cc_help_version
             echo "ALIASES"
             echo "-------"
             _cc_alias_table | awk -F '\t' '{ printf "%-16s %s\n", $1, $2 }'
@@ -1280,12 +1426,44 @@ helpme() {
             echo "---------"
             _cc_function_table | awk -F '\t' '{ printf "%-16s %-12s %s\n", $2, $1, $3 }'
             echo
+            _cc_help_engineering
+            echo
             echo "Usage:"
             echo "  helpme"
             echo "  helpme <command>"
             echo "  helpme search <term>"
+            echo "  helpme engineering"
+            echo "  helpme install"
+            echo "  helpme docs"
+            echo "  helpme standards"
             echo "  helpme stats"
+            echo "  helpme version"
             echo "  helpme github"
+            ;;
+        version|--version)
+            _cc_help_version
+            ;;
+        engineering|engineer|dev)
+            _cc_help_version
+            _cc_help_engineering
+            ;;
+        install|installer|update)
+            _cc_help_version
+            echo "Install / Update Commands"
+            echo "-------------------------"
+            printf "%-28s %s\n" "install/install.sh" "Install shell toolkit files."
+            printf "%-28s %s\n" "install/update.sh" "Pull latest changes and reinstall."
+            printf "%-28s %s\n" "install/verify.sh" "Verify structure and syntax."
+            printf "%-28s %s\n" "install/create-baseline.sh" "Capture OS baseline files."
+            printf "%-28s %s\n" "install/promote-defaults.sh" "Promote bash files to deployable defaults."
+            ;;
+        docs|documentation)
+            _cc_help_version
+            _cc_help_docs
+            ;;
+        standards|standard)
+            _cc_help_version
+            _cc_help_standards
             ;;
         github|git|workflow|gitflow)
             _cc_gitflow_help
@@ -1305,14 +1483,18 @@ helpme() {
             fi
             echo "Search results for: $term"
             echo "------------------------"
-            { _cc_alias_table | awk -F '\t' '{ print "alias\t" $1 "\t" $2 }'; _cc_function_table | awk -F '\t' '{ print "function\t" $2 "\t" $3 }'; } |
-                awk -F '\t' -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q { printf "%-9s %-16s %s\n", $1, $2, $3 }'
+            {
+                _cc_alias_table | awk -F '\t' '{ print "alias\t" $1 "\t" $2 }'
+                _cc_function_table | awk -F '\t' '{ print "function\t" $2 "\t" $3 }'
+                _cc_help_engineering | awk 'NF { print "engineering\t" $1 "\t" substr($0, index($0,$2)) }'
+            } | awk -F '\t' -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q { printf "%-12s %-22s %s\n", $1, $2, $3 }'
             ;;
         stats)
-            echo "Captain Cronos Toolkit Stats"
-            echo "============================"
-            printf "Aliases   : %s\n" "$(_cc_alias_names | wc -l)"
-            printf "Functions : %s\n" "$(_cc_function_names | wc -l)"
+            _cc_help_version
+            echo "Toolkit Statistics"
+            echo "=================="
+            printf "Aliases       : %s\n" "$(_cc_alias_names | wc -l)"
+            printf "Functions     : %s\n" "$(_cc_function_names | wc -l)"
             printf "Function file : %s\n" "$(_cc_meta_file)"
             printf "Alias file    : %s\n" "$(_cc_alias_file)"
             ;;

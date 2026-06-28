@@ -1,0 +1,6 @@
+
+# Runtime / migration backups
+*.bak
+*.orig
+*.original
+*.pre-*
