@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : cc-doctor
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Run repository health checks for the Shell Toolkit.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+case "${1:-}" in
+    --help|-h)
+        echo "Usage: tools/cc-doctor"
+        echo
+        echo "Runs repository health checks, including required files, syntax, and Git status."
+        exit 0
+        ;;
+    --version)
+        cc_version
+        exit 0
+        ;;
+esac
+
+cc_banner
+
+cc_log "Running install/verify.sh..."
+install/verify.sh
+
+cc_log "Checking Git status..."
+if [ -n "$(git status --short)" ]; then
+    cc_warn "Working tree has uncommitted changes:"
+    git status --short
+else
+    cc_log "Working tree clean."
+fi
+
+cc_log "Checking executable scripts..."
+for script in install/*.sh tools/cc-*; do
+    [ -e "$script" ] || continue
+    if [ ! -x "$script" ]; then
+        cc_warn "Not executable: $script"
+    fi
+    bash -n "$script"
+done
+
+cc_log "Doctor check complete."
