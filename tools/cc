@@ -6,7 +6,7 @@
 # Script      : cc
 # Version     : reads VERSION
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Unified command front-end for Captain Cronos Shell Toolkit.
+# Purpose     : Unified command dispatcher for Captain Cronos Shell Toolkit.
 # ==============================================================================
 
 set -euo pipefail
@@ -29,41 +29,35 @@ if [ ! -d "$PROJECT_ROOT" ]; then
 fi
 
 cd "$PROJECT_ROOT"
-
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
+COMMAND_DIR="$PROJECT_ROOT/tools/commands"
+
 show_help() {
-    cat <<'EOF_HELP'
-Captain Cronos Shell Toolkit Command Front-End
-==============================================
-
-Usage:
-  cc <command> [options]
-
-Commands:
-  install      Install the Shell Toolkit locally.
-  update       Pull latest changes and reinstall the Shell Toolkit.
-  verify       Verify repository structure and Bash syntax.
-  doctor       Run repository and installation health checks.
-  version      Show toolkit version information.
-  baseline     Capture operating-system baseline shell files.
-  defaults     Promote active shell files into defaults/v1.
-  repo         Show repository path used by cc.
-  help         Show this help.
-
-Examples:
-  cc version
-  cc repo
-  cc verify
-  cc doctor
-  cc install --dry-run
-  cc update
-  cc baseline
-  cc defaults
-
-Notes:
-  This command can be run from anywhere after install/install.sh places it in ~/bin.
-EOF_HELP
+    echo "Captain Cronos Shell Toolkit"
+    echo "============================"
+    echo
+    echo "Usage:"
+    echo "  cc <command> [options]"
+    echo
+    echo "Commands:"
+    if [ -d "$COMMAND_DIR" ]; then
+        for command_file in "$COMMAND_DIR"/*; do
+            [ -f "$command_file" ] || continue
+            command_name="$(basename "$command_file")"
+            command_desc="$(grep -m 1 '^# Purpose     :' "$command_file" | sed 's/^# Purpose     : //')"
+            printf "  %-12s %s\n" "$command_name" "${command_desc:-No description.}"
+        done | sort
+    fi
+    echo
+    echo "Examples:"
+    echo "  cc version"
+    echo "  cc repo"
+    echo "  cc doctor"
+    echo "  cc install --dry-run"
+    echo "  cc update"
+    echo
+    echo "Repository: $PROJECT_ROOT"
 }
 
 cmd="${1:-help}"
@@ -72,35 +66,20 @@ shift || true
 case "$cmd" in
     help|--help|-h)
         show_help
+        exit 0
         ;;
-    repo)
-        echo "$PROJECT_ROOT"
-        ;;
-    version|--version)
-        cc_version
-        ;;
-    install)
-        exec install/install.sh "$@"
-        ;;
-    update|upgrade)
-        exec install/update.sh "$@"
-        ;;
-    verify)
-        exec install/verify.sh "$@"
-        ;;
-    doctor)
-        exec tools/cc-doctor "$@"
-        ;;
-    baseline)
-        exec install/create-baseline.sh "$@"
-        ;;
-    defaults|promote-defaults)
-        exec install/promote-defaults.sh "$@"
-        ;;
-    *)
-        cc_error "Unknown command: $cmd"
-        echo
-        show_help
-        exit 1
+    --version)
+        cmd="version"
         ;;
 esac
+
+command_path="$COMMAND_DIR/$cmd"
+
+if [ ! -f "$command_path" ]; then
+    cc_error "Unknown command: $cmd"
+    echo
+    show_help
+    exit 1
+fi
+
+bash "$command_path" "$@"
