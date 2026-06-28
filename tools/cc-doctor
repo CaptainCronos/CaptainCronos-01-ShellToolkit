@@ -11,16 +11,30 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cd "$PROJECT_ROOT"
+DEFAULT_REPO="$HOME/GitHub/CaptainCronos-01-ShellToolkit"
+PROJECT_ROOT="${CAPTAIN_CRONOS_REPO:-}"
 
+if [ -z "$PROJECT_ROOT" ]; then
+    PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+fi
+
+if [ -z "$PROJECT_ROOT" ] || [ ! -d "$PROJECT_ROOT" ]; then
+    PROJECT_ROOT="$DEFAULT_REPO"
+fi
+
+if [ ! -d "$PROJECT_ROOT" ]; then
+    echo "[CC ERROR] Repository not found: $PROJECT_ROOT" >&2
+    exit 1
+fi
+
+cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
 case "${1:-}" in
     --help|-h)
         echo "Usage: tools/cc-doctor"
         echo
-        echo "Runs repository health checks, including required files, syntax, and Git status."
+        echo "Runs repository health checks, including required files, syntax, Git status, and installed command availability."
         exit 0
         ;;
     --version)
@@ -42,13 +56,20 @@ else
     cc_log "Working tree clean."
 fi
 
-cc_log "Checking executable scripts..."
-for script in install/*.sh tools/cc-*; do
+cc_log "Checking script syntax and executable status..."
+for script in install/*.sh tools/cc tools/cc-*; do
     [ -e "$script" ] || continue
     if [ ! -x "$script" ]; then
-        cc_warn "Not executable: $script"
+        cc_warn "Not executable in repository checkout: $script"
     fi
     bash -n "$script"
 done
+
+cc_log "Checking installed command front-end..."
+if [ -x "$HOME/bin/cc" ]; then
+    cc_log "Installed command found: $HOME/bin/cc"
+else
+    cc_warn "Installed command missing or not executable: $HOME/bin/cc"
+fi
 
 cc_log "Doctor check complete."
