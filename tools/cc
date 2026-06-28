@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : cc
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Unified command front-end for Captain Cronos Shell Toolkit.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+show_help() {
+    cat <<'EOF_HELP'
+Captain Cronos Shell Toolkit Command Front-End
+==============================================
+
+Usage:
+  cc <command> [options]
+
+Commands:
+  install      Install the Shell Toolkit locally.
+  update       Pull latest changes and reinstall the Shell Toolkit.
+  verify       Verify repository structure and Bash syntax.
+  doctor       Run repository and installation health checks.
+  version      Show toolkit version information.
+  baseline     Capture operating-system baseline shell files.
+  defaults     Promote active shell files into defaults/v1.
+  help         Show this help.
+
+Examples:
+  cc version
+  cc verify
+  cc doctor
+  cc install --dry-run
+  cc update
+  cc baseline
+  cc defaults
+
+Notes:
+  This command dispatches to the existing toolkit scripts. It is the preferred
+  entry point once the toolkit is installed into PATH.
+EOF_HELP
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+    help|--help|-h)
+        show_help
+        ;;
+    version|--version)
+        cc_version
+        ;;
+    install)
+        exec install/install.sh "$@"
+        ;;
+    update|upgrade)
+        exec install/update.sh "$@"
+        ;;
+    verify)
+        exec install/verify.sh "$@"
+        ;;
+    doctor)
+        exec tools/cc-doctor "$@"
+        ;;
+    baseline)
+        exec install/create-baseline.sh "$@"
+        ;;
+    defaults|promote-defaults)
+        exec install/promote-defaults.sh "$@"
+        ;;
+    *)
+        cc_error "Unknown command: $cmd"
+        echo
+        show_help
+        exit 1
+        ;;
+esac
