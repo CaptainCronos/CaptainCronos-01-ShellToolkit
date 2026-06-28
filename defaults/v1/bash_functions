@@ -1,0 +1,1332 @@
+# ~/.bash_functions
+# Captain Cronos shell functions
+# Clear old aliases that would override toolkit function commands.
+unalias functions funcs showfunc 2>/dev/null
+
+: "${CAPTAIN_CRONOS_FUNCTIONS:=${BASH_SOURCE[0]:-$HOME/.bash_functions}}"
+: "${CAPTAIN_CRONOS_ALIASES:=$HOME/.bash_aliases}"
+# Source this file from ~/.bashrc after ~/.bash_aliases.
+
+# =============================
+# EDITOR HELPERS
+# =============================
+
+# @name bf
+# @group Editors
+# @desc Edit files with Bluefish when available, otherwise nano; request root when needed.
+# @usage bf <file> [file...]
+# @example bf ~/.bashrc
+# @example bf /etc/fstab
+bf() {
+    local editor file
+    editor="$(command -v bluefish || printf '%s' "${EDITOR:-/bin/nano}")"
+
+    if [ "$#" -eq 0 ]; then
+        echo "Usage: bf <file> [file...]"
+        return 1
+    fi
+
+    for file in "$@"; do
+        if [ -w "$file" ] || [ ! -e "$file" ]; then
+            "$editor" "$file" &
+        else
+            echo "Requesting root access for: $file"
+            pkexec env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" "$editor" "$file" &
+        fi
+    done
+}
+
+# =============================
+# SYSTEM INFO
+# =============================
+
+# @name loadavg
+# @group System
+# @desc Show system load averages for 1, 5, and 15 minutes.
+# @usage loadavg
+# @example loadavg
+loadavg() {
+    awk '{print "Load Averages: "$1" "$2" "$3" (1m:5m:15m)"}' /proc/loadavg
+}
+
+# @name space
+# @group Filesystem
+# @desc Show total disk usage for a directory.
+# @usage space <directory>
+# @example space /timeshift-usb
+# @example space ~/Downloads
+space() {
+    if [ "$#" -lt 1 ] || [ ! -d "$1" ]; then
+        echo "Usage: space <directory>"
+        return 1
+    fi
+    sudo du -sh -- "$1" | awk '{print $1}'
+}
+
+# @name findharddrives
+# @group Filesystem
+# @desc Show physical drives, filesystems, labels, UUIDs, usage, and mount points.
+# @usage findharddrives
+# @example findharddrives
+findharddrives() {
+    lsblk -e 7 -o NAME,FSTYPE,LABEL,UUID,SIZE,FSAVAIL,FSUSE%,MOUNTPOINTS
+}
+
+# =============================
+# NETWORK
+# =============================
+
+# @name findopenports
+# @group Network
+# @desc Run a full TCP SYN port scan against a target using nmap.
+# @usage findopenports [target]
+# @example findopenports
+# @example findopenports 192.168.1.10
+findopenports() {
+    local target="${1:-localhost}"
+    sudo nmap -sS -p- "$target"
+}
+
+# =============================
+# ARCHIVE HELPERS
+# =============================
+
+# @name extract
+# @group Archives
+# @desc Extract common tar archive formats.
+# @usage extract <archive>
+# @example extract backup.tar.gz
+# @example extract source.tar.xz
+extract() {
+    if [ "$#" -ne 1 ]; then
+        echo "Usage: extract <archive>"
+        return 1
+    fi
+
+    case "$1" in
+        *.tar.xz|*.txz) tar -xJf "$1" ;;
+        *.tar.gz|*.tgz) tar -xzf "$1" ;;
+        *.tar.bz2)      tar -xjf "$1" ;;
+        *.tar)          tar -xf "$1" ;;
+        *) echo "Unknown archive format: $1"; return 1 ;;
+    esac
+}
+
+# @name maketar
+# @group Archives
+# @desc Create a gzip-compressed tar archive.
+# @usage maketar <archive.tar.gz> <file-or-directory> [more...]
+# @example maketar backup.tar.gz ~/Documents
+maketar() {
+    if [ "$#" -lt 2 ]; then
+        echo "Usage: maketar <archive.tar.gz> <file-or-directory> [more...]"
+        return 1
+    fi
+    tar -zcpf "$@"
+}
+
+# =============================
+# TIMESHIFT HELPERS
+# =============================
+
+_ts_files() {
+    ls -1t /var/log/timeshift/*log* 2>/dev/null | head -n 12
+}
+
+# @name tslast
+# @group Timeshift
+# @desc Show the newest Timeshift log file.
+# @usage tslast
+# @example tslast
+tslast() {
+    _ts_files | head -n 1
+}
+
+# @name tslog
+# @group Timeshift
+# @desc Search recent Timeshift logs; optional first number controls output line count.
+# @usage tslog [lines] <pattern>
+# @example tslog error
+# @example tslog 300 rsync
+tslog() {
+    local n=200 pattern file
+
+    if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+        n="$1"
+        shift
+    fi
+
+    pattern="$*"
+    if [ -z "$pattern" ]; then
+        echo "Usage: tslog [lines] <pattern>"
+        return 1
+    fi
+
+    for file in $(_ts_files); do
+        if [[ "$file" == *.gz ]]; then
+            gzip -cd -- "$file" | grep -i -- "$pattern" || true
+        else
+            grep -i -- "$pattern" -- "$file" || true
+        fi
+    done | tail -n "$n"
+}
+
+# @name tsfollow
+# @group Timeshift
+# @desc Follow the current Timeshift log file.
+# @usage tsfollow
+# @example tsfollow
+tsfollow() {
+    local current next
+    current="$(tslast)"
+    [ -n "$current" ] || { echo "No Timeshift logs found."; return 1; }
+
+    echo "Following: $current"
+
+    while :; do
+        next="$(tslast)"
+        if [ "$next" != "$current" ] && [ -n "$next" ]; then
+            echo "Switching to: $next"
+            exec tail -F "$next"
+        fi
+        sleep 10
+    done &
+
+    tail -F "$current"
+}
+
+# @name tsdf
+# @group Timeshift
+# @desc Watch Timeshift filesystem usage.
+# @usage tsdf
+# @example tsdf
+tsdf() {
+    watch -n 15 'df -h /timeshift'
+}
+
+# =============================
+# TREE / USB HELPERS
+# =============================
+
+# Clear old alias before defining function, if an old shell still has it loaded.
+unalias lstree 2>/dev/null
+
+# @name lstree
+# @group Filesystem
+# @desc Display a tree view of a mounted USB drive, jump drive, or directory.
+# @usage lstree [drive-label-or-path]
+# @example lstree
+# @example lstree Ventoy
+# @example lstree /timeshift-usb
+lstree() {
+    local root target
+
+    if ! command -v tree >/dev/null 2>&1; then
+        echo "Missing dependency: tree"
+        echo "Install with: sudo apt install tree"
+        return 1
+    fi
+
+    if [ "$#" -eq 0 ]; then
+        for root in "/media/$USER" "/run/media/$USER"; do
+            [ -d "$root" ] && tree -a -C -h --dirsfirst "$root"
+        done
+        return
+    fi
+
+    if [ -d "$1" ]; then
+        tree -a -C -h --dirsfirst "$1"
+        return
+    fi
+
+    for root in "/media/$USER" "/run/media/$USER"; do
+        target="$root/$1"
+        if [ -d "$target" ]; then
+            tree -a -C -h --dirsfirst "$target"
+            return
+        fi
+    done
+
+    echo "Drive or directory not found: $1"
+    return 1
+}
+
+
+# =============================
+# GIT / GITHUB HELPERS
+# =============================
+
+_cc_gitflow_help() {
+    cat <<'EOF_HELP'
+Captain Cronos Git Assistant v1.2
+=================================
+
+Command:
+  gitflow [repo-directory]
+  gitflow --help
+
+Purpose:
+  Interactive Git assistant for new and existing Captain Cronos repositories.
+
+What it does:
+  - Verifies or initializes a Git repository.
+  - Shows repository, branch, commit count, remote, tracking, and status.
+  - Groups actions by Repository, Changes, Remote, Setup, and Workflow.
+  - Detects brand-new repositories with no commits.
+  - Offers to rename master to main.
+  - Offers to set Git's global default branch to main.
+  - Creates starter repository structures using repository profiles.
+  - Separates required and recommended health-check items.
+  - Offers automatic fixes for missing health-check items.
+  - Stages files interactively.
+  - Shows staged changes before commit.
+  - Prompts for a commit message.
+  - Configures or updates origin safely.
+  - Pushes using the current branch.
+  - Shows recent commits and repository statistics.
+  - Supports fetch, pull, sync, and tags.
+
+Repository profiles:
+  1) Shell Toolkit
+  2) Python Project
+  3) Documentation
+  4) Website
+  5) Generic
+
+Common first-run workflow:
+  cd ~/GitHub/CaptainCronos-01-ShellToolkit
+  gitflow
+  Choose option 17 for the full guided workflow.
+
+Related commands:
+  git status
+  git log --oneline -5
+  functions
+  showfunc gitflow
+EOF_HELP
+}
+
+# @name gitflow
+# @group GitHub
+# @desc Interactive Git assistant for new and existing Captain Cronos repositories.
+# @usage gitflow [repo-directory]
+# @example gitflow
+# @example gitflow ~/GitHub/CaptainCronos-01-ShellToolkit
+# @example gitflow --help
+gitflow() {
+    local target repo_root repo_name branch remote_url commit_count tracking status_short choice
+
+    if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+        _cc_gitflow_help
+        return 0
+    fi
+
+    target="${1:-$PWD}"
+    if [ ! -d "$target" ]; then
+        echo "ERROR: Directory not found: $target"
+        return 1
+    fi
+
+    cd "$target" || return 1
+
+    if ! command -v git >/dev/null 2>&1; then
+        echo "ERROR: git is not installed or not in PATH."
+        return 1
+    fi
+
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "ERROR: Not inside a Git repository."
+        echo
+        read -r -p "Initialize Git here? [y/N] " choice
+        case "$choice" in
+            [Yy]*) git init || return 1 ;;
+            *) echo "Cancelled."; return 1 ;;
+        esac
+    fi
+
+    repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
+    cd "$repo_root" || return 1
+    repo_name="$(basename "$repo_root")"
+
+    while true; do
+        branch="$(_cc_git_current_branch)"
+        commit_count="$(_cc_git_commit_count)"
+        remote_url="$(git remote get-url origin 2>/dev/null)"
+        [ -z "$remote_url" ] && remote_url="None configured"
+        tracking="$(_cc_git_tracking_branch)"
+        status_short="$(git status --short)"
+
+        clear 2>/dev/null
+        echo "============================================================"
+        echo " Captain Cronos Git Assistant v1.2"
+        echo "============================================================"
+        echo
+        echo "Repository : $repo_name"
+        echo "Path       : $repo_root"
+        echo "Branch     : $branch"
+        echo "Commits    : $commit_count"
+        echo "Remote     : $remote_url"
+        echo "Tracking   : $tracking"
+        echo
+        echo "Status"
+        echo "------"
+        if [ -z "$status_short" ]; then
+            echo "Working tree clean."
+        else
+            printf '%s\n' "$status_short"
+        fi
+        echo
+        echo "Repository"
+        echo "----------"
+        echo "1) Show full git status"
+        echo "2) Repository health check"
+        echo "3) Repository statistics"
+        echo "4) Recent commits"
+        echo
+        echo "Changes"
+        echo "-------"
+        echo "5) Stage files"
+        echo "6) Review staged changes"
+        echo "7) Commit staged changes"
+        echo
+        echo "Remote"
+        echo "------"
+        echo "8) Configure or update origin remote"
+        echo "9) Push current branch"
+        echo "10) Pull latest"
+        echo "11) Fetch"
+        echo "12) Sync with origin (fetch + pull --rebase)"
+        echo
+        echo "Setup"
+        echo "-----"
+        echo "13) Configure default branch as main"
+        echo "14) Rename current branch to main"
+        echo "15) Create starter repository structure"
+        echo "16) Create tag"
+        echo
+        echo "Workflow"
+        echo "--------"
+        echo "17) Full guided workflow"
+        echo "0) Exit"
+        echo
+        read -r -p "Selection: " choice
+
+        case "$choice" in
+            1)
+                echo
+                git status
+                _cc_press_enter
+                ;;
+            2)
+                _cc_git_health_check
+                _cc_press_enter
+                ;;
+            3)
+                _cc_git_repository_stats
+                _cc_press_enter
+                ;;
+            4)
+                _cc_git_recent_commits
+                _cc_press_enter
+                ;;
+            5)
+                _cc_git_stage_menu
+                _cc_press_enter
+                ;;
+            6)
+                _cc_git_review_staged
+                _cc_press_enter
+                ;;
+            7)
+                _cc_git_commit_prompt
+                _cc_press_enter
+                ;;
+            8)
+                _cc_git_configure_remote "$repo_name"
+                _cc_press_enter
+                ;;
+            9)
+                _cc_git_push_current
+                _cc_press_enter
+                ;;
+            10)
+                _cc_git_pull_latest
+                _cc_press_enter
+                ;;
+            11)
+                _cc_git_fetch
+                _cc_press_enter
+                ;;
+            12)
+                _cc_git_sync
+                _cc_press_enter
+                ;;
+            13)
+                git config --global init.defaultBranch main
+                echo "Global init.defaultBranch set to: $(git config --global --get init.defaultBranch)"
+                _cc_press_enter
+                ;;
+            14)
+                _cc_git_rename_main
+                _cc_press_enter
+                ;;
+            15)
+                _cc_git_starter_structure "$repo_name"
+                _cc_press_enter
+                ;;
+            16)
+                _cc_git_create_tag
+                _cc_press_enter
+                ;;
+            17)
+                _cc_git_full_workflow "$repo_name"
+                _cc_press_enter
+                ;;
+            0|q|Q|exit)
+                return 0
+                ;;
+            *)
+                echo "Invalid selection."
+                _cc_press_enter
+                ;;
+        esac
+    done
+}
+
+_cc_press_enter() {
+    echo
+    read -r -p "Press Enter to continue..." _cc_unused
+}
+
+_cc_git_current_branch() {
+    local branch
+    branch="$(git branch --show-current 2>/dev/null)"
+    [ -z "$branch" ] && branch="(detached or unborn)"
+    printf '%s\n' "$branch"
+}
+
+_cc_git_commit_count() {
+    if git rev-parse --verify HEAD >/dev/null 2>&1; then
+        git rev-list --count HEAD 2>/dev/null
+    else
+        printf '0\n'
+    fi
+}
+
+_cc_git_tracking_branch() {
+    local tracking
+    tracking="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"
+    [ -z "$tracking" ] && tracking="None configured"
+    printf '%s\n' "$tracking"
+}
+
+_cc_git_recent_commits() {
+    if git rev-parse --verify HEAD >/dev/null 2>&1; then
+        git log --oneline -5
+    else
+        echo "No commits yet."
+    fi
+}
+
+_cc_git_repository_stats() {
+    local commit_count branch_count tag_count remote_count modified_count untracked_count staged_count
+    commit_count="$(_cc_git_commit_count)"
+    branch_count="$(git branch --list 2>/dev/null | wc -l | tr -d ' ')"
+    tag_count="$(git tag --list 2>/dev/null | wc -l | tr -d ' ')"
+    remote_count="$(git remote 2>/dev/null | wc -l | tr -d ' ')"
+    modified_count="$(git status --short 2>/dev/null | awk '$1 !~ /^\\?\\?/ {count++} END {print count+0}')"
+    untracked_count="$(git status --short 2>/dev/null | awk '$1 == "??" {count++} END {print count+0}')"
+    staged_count="$(git diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')"
+
+    echo "Repository Statistics"
+    echo "---------------------"
+    printf '%-16s %s\n' "Commits:" "$commit_count"
+    printf '%-16s %s\n' "Branches:" "$branch_count"
+    printf '%-16s %s\n' "Tags:" "$tag_count"
+    printf '%-16s %s\n' "Remotes:" "$remote_count"
+    printf '%-16s %s\n' "Staged files:" "$staged_count"
+    printf '%-16s %s\n' "Modified files:" "$modified_count"
+    printf '%-16s %s\n' "Untracked files:" "$untracked_count"
+}
+
+_cc_git_rename_main() {
+    local branch
+    branch="$(git branch --show-current 2>/dev/null)"
+    if [ "$branch" = "main" ]; then
+        echo "Current branch is already main."
+        return 0
+    fi
+    git branch -M main
+    echo "Current branch renamed to main."
+}
+
+_cc_git_profile_select() {
+    local choice
+    echo
+    echo "Repository Type"
+    echo "---------------"
+    echo "1) Shell Toolkit"
+    echo "2) Python Project"
+    echo "3) Documentation"
+    echo "4) Website"
+    echo "5) Generic"
+    echo
+    read -r -p "Selection [1-5, default 5]: " choice
+    case "$choice" in
+        1) printf '%s\n' "shell" ;;
+        2) printf '%s\n' "python" ;;
+        3) printf '%s\n' "docs" ;;
+        4) printf '%s\n' "website" ;;
+        *) printf '%s\n' "generic" ;;
+    esac
+}
+
+_cc_git_profile_label() {
+    case "$1" in
+        shell) echo "Shell Toolkit" ;;
+        python) echo "Python Project" ;;
+        docs) echo "Documentation" ;;
+        website) echo "Website" ;;
+        *) echo "Generic" ;;
+    esac
+}
+
+_cc_git_profile_required() {
+    case "$1" in
+        shell) echo "README.md .gitignore LICENSE scripts" ;;
+        python) echo "README.md .gitignore LICENSE src tests" ;;
+        docs) echo "README.md .gitignore LICENSE docs" ;;
+        website) echo "README.md .gitignore LICENSE public" ;;
+        *) echo "README.md .gitignore LICENSE" ;;
+    esac
+}
+
+_cc_git_profile_recommended() {
+    case "$1" in
+        shell) echo "CHANGELOG.md docs CONTRIBUTING.md SECURITY.md" ;;
+        python) echo "CHANGELOG.md docs requirements.txt CONTRIBUTING.md SECURITY.md" ;;
+        docs) echo "CHANGELOG.md CONTRIBUTING.md SECURITY.md" ;;
+        website) echo "CHANGELOG.md docs scripts CONTRIBUTING.md SECURITY.md" ;;
+        *) echo "CHANGELOG.md docs scripts CONTRIBUTING.md SECURITY.md" ;;
+    esac
+}
+
+_cc_git_create_item() {
+    local item="$1" repo_name="$2"
+    case "$item" in
+        README.md)
+            [ -f README.md ] || cat > README.md <<EOF_README
+# $repo_name
+
+Captain Cronos project repository.
+
+## Purpose
+
+Describe the purpose of this repository.
+
+## Structure
+
+Document the important files and directories here.
+EOF_README
+            ;;
+        .gitignore)
+            [ -f .gitignore ] || cat > .gitignore <<'EOF_GITIGNORE'
+# Editor backups
+*~
+.*.swp
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+EOF_GITIGNORE
+            ;;
+        LICENSE)
+            [ -f LICENSE ] || cat > LICENSE <<EOF_LICENSE
+Copyright (c) $(date +%Y) Joseph Dobransky
+
+License terms to be determined.
+EOF_LICENSE
+            ;;
+        CHANGELOG.md)
+            [ -f CHANGELOG.md ] || cat > CHANGELOG.md <<'EOF_CHANGELOG'
+# Changelog
+
+## Unreleased
+
+- Initial repository structure.
+EOF_CHANGELOG
+            ;;
+        CONTRIBUTING.md)
+            [ -f CONTRIBUTING.md ] || cat > CONTRIBUTING.md <<'EOF_CONTRIBUTING'
+# Contributing
+
+This repository is maintained as part of the Captain Cronos project.
+
+## Standard workflow
+
+1. Review the current repository status.
+2. Make focused changes.
+3. Test before committing.
+4. Use clear commit messages.
+EOF_CONTRIBUTING
+            ;;
+        SECURITY.md)
+            [ -f SECURITY.md ] || cat > SECURITY.md <<'EOF_SECURITY'
+# Security
+
+Do not commit secrets, passwords, private keys, tokens, or environment files.
+
+Report security concerns through the project maintainer.
+EOF_SECURITY
+            ;;
+        requirements.txt)
+            [ -f requirements.txt ] || : > requirements.txt
+            ;;
+        docs|scripts|src|tests|public)
+            mkdir -p "$item"
+            [ -f "$item/README.md" ] || cat > "$item/README.md" <<EOF_DIR
+# $item
+
+Repository $item content goes here.
+EOF_DIR
+            ;;
+    esac
+}
+
+_cc_git_create_profile_items() {
+    local profile="$1" repo_name="$2" scope="$3" item
+    case "$scope" in
+        required)
+            for item in $(_cc_git_profile_required "$profile"); do
+                _cc_git_create_item "$item" "$repo_name"
+            done
+            ;;
+        recommended)
+            for item in $(_cc_git_profile_recommended "$profile"); do
+                _cc_git_create_item "$item" "$repo_name"
+            done
+            ;;
+        all|*)
+            for item in $(_cc_git_profile_required "$profile") $(_cc_git_profile_recommended "$profile"); do
+                _cc_git_create_item "$item" "$repo_name"
+            done
+            ;;
+    esac
+}
+
+_cc_git_starter_structure() {
+    local repo_name="$1" profile
+    profile="$(_cc_git_profile_select)"
+    echo
+    echo "Creating starter structure for profile: $(_cc_git_profile_label "$profile")"
+    _cc_git_create_profile_items "$profile" "$repo_name" all
+    echo "Starter repository structure created or verified."
+}
+
+_cc_git_stage_menu() {
+    local choice files
+
+    echo
+    echo "Stage Options"
+    echo "-------------"
+    echo "1) Stage all changes (git add -A)"
+    echo "2) Stage specific file(s)"
+    echo "3) Unstage everything"
+    echo "0) Cancel"
+    echo
+    read -r -p "Selection: " choice
+
+    case "$choice" in
+        1)
+            git add -A
+            echo "All changes staged."
+            ;;
+        2)
+            read -r -p "File(s) to stage: " files
+            if [ -z "$files" ]; then
+                echo "No files entered."
+                return 1
+            fi
+            # shellcheck disable=SC2086
+            git add $files
+            ;;
+        3)
+            git reset
+            echo "Staging area cleared."
+            ;;
+        0|q|Q)
+            echo "Cancelled."
+            ;;
+        *)
+            echo "Invalid selection."
+            return 1
+            ;;
+    esac
+
+    echo
+    git status --short
+}
+
+_cc_git_review_staged() {
+    local choice
+    if git diff --cached --quiet; then
+        echo "No staged changes to review."
+        return 0
+    fi
+
+    echo "Staged change summary:"
+    git diff --cached --stat
+    echo
+    read -r -p "Show full staged diff? [y/N] " choice
+    case "$choice" in
+        [Yy]*) git diff --cached ;;
+    esac
+}
+
+_cc_git_commit_prompt() {
+    local msg choice
+
+    if git diff --cached --quiet; then
+        echo "No staged changes to commit."
+        return 1
+    fi
+
+    _cc_git_review_staged
+    echo
+    read -r -p "Commit message: " msg
+    if [ -z "$msg" ]; then
+        echo "Commit cancelled: empty message."
+        return 1
+    fi
+
+    echo
+    read -r -p "Commit staged changes? [Y/n] " choice
+    case "$choice" in
+        [Nn]*) echo "Commit cancelled."; return 1 ;;
+    esac
+
+    git commit -m "$msg"
+}
+
+_cc_git_configure_remote() {
+    local repo_name="$1" remote_input current choice
+
+    current="$(git remote get-url origin 2>/dev/null)"
+    if [ -n "$current" ]; then
+        echo "Origin remote already configured:"
+        echo
+        echo "$current"
+        echo
+        echo "1) Keep existing"
+        echo "2) Change origin remote"
+        echo "0) Cancel"
+        echo
+        read -r -p "Selection: " choice
+        case "$choice" in
+            1|""|0|q|Q) echo "Keeping existing origin."; return 0 ;;
+            2) ;;
+            *) echo "Cancelled."; return 1 ;;
+        esac
+    fi
+
+    echo "Enter origin URL."
+    echo "Example: git@github.com:CaptainCronos/$repo_name.git"
+    read -r -p "Origin URL: " remote_input
+    if [ -z "$remote_input" ]; then
+        echo "No remote entered."
+        return 1
+    fi
+
+    if [ -n "$current" ]; then
+        git remote set-url origin "$remote_input"
+    else
+        git remote add origin "$remote_input"
+    fi
+    echo "Origin configured: $(git remote get-url origin)"
+}
+
+_cc_git_push_current() {
+    local branch choice
+
+    branch="$(git branch --show-current 2>/dev/null)"
+    if [ -z "$branch" ]; then
+        echo "Cannot determine current branch."
+        return 1
+    fi
+
+    if ! git remote get-url origin >/dev/null 2>&1; then
+        echo "No origin remote configured."
+        return 1
+    fi
+
+    echo "Push branch '$branch' to origin?"
+    read -r -p "Proceed? [Y/n] " choice
+    case "$choice" in
+        [Nn]*) echo "Push cancelled."; return 1 ;;
+    esac
+
+    git push -u origin "$branch"
+}
+
+_cc_git_pull_latest() {
+    if ! git remote get-url origin >/dev/null 2>&1; then
+        echo "No origin remote configured."
+        return 1
+    fi
+    git pull
+}
+
+_cc_git_fetch() {
+    if ! git remote get-url origin >/dev/null 2>&1; then
+        echo "No origin remote configured."
+        return 1
+    fi
+    git fetch --all --prune
+}
+
+_cc_git_sync() {
+    local choice
+    if ! git remote get-url origin >/dev/null 2>&1; then
+        echo "No origin remote configured."
+        return 1
+    fi
+    if [ -n "$(git status --short)" ]; then
+        echo "Working tree is not clean. Commit or stash changes before syncing."
+        return 1
+    fi
+    read -r -p "Fetch and pull --rebase from upstream? [Y/n] " choice
+    case "$choice" in
+        [Nn]*) echo "Sync cancelled."; return 1 ;;
+    esac
+    git fetch --all --prune || return 1
+    git pull --rebase
+}
+
+_cc_git_create_tag() {
+    local tag msg choice
+    if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+        echo "No commits yet. Cannot tag."
+        return 1
+    fi
+    read -r -p "Tag name (example: v1.0.0): " tag
+    if [ -z "$tag" ]; then
+        echo "No tag entered."
+        return 1
+    fi
+    read -r -p "Tag message: " msg
+    [ -z "$msg" ] && msg="$tag"
+    read -r -p "Create annotated tag '$tag'? [Y/n] " choice
+    case "$choice" in
+        [Nn]*) echo "Tag cancelled."; return 1 ;;
+    esac
+    git tag -a "$tag" -m "$msg" || return 1
+    read -r -p "Push tag to origin? [y/N] " choice
+    case "$choice" in
+        [Yy]*) git push origin "$tag" ;;
+        *) echo "Tag created locally." ;;
+    esac
+}
+
+_cc_git_health_check() {
+    local branch commit_count remote tracking status_short profile repo_name missing_req=0 missing_rec=0 item choice
+    branch="$(_cc_git_current_branch)"
+    commit_count="$(_cc_git_commit_count)"
+    remote="$(git remote get-url origin 2>/dev/null)"
+    tracking="$(_cc_git_tracking_branch)"
+    status_short="$(git status --short)"
+    repo_name="$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")"
+    profile="$(_cc_git_profile_select)"
+
+    echo
+    echo "Repository Health"
+    echo "================="
+    echo
+    printf '%-18s %s\n' "Repository:" "$repo_name"
+    printf '%-18s %s\n' "Profile:" "$(_cc_git_profile_label "$profile")"
+    printf '%-18s %s\n' "Branch:" "$branch"
+    printf '%-18s %s\n' "Commits:" "$commit_count"
+    printf '%-18s %s\n' "Remote:" "${remote:-None configured}"
+    printf '%-18s %s\n' "Tracking:" "$tracking"
+    if [ -z "$status_short" ]; then
+        printf '%-18s %s\n' "Working tree:" "Clean"
+    else
+        printf '%-18s %s\n' "Working tree:" "Changes present"
+    fi
+    echo
+    _cc_git_repository_stats
+    echo
+    echo "Required"
+    echo "--------"
+    for item in $(_cc_git_profile_required "$profile"); do
+        if [ -e "$item" ]; then
+            echo "OK      $item"
+        else
+            echo "MISSING $item"
+            missing_req=$((missing_req + 1))
+        fi
+    done
+    echo
+    echo "Recommended"
+    echo "-----------"
+    for item in $(_cc_git_profile_recommended "$profile"); do
+        if [ -e "$item" ]; then
+            echo "OK      $item"
+        else
+            echo "MISSING $item"
+            missing_rec=$((missing_rec + 1))
+        fi
+    done
+    echo
+    if [ "$missing_req" -eq 0 ] && [ "$missing_rec" -eq 0 ]; then
+        echo "Health check complete: all baseline items present."
+        return 0
+    fi
+
+    echo "Health check complete: $missing_req required and $missing_rec recommended item(s) missing."
+    echo
+    echo "Fix Options"
+    echo "-----------"
+    echo "1) Create missing required items"
+    echo "2) Create missing recommended items"
+    echo "3) Create all missing items"
+    echo "0) Return"
+    echo
+    read -r -p "Selection: " choice
+    case "$choice" in
+        1)
+            _cc_git_create_profile_items "$profile" "$repo_name" required
+            echo "Required items created or verified."
+            ;;
+        2)
+            _cc_git_create_profile_items "$profile" "$repo_name" recommended
+            echo "Recommended items created or verified."
+            ;;
+        3)
+            _cc_git_create_profile_items "$profile" "$repo_name" all
+            echo "All baseline items created or verified."
+            ;;
+        *)
+            echo "No changes made."
+            ;;
+    esac
+}
+
+_cc_git_full_workflow() {
+    local repo_name="$1" choice branch
+
+    git config --global init.defaultBranch main >/dev/null 2>&1
+
+    branch="$(git branch --show-current 2>/dev/null)"
+    if [ "$branch" = "master" ]; then
+        read -r -p "Current branch is master. Rename to main? [Y/n] " choice
+        case "$choice" in
+            [Nn]*) ;;
+            *) git branch -M main ;;
+        esac
+    fi
+
+    if [ ! -f README.md ]; then
+        read -r -p "README.md missing. Create starter repository structure? [Y/n] " choice
+        case "$choice" in
+            [Nn]*) ;;
+            *) _cc_git_starter_structure "$repo_name" ;;
+        esac
+    fi
+
+    echo
+    git status
+    echo
+    read -r -p "Stage files now? [Y/n] " choice
+    case "$choice" in
+        [Nn]*) ;;
+        *) _cc_git_stage_menu ;;
+    esac
+
+    _cc_git_commit_prompt || return 1
+
+    if ! git remote get-url origin >/dev/null 2>&1; then
+        read -r -p "No origin remote. Configure it now? [y/N] " choice
+        case "$choice" in
+            [Yy]*) _cc_git_configure_remote "$repo_name" ;;
+        esac
+    else
+        echo "Origin already configured: $(git remote get-url origin)"
+    fi
+
+    if git remote get-url origin >/dev/null 2>&1; then
+        read -r -p "Push now? [Y/n] " choice
+        case "$choice" in
+            [Nn]*) ;;
+            *) _cc_git_push_current ;;
+        esac
+    fi
+}
+
+# =============================
+# CAPTAIN CRONOS TOOLKIT HELP
+# =============================
+
+_cc_meta_file() {
+    printf '%s\n' "${CAPTAIN_CRONOS_FUNCTIONS:-$HOME/.bash_functions}"
+}
+
+_cc_alias_file() {
+    printf '%s\n' "${CAPTAIN_CRONOS_ALIASES:-$HOME/.bash_aliases}"
+}
+
+_cc_function_names() {
+    awk '
+        /^# @name[[:space:]]+/ {
+            sub(/^# @name[[:space:]]+/, "")
+            print
+        }
+    ' "$(_cc_meta_file)" 2>/dev/null | sort -u
+}
+
+_cc_alias_names() {
+    awk '
+        /^alias[[:space:]]+[A-Za-z0-9_.-]+=/ {
+            sub(/^alias[[:space:]]+/, "")
+            sub(/=.*/, "")
+            print
+        }
+    ' "$(_cc_alias_file)" 2>/dev/null | sort -u
+}
+
+_cc_function_table() {
+    awk '
+        function flush() {
+            if (name != "") {
+                printf "%s\t%s\t%s\n", group, name, desc
+            }
+            name=""; group="Other"; desc=""
+        }
+        BEGIN { group="Other" }
+        /^# @name[[:space:]]+/  { flush(); name=$0; sub(/^# @name[[:space:]]+/, "", name); next }
+        /^# @group[[:space:]]+/ { group=$0; sub(/^# @group[[:space:]]+/, "", group); next }
+        /^# @desc[[:space:]]+/  { desc=$0; sub(/^# @desc[[:space:]]+/, "", desc); next }
+        END { flush() }
+    ' "$(_cc_meta_file)" 2>/dev/null | sort -t $'\t' -k1,1 -k2,2
+}
+
+_cc_alias_table() {
+    awk '
+        /^# @alias[[:space:]]+/ {
+            line=$0
+            sub(/^# @alias[[:space:]]+/, "", line)
+            name=line
+            desc=line
+            sub(/[[:space:]].*/, "", name)
+            sub(/^[^[:space:]]+[[:space:]]+/, "", desc)
+            printf "%s\t%s\n", name, desc
+        }
+    ' "$(_cc_alias_file)" 2>/dev/null | sort
+}
+
+_cc_command_help() {
+    local cmd="$1"
+    awk -v cmd="$cmd" '
+        function print_block() {
+            if (name == cmd) {
+                print name
+                print "----------------------------------------"
+                if (group != "") print "Group: " group
+                if (desc != "")  print "Description: " desc
+                if (usage != "") print "Usage: " usage
+                if (examples != "") {
+                    print "Examples:"
+                    n=split(examples, a, "\034")
+                    for (i=1; i<=n; i++) if (a[i] != "") print "  " a[i]
+                }
+                found=1
+            }
+        }
+        /^# @name[[:space:]]+/ {
+            print_block()
+            name=$0; sub(/^# @name[[:space:]]+/, "", name)
+            group=""; desc=""; usage=""; examples=""
+            next
+        }
+        /^# @group[[:space:]]+/   { group=$0; sub(/^# @group[[:space:]]+/, "", group); next }
+        /^# @desc[[:space:]]+/    { desc=$0; sub(/^# @desc[[:space:]]+/, "", desc); next }
+        /^# @usage[[:space:]]+/   { usage=$0; sub(/^# @usage[[:space:]]+/, "", usage); next }
+        /^# @example[[:space:]]+/ {
+            ex=$0; sub(/^# @example[[:space:]]+/, "", ex)
+            examples = examples ex "\034"
+            next
+        }
+        END { print_block(); if (!found) exit 1 }
+    ' "$(_cc_meta_file)" 2>/dev/null
+}
+
+_cc_alias_help() {
+    local cmd="$1"
+    awk -v cmd="$cmd" '
+        /^# @alias[[:space:]]+/ {
+            line=$0
+            sub(/^# @alias[[:space:]]+/, "", line)
+            name=line
+            desc=line
+            sub(/[[:space:]].*/, "", name)
+            sub(/^[^[:space:]]+[[:space:]]+/, "", desc)
+            if (name == cmd) {
+                print name
+                print "----------------------------------------"
+                print "Type: Alias"
+                print "Description: " desc
+                found=1
+            }
+        }
+        /^alias[[:space:]]+/ {
+            line=$0
+            sub(/^alias[[:space:]]+/, "", line)
+            name=line
+            sub(/=.*/, "", name)
+            if (name == cmd) print "Definition: alias " line
+        }
+        END { if (!found) exit 1 }
+    ' "$(_cc_alias_file)" 2>/dev/null
+}
+
+# @name aliases
+# @group Shell
+# @desc Show Bash aliases and Captain Cronos documented functions.
+# @usage aliases
+# @example aliases
+aliases() {
+    echo "===== ALIASES ====="
+    alias
+
+    echo
+    echo "===== CAPTAIN CRONOS FUNCTIONS ====="
+    _cc_function_table | awk -F '\t' '{ printf "%-16s %-12s %s\n", $2, $1, $3 }'
+}
+
+# @name functions
+# @group Shell
+# @desc Show only documented Captain Cronos functions from ~/.bash_functions.
+# @usage functions
+# @example functions
+functions() {
+    _cc_function_table | awk -F '\t' '
+        BEGIN {
+            printf "%-16s %-12s %s\n", "Function", "Group", "Description"
+            printf "%-16s %-12s %s\n", "--------", "-----", "-----------"
+        }
+        { printf "%-16s %-12s %s\n", $2, $1, $3 }
+    '
+}
+
+# @name funcs
+# @group Shell
+# @desc Short alias-function for functions.
+# @usage funcs
+# @example funcs
+funcs() {
+    functions "$@"
+}
+
+# @name showfunc
+# @group Shell
+# @desc Show the full definition of one documented Captain Cronos function.
+# @usage showfunc <function_name>
+# @example showfunc gitflow
+showfunc() {
+    if [ -z "$1" ]; then
+        echo "Usage: showfunc <function_name>"
+        return 1
+    fi
+
+    if ! _cc_function_names | grep -qx "$1"; then
+        echo "Not a documented Captain Cronos function: $1"
+        echo "Try: functions"
+        return 1
+    fi
+
+    declare -f "$1"
+}
+
+# @name helpme
+# @group Shell
+# @desc Show Captain Cronos Toolkit help, command details, search results, or stats.
+# @usage helpme [command|search <term>|stats|aliases|functions|github]
+# @example helpme
+# @example helpme lstree
+# @example helpme search backup
+# @example helpme stats
+# @example helpme github
+helpme() {
+    local cmd term
+
+    case "${1:-}" in
+        ""|list)
+            echo "Captain Cronos Command Toolkit"
+            echo "=============================="
+            echo
+            echo "ALIASES"
+            echo "-------"
+            _cc_alias_table | awk -F '\t' '{ printf "%-16s %s\n", $1, $2 }'
+            echo
+            echo "FUNCTIONS"
+            echo "---------"
+            _cc_function_table | awk -F '\t' '{ printf "%-16s %-12s %s\n", $2, $1, $3 }'
+            echo
+            echo "Usage:"
+            echo "  helpme"
+            echo "  helpme <command>"
+            echo "  helpme search <term>"
+            echo "  helpme stats"
+            echo "  helpme github"
+            ;;
+        github|git|workflow|gitflow)
+            _cc_gitflow_help
+            ;;
+        aliases)
+            _cc_alias_table | awk -F '\t' '{ printf "%-16s %s\n", $1, $2 }'
+            ;;
+        functions)
+            _cc_function_table | awk -F '\t' '{ printf "%-16s %-12s %s\n", $2, $1, $3 }'
+            ;;
+        search)
+            shift
+            term="$*"
+            if [ -z "$term" ]; then
+                echo "Usage: helpme search <term>"
+                return 1
+            fi
+            echo "Search results for: $term"
+            echo "------------------------"
+            { _cc_alias_table | awk -F '\t' '{ print "alias\t" $1 "\t" $2 }'; _cc_function_table | awk -F '\t' '{ print "function\t" $2 "\t" $3 }'; } |
+                awk -F '\t' -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q { printf "%-9s %-16s %s\n", $1, $2, $3 }'
+            ;;
+        stats)
+            echo "Captain Cronos Toolkit Stats"
+            echo "============================"
+            printf "Aliases   : %s\n" "$(_cc_alias_names | wc -l)"
+            printf "Functions : %s\n" "$(_cc_function_names | wc -l)"
+            printf "Function file : %s\n" "$(_cc_meta_file)"
+            printf "Alias file    : %s\n" "$(_cc_alias_file)"
+            ;;
+        *)
+            cmd="$1"
+            if _cc_command_help "$cmd"; then
+                return 0
+            fi
+            if _cc_alias_help "$cmd"; then
+                return 0
+            fi
+            echo "No help entry for: $cmd"
+            echo "Try: helpme search $cmd"
+            return 1
+            ;;
+    esac
+}

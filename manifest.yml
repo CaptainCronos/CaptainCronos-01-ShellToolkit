@@ -1,0 +1,19 @@
+project:
+  name: Captain Cronos Shell Toolkit
+  repository: CaptainCronos-01-ShellToolkit
+  status: alpha
+
+version:
+  source: VERSION
+
+paths:
+  bashrc: bash/bashrc
+  aliases: bash/bash_aliases
+  functions: bash/bash_functions
+  baseline: baseline/ubuntu-26.04
+  defaults: defaults/v1
+  backups: ~/.captaincronos/backups
+
+standards:
+  script_header: CC-STD-001
+  repository_layout: CC-STD-002

@@ -1,0 +1,125 @@
+# ~/.bash_aliases
+# Captain Cronos shell aliases
+# Source this file from ~/.bashrc before ~/.bash_functions.
+
+# =============================
+# CAPTAIN CRONOS TOOLKIT
+# =============================
+
+# @alias cc Show Captain Cronos Toolkit help.
+alias cc='helpme'
+
+# @alias h Show Captain Cronos Toolkit help.
+alias h='helpme'
+
+
+
+
+# =============================
+# PYTHON
+# =============================
+
+# @alias activate_python Activate the personal Python virtual environment at ~/myenv.
+alias activate_python='source ~/myenv/bin/activate'
+
+# =============================
+# FILE LISTING
+# =============================
+
+# @alias l Short ls listing.
+alias l='ls -CF'
+
+# @alias la Long ls listing with hidden files.
+alias la='ls -A'
+
+# @alias ll Long ls listing.
+alias ll='ls -alF'
+
+# @alias ls Colorized ls output.
+alias ls='ls --color=auto'
+
+# @alias lsl Long ls listing with hidden files and human-readable sizes.
+alias lsl='ls -lah'
+
+# @alias lss Long ls listing with human-readable sizes.
+alias lss='ls -lh'
+
+# @alias filecount Count visible files in the current directory.
+alias filecount='ls -1 | wc -l'
+
+# =============================
+# STORAGE
+# =============================
+
+# @alias drives Show installed storage devices using findharddrives.
+alias drives='findharddrives'
+
+# @alias showdrives Show installed storage devices using findharddrives.
+alias showdrives='findharddrives'
+
+# @alias drives-short Short drive list with name, label, size, and mountpoints.
+alias drives-short='lsblk -e 7 -o NAME,LABEL,SIZE,MOUNTPOINTS'
+
+# =============================
+# EDITORS
+# =============================
+
+# @alias edit Open nano with line wrapping disabled.
+alias edit='/bin/nano -w'
+
+# @alias edit-in-kitty Open a new Kitty window running nano.
+alias edit-in-kitty='kitty edit-in-kitty'
+
+# =============================
+# GREP COLORS
+# =============================
+
+# @alias grep Colorized grep output.
+alias grep='grep --color=auto'
+
+# @alias egrep Colorized egrep output.
+alias egrep='egrep --color=auto'
+
+# @alias fgrep Colorized fgrep output.
+alias fgrep='fgrep --color=auto'
+
+# =============================
+# ARCHIVES
+# =============================
+
+# @alias gunzip Use unpigz when available.
+if command -v unpigz >/dev/null 2>&1; then
+    alias gunzip='unpigz'
+fi
+
+# @alias gzip Use pigz when available.
+if command -v pigz >/dev/null 2>&1; then
+    alias gzip='pigz'
+fi
+
+# @alias cp Use gcp when available.
+if command -v gcp >/dev/null 2>&1; then
+    alias cp='gcp'
+fi
+
+# =============================
+# SAFER REMOVE
+# =============================
+
+# @alias rm Move files to trash instead of permanent removal when trash-put is available.
+if command -v trash-put >/dev/null 2>&1; then
+    alias rm='trash-put'
+fi
+
+# @alias rrm Use real /bin/rm when permanent removal is intended.
+alias rrm='/bin/rm'
+
+# =============================
+# SYSTEM
+# =============================
+
+# @alias rr Check whether Ubuntu says a reboot is required.
+alias rr='if [ -f /var/run/reboot-required ]; then echo "reboot required"; else echo "No reboot needed"; fi'
+
+# @alias alert Desktop notification for the last terminal command.
+alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
