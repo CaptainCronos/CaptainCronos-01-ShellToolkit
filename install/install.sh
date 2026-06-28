@@ -6,7 +6,7 @@
 # Script      : install.sh
 # Version     : reads VERSION
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Install Captain Cronos shell files with verification and backup.
+# Purpose     : Install Captain Cronos shell files and command front-end.
 # ==============================================================================
 
 set -euo pipefail
@@ -16,13 +16,15 @@ cd "$PROJECT_ROOT"
 
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
-INSTALL_VERSION="2.0.0-alpha1"
+INSTALL_VERSION="2.1.0-alpha1"
 BACKUP_ROOT="$HOME/.captaincronos/backups"
 BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)"
+USER_BIN="$HOME/bin"
 DRY_RUN="no"
 SKIP_BACKUP="no"
 SKIP_BASELINE="no"
 INSTALL_BASHRC="yes"
+INSTALL_COMMANDS="yes"
 
 show_help() {
     cat <<'EOF_HELP'
@@ -37,6 +39,7 @@ Options:
   --no-backup        Do not create timestamped backups before installing.
   --no-baseline      Do not create baseline files if baseline appears empty.
   --no-bashrc        Install aliases/functions only; do not replace ~/.bashrc.
+  --no-commands      Do not install command front-end into ~/bin.
   --help, -h         Show this help.
   --version          Show installer and toolkit version.
 
@@ -47,8 +50,9 @@ What it does:
   4. Optionally captures baseline OS shell files.
   5. Backs up current ~/.bashrc, ~/.bash_aliases, and ~/.bash_functions.
   6. Installs bash/bashrc, bash/bash_aliases, and bash/bash_functions.
-  7. Verifies installed files.
-  8. Prints a final install report.
+  7. Installs the cc command front-end into ~/bin.
+  8. Verifies installed files.
+  9. Prints a final install report.
 EOF_HELP
 }
 
@@ -68,6 +72,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --no-bashrc)
             INSTALL_BASHRC="no"
+            shift
+            ;;
+        --no-commands)
+            INSTALL_COMMANDS="no"
             shift
             ;;
         --help|-h)
@@ -90,15 +98,16 @@ done
 install_copy() {
     local src="$1"
     local dest="$2"
+    local mode="${3:-0644}"
 
     cc_require_file "$src"
 
     if [ "$DRY_RUN" = "yes" ]; then
-        cc_log "DRY RUN: would install $src -> $dest"
+        cc_log "DRY RUN: would install $src -> $dest mode $mode"
         return 0
     fi
 
-    install -m 0644 "$src" "$dest"
+    install -m "$mode" "$src" "$dest"
     cc_log "Installed: $src -> $dest"
 }
 
@@ -116,14 +125,29 @@ backup_file() {
     fi
 }
 
+ensure_user_bin() {
+    if [ "$INSTALL_COMMANDS" != "yes" ]; then
+        return 0
+    fi
+
+    if [ "$DRY_RUN" = "yes" ]; then
+        cc_log "DRY RUN: would ensure command directory exists: $USER_BIN"
+        return 0
+    fi
+
+    mkdir -p "$USER_BIN"
+}
+
 verify_bash_sources() {
     cc_require_file bash/bash_aliases
     cc_require_file bash/bash_functions
     cc_require_file bash/bashrc
+    cc_require_file tools/cc
 
     bash -n bash/bash_aliases
     bash -n bash/bash_functions
     bash -n bash/bashrc
+    bash -n tools/cc
 }
 
 verify_installed_files() {
@@ -136,6 +160,11 @@ verify_installed_files() {
     if [ "$INSTALL_BASHRC" = "yes" ]; then
         [ -f "$HOME/.bashrc" ] || { cc_error "Missing installed file: ~/.bashrc"; return 1; }
         bash -n "$HOME/.bashrc"
+    fi
+
+    if [ "$INSTALL_COMMANDS" = "yes" ]; then
+        [ -x "$HOME/bin/cc" ] || { cc_error "Missing installed command: ~/bin/cc"; return 1; }
+        "$HOME/bin/cc" version >/dev/null
     fi
 }
 
@@ -156,6 +185,18 @@ capture_baseline_if_needed() {
     fi
 }
 
+print_path_note() {
+    case ":$PATH:" in
+        *":$HOME/bin:"*) return 0 ;;
+        *)
+            echo
+            echo "PATH note:"
+            echo "  ~/bin is not currently in PATH. Add this to ~/.bashrc if needed:"
+            echo '  export PATH="$HOME/bin:$PATH"'
+            ;;
+    esac
+}
+
 print_report() {
     echo
     echo "Install Report"
@@ -167,12 +208,15 @@ print_report() {
     printf '%-18s %s\n' "Backup dir:" "$([ "$SKIP_BACKUP" = "yes" ] && echo "skipped" || echo "$BACKUP_DIR")"
     printf '%-18s %s\n' "Dry run:" "$DRY_RUN"
     printf '%-18s %s\n' "Install bashrc:" "$INSTALL_BASHRC"
+    printf '%-18s %s\n' "Install commands:" "$INSTALL_COMMANDS"
     echo
     echo "Reload with:"
     echo "  source ~/.bashrc"
     echo
     echo "Verify with:"
-    echo "  helpme version"
+    echo "  cc version"
+    echo "  cc repo"
+    echo "  cc doctor"
     echo "  helpme engineering"
     echo "  lstree --depth 2 ."
 }
@@ -185,7 +229,7 @@ cc_log "Starting installer v$INSTALL_VERSION"
 cc_log "Verifying repository framework..."
 install/verify.sh
 
-cc_log "Verifying Bash source files..."
+cc_log "Verifying Bash source files and command front-end..."
 verify_bash_sources
 
 capture_baseline_if_needed
@@ -194,21 +238,31 @@ cc_log "Preparing backups..."
 backup_file "$HOME/.bashrc"
 backup_file "$HOME/.bash_aliases"
 backup_file "$HOME/.bash_functions"
+backup_file "$HOME/bin/cc"
 
 cc_log "Installing shell files..."
-install_copy bash/bash_aliases "$HOME/.bash_aliases"
-install_copy bash/bash_functions "$HOME/.bash_functions"
+install_copy bash/bash_aliases "$HOME/.bash_aliases" 0644
+install_copy bash/bash_functions "$HOME/.bash_functions" 0644
 
 if [ "$INSTALL_BASHRC" = "yes" ]; then
-    install_copy bash/bashrc "$HOME/.bashrc"
+    install_copy bash/bashrc "$HOME/.bashrc" 0644
 else
     cc_log "Skipping ~/.bashrc install by request."
 fi
 
+if [ "$INSTALL_COMMANDS" = "yes" ]; then
+    cc_log "Installing command front-end..."
+    ensure_user_bin
+    install_copy tools/cc "$HOME/bin/cc" 0755
+else
+    cc_log "Skipping command front-end install by request."
+fi
+
 if [ "$DRY_RUN" != "yes" ]; then
-    cc_log "Verifying installed shell files..."
+    cc_log "Verifying installed shell files and command front-end..."
     verify_installed_files
 fi
 
 cc_log "Install complete."
 print_report
+print_path_note
