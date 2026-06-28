@@ -11,7 +11,23 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+DEFAULT_REPO="$HOME/GitHub/CaptainCronos-01-ShellToolkit"
+PROJECT_ROOT="${CAPTAIN_CRONOS_REPO:-}"
+
+if [ -z "$PROJECT_ROOT" ]; then
+    PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+fi
+
+if [ -z "$PROJECT_ROOT" ] || [ ! -d "$PROJECT_ROOT" ]; then
+    PROJECT_ROOT="$DEFAULT_REPO"
+fi
+
+if [ ! -d "$PROJECT_ROOT" ]; then
+    echo "[CC ERROR] Repository not found: $PROJECT_ROOT" >&2
+    echo "Set CAPTAIN_CRONOS_REPO or clone to: $DEFAULT_REPO" >&2
+    exit 1
+fi
+
 cd "$PROJECT_ROOT"
 
 source "$PROJECT_ROOT/lib/cc-common.sh"
@@ -32,10 +48,12 @@ Commands:
   version      Show toolkit version information.
   baseline     Capture operating-system baseline shell files.
   defaults     Promote active shell files into defaults/v1.
+  repo         Show repository path used by cc.
   help         Show this help.
 
 Examples:
   cc version
+  cc repo
   cc verify
   cc doctor
   cc install --dry-run
@@ -44,8 +62,7 @@ Examples:
   cc defaults
 
 Notes:
-  This command dispatches to the existing toolkit scripts. It is the preferred
-  entry point once the toolkit is installed into PATH.
+  This command can be run from anywhere after install/install.sh places it in ~/bin.
 EOF_HELP
 }
 
@@ -55,6 +72,9 @@ shift || true
 case "$cmd" in
     help|--help|-h)
         show_help
+        ;;
+    repo)
+        echo "$PROJECT_ROOT"
         ;;
     version|--version)
         cc_version
