@@ -1,10 +1,11 @@
 # Captain Cronos Command Inventory
 
-Generated: Mon Jun 29 09:56:06 AM EDT 2026
+Generated: Mon Jun 29 06:57:59 PM EDT 2026
 
 | Command | Version | Purpose |
 |---|---|---|
 | cc baseline | reads VERSION | Capture operating-system baseline shell files. |
+| cc config | 1.0.0-alpha1 | View and update toolkit configuration. |
 | cc defaults | reads VERSION | Promote active shell files into deployable defaults. |
 | cc docs | 1.0.0-alpha1 | Generate toolkit documentation and command references. |
 | cc doctor | 2.0.0-alpha1 | Run repository, installation, and host health checks. |
@@ -15,6 +16,9 @@ Generated: Mon Jun 29 09:56:06 AM EDT 2026
 | cc kernel-cleanup | 1.0.0-alpha1 | Review and optionally purge obsolete kernel packages safely. |
 | cc monthly-health | 2.0.0-alpha1 | Generate a monthly host health and maintenance report. |
 | cc monthly-health-timer | reads VERSION | Retire or inspect the standalone monthly health user timer. |
+| cc plugin | 1.0.0-alpha1 | Inspect local toolkit plugin directories. |
+| cc registry | 1.0.1-alpha1 | Display command metadata registry information. |
+| cc release | 1.0.0-alpha1 | Plan and run the toolkit release workflow. |
 | cc repo | reads VERSION | Show repository path and Git remote information. |
 | cc repos | 1.2.1-alpha1 | Inventory and manage local Git repositories. |
 | cc smart | reads VERSION | Summarize SMART health for installed storage devices. |

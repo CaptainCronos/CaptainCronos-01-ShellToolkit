@@ -1,9 +1,22 @@
 # Recent Change Summary
 
-Generated: Mon Jun 29 09:56:06 AM EDT 2026
+Generated: Mon Jun 29 06:58:00 PM EDT 2026
 
 ~~~text
-09ffb8e (HEAD -> main, origin/main, origin/HEAD) Bump toolkit version to 1.2.0-alpha1
+3be878a (HEAD -> main, origin/main, origin/HEAD) Add plugin inspection command
+5d4ceca Add bitcoin plugin skeleton
+fb00691 Add maintenance plugin skeleton
+2c7ca55 Add repository plugin skeleton
+c96f6a8 Add plugin directory skeleton
+724ae6e Infer command categories from registry metadata
+a86b97e Add configuration command
+6420ecd Add configuration helper library
+302e906 Fix registry default argument handling
+5d45f07 Add release planning command
+300a8d0 Add command registry command
+2d56cd3 Add command metadata library
+40e7358 Generate documentation for 1.2.0-alpha1
+09ffb8e Bump toolkit version to 1.2.0-alpha1
 1cbc91a Add documentation automation command
 17546fa Ignore runtime logs and generated inventory files
 f25d0ba Fix repo dashboard awk and toolkit detection
@@ -30,17 +43,4 @@ e134f46 Add cc gitflow command module
 657f30f Bump toolkit to 1.1.0-alpha1
 ff49af3 Add cc defaults command module
 0ab083f Add cc verify command module
-10b2581 Add cc status command module
-2804e63 Add cc baseline command module
-d2f78f5 Add cc update command module
-c4bd302 Add cc install command module
-678f5cf Add cc repo command module
-63745c6 Add cc doctor command module
-9bb1978 Remove deprecated cc alias
-32c1c83 Add command framework overview
-c4d9153 Add repository template definition
-ecad4b9 Add verification checklist
-cc51cd1 Add release checklist
-b2f9ab4 Add command framework standard
-1d3807c Add release process standard
 ~~~

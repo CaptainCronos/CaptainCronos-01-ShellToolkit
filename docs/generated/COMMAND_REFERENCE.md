@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Mon Jun 29 09:56:06 AM EDT 2026
+Generated: Mon Jun 29 06:58:00 PM EDT 2026
 
 ## cc baseline
 
@@ -8,6 +8,19 @@ Generated: Mon Jun 29 09:56:06 AM EDT 2026
 Usage: cc baseline
 
 Captures operating-system baseline shell files.
+~~~
+
+## cc config
+
+~~~text
+Usage:
+  cc config show
+  cc config init
+  cc config get KEY [DEFAULT]
+  cc config set KEY VALUE
+
+Configuration file:
+  ~/.captaincronos/config
 ~~~
 
 ## cc defaults
@@ -131,6 +144,42 @@ Usage: cc monthly-health-timer status|retire|run-once|install-standalone|enable|
 
 Recommended architecture: run cc monthly-health from the existing daily-backup-report framework.
 The standalone user timer is retained only as an optional fallback.
+~~~
+
+## cc plugin
+
+~~~text
+Usage:
+  cc plugin [list|status|info NAME]
+
+Actions:
+  list        List plugin directories.
+  status      Show plugin directory status and file counts.
+  info NAME   Show detail for one plugin directory.
+
+This command only inspects plugin directories. It does not enable, disable, or execute plugins yet.
+~~~
+
+## cc registry
+
+~~~text
+Usage:
+  cc registry [table|tsv|markdown]
+
+Shows the command metadata registry generated from tools/commands headers.
+~~~
+
+## cc release
+
+~~~text
+Usage:
+  cc release [plan|check] [--apply]
+
+Actions:
+  plan   Show the release workflow checklist.
+  check  Run pre-release verification checks.
+
+This is the first release-engine stage. Version bumping, tagging, and push automation are intentionally not automatic yet.
 ~~~
 
 ## cc repo
