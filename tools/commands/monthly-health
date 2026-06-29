@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : monthly-health
-# Version     : reads VERSION
+# Version     : 2.0.0-alpha1
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Generate a monthly host health report.
+# Purpose     : Generate a monthly host health and maintenance report.
 # ==============================================================================
 
 set -euo pipefail
@@ -15,11 +15,28 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
+OUTPUT="file"
+JOURNAL_SINCE="${JOURNAL_SINCE:-24 hours ago}"
+TOP_N="${TOP_N:-5}"
+REPORT_DIR="$HOME/.captaincronos/reports/monthly-health"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+REPORT_FILE="$REPORT_DIR/monthly-health-$STAMP.log"
+LATEST_LINK="$REPORT_DIR/latest.log"
+
 usage() {
-    echo "Usage: cc monthly-health [--stdout]"
-    echo
-    echo "Generates a monthly host health report under ~/.captaincronos/reports/monthly-health."
-    echo "Use --stdout to print the report instead of writing a file."
+    cat <<'EOF_HELP'
+Usage:
+  cc monthly-health [--stdout] [--file]
+
+Generates a host health and maintenance report.
+
+Default output:
+  ~/.captaincronos/reports/monthly-health/monthly-health-YYYYMMDD-HHMMSS.log
+
+Environment:
+  JOURNAL_SINCE="7 days ago" cc monthly-health
+  TOP_N=10 cc monthly-health --stdout
+EOF_HELP
 }
 
 case "${1:-}" in
@@ -28,22 +45,35 @@ case "${1:-}" in
         exit 0
         ;;
     --version)
-        cc_version
+        echo "2.0.0-alpha1"
         exit 0
+        ;;
+    --stdout)
+        OUTPUT="stdout"
+        ;;
+    --file|"")
+        OUTPUT="file"
+        ;;
+    *)
+        usage
+        exit 1
         ;;
 esac
 
-REPORT_DIR="$HOME/.captaincronos/reports/monthly-health"
-STAMP="$(date +%Y%m%d-%H%M%S)"
-REPORT_FILE="$REPORT_DIR/monthly-health-$STAMP.log"
-
 section() {
     echo
-    echo "========================================"
+    echo "============================================================"
     echo "$1"
-    echo "========================================"
+    echo "============================================================"
     echo
 }
+
+subsection() {
+    echo
+    echo "-- $1 --"
+}
+
+have() { command -v "$1" >/dev/null 2>&1; }
 
 run_section() {
     local title="$1"
@@ -52,44 +82,213 @@ run_section() {
     "$@" 2>&1 || true
 }
 
-generate_report() {
-    section "Captain Cronos Monthly Health Report"
-    echo "Generated: $(date)"
-    echo "Host: $(hostname 2>/dev/null || echo unknown)"
-    echo "Kernel: $(uname -r 2>/dev/null || echo unknown)"
-    echo "Toolkit: $(bash "$PROJECT_ROOT/tools/cc" version 2>/dev/null | awk '/Toolkit/ {print $3; exit}' || echo unknown)"
-
-    run_section "Repository Status" bash "$PROJECT_ROOT/tools/cc" status
-    run_section "Toolkit Doctor" bash "$PROJECT_ROOT/tools/cc" doctor
-    run_section "Drive Inventory" bash "$PROJECT_ROOT/tools/cc" drives
-    run_section "SMART Summary" bash "$PROJECT_ROOT/tools/cc" smart
-
-    run_section "Uptime and Load" uptime
-    run_section "Memory" free -h
-    run_section "Mounted Filesystems" df -hT
-
-    if command -v systemctl >/dev/null 2>&1; then
-        section "Timers"
-        systemctl list-timers --all 2>/dev/null | grep -E 'timeshift|bitcoin|captain|monthly' || true
-    fi
-
-    if command -v ss >/dev/null 2>&1; then
-        section "Listening TCP Ports"
-        ss -tln 2>/dev/null || true
-    fi
-
-    if command -v journalctl >/dev/null 2>&1; then
-        section "Recent Errors"
-        journalctl --since "24 hours ago" --no-pager -n 500 2>/dev/null | grep -Ei 'fail|error|denied|timed out|segfault' | tail -n 30 || true
-    fi
-
-    section "Health Report Complete"
+run_cc() {
+    local cmd="$1"
+    shift
+    run_section "cc $cmd $*" bash "$PROJECT_ROOT/tools/cc" "$cmd" "$@"
 }
 
-if [ "${1:-}" = "--stdout" ]; then
+service_status() {
+    local unit="$1"
+    if systemctl is-active --quiet "$unit" 2>/dev/null; then
+        printf '%-24s %s\n' "$unit" "active"
+    elif systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$unit.service"; then
+        printf '%-24s %s\n' "$unit" "installed-not-active"
+    else
+        printf '%-24s %s\n' "$unit" "not-found"
+    fi
+}
+
+mount_check() {
+    local path="$1"
+    if [ -e "$path" ] && mountpoint -q "$path" 2>/dev/null; then
+        printf '%-24s %s\n' "$path" "mounted"
+    elif [ -e "$path" ]; then
+        printf '%-24s %s\n' "$path" "exists-not-mounted"
+    else
+        printf '%-24s %s\n' "$path" "missing"
+    fi
+}
+
+print_header() {
+    section "Captain Cronos Monthly Health Report"
+    printf '%-20s %s\n' "Generated:" "$(date)"
+    printf '%-20s %s\n' "Host:" "$(hostname 2>/dev/null || echo unknown)"
+    printf '%-20s %s\n' "Kernel:" "$(uname -r 2>/dev/null || echo unknown)"
+    printf '%-20s %s\n' "User:" "${USER:-unknown}"
+    printf '%-20s %s\n' "Toolkit root:" "$PROJECT_ROOT"
+    printf '%-20s %s\n' "Toolkit version:" "$(bash "$PROJECT_ROOT/tools/cc" version 2>/dev/null | awk '/Toolkit/ {print $3; exit}' || echo unknown)"
+    if [ -f /var/run/reboot-required ]; then
+        printf '%-20s %s\n' "Reboot required:" "yes"
+    else
+        printf '%-20s %s\n' "Reboot required:" "no"
+    fi
+}
+
+print_basics() {
+    section "System Basics"
+    subsection "Uptime and load"
+    uptime || true
+    subsection "Memory"
+    free -h || true
+    subsection "VM tuning"
+    for key in vm.swappiness vm.vfs_cache_pressure vm.dirty_background_ratio vm.dirty_ratio vm.compaction_proactiveness; do
+        sysctl "$key" 2>/dev/null || true
+    done
+    subsection "Top CPU"
+    ps -eo user,pid,pcpu,pmem,vsz,rss,stat,start,time,comm --sort=-pcpu | head -n $((TOP_N + 1)) || true
+    subsection "Top Memory"
+    ps -eo user,pid,pcpu,pmem,vsz,rss,stat,start,time,comm --sort=-pmem | head -n $((TOP_N + 1)) || true
+}
+
+print_storage() {
+    section "Storage"
+    subsection "Mount checks"
+    for path in / /home /my_files /home_1 /timeshift-usb; do
+        mount_check "$path"
+    done
+    subsection "Filesystems"
+    df -hT | awk 'NR==1 || /^\/dev\//' || true
+    subsection "Block devices"
+    lsblk -e 7 -o NAME,TYPE,SIZE,FSTYPE,LABEL,UUID,FSUSE%,MOUNTPOINTS 2>/dev/null || true
+    subsection "SMART"
+    bash "$PROJECT_ROOT/tools/cc" smart 2>&1 || true
+}
+
+print_updates() {
+    section "Maintenance Update Readiness"
+    subsection "Toolkit status"
+    bash "$PROJECT_ROOT/tools/cc" status 2>&1 || true
+    subsection "Doctor"
+    bash "$PROJECT_ROOT/tools/cc" doctor 2>&1 || true
+    subsection "Kernel cleanup dry-run"
+    bash "$PROJECT_ROOT/tools/cc" kernel-cleanup --dry-run 2>&1 || true
+    subsection "System update dry-run"
+    bash "$PROJECT_ROOT/tools/cc" system-update --dry-run 2>&1 || true
+}
+
+print_backups() {
+    section "Backup Systems"
+    subsection "Timers"
+    if have systemctl; then
+        systemctl list-timers --all 2>/dev/null | grep -E 'NEXT|timeshift|bitcoin|backup|captain|monthly' || true
+    fi
+    subsection "Timeshift"
+    if [ -x "$HOME/bin/timeshift-status.sh" ]; then
+        "$HOME/bin/timeshift-status.sh" 2>&1 | sed -n '1,120p' || true
+    else
+        echo "timeshift-status.sh not found or not executable"
+    fi
+    subsection "Bitcoin backups"
+    if [ -x "$HOME/bin/bitcoin-backup-status.sh" ]; then
+        "$HOME/bin/bitcoin-backup-status.sh" 2>&1 | sed -n '1,160p' || true
+    else
+        echo "bitcoin-backup-status.sh not found or not executable"
+    fi
+}
+
+print_services() {
+    section "Services"
+    for unit in apache2 mariadb mysql bitcoind electrs fail2ban ufw; do
+        service_status "$unit"
+    done
+    subsection "MariaDB socket/port"
+    [ -S /run/mysqld/mysqld.sock ] || [ -S /var/run/mysqld/mysqld.sock ] && echo "mysql socket present" || echo "mysql socket missing"
+    if have ss; then
+        ss -ltn | awk '{print $4}' | grep -qE '(:|^)3306$' && echo "port 3306 listening" || echo "port 3306 not detected"
+    fi
+}
+
+print_security_network() {
+    section "Security and Network"
+    subsection "UFW"
+    if have ufw; then
+        sudo ufw status verbose 2>/dev/null || ufw status verbose 2>/dev/null || true
+    else
+        echo "ufw not installed"
+    fi
+    subsection "Listening TCP ports"
+    if have ss; then
+        ss -tln 2>/dev/null || true
+    elif have netstat; then
+        netstat -tln 2>/dev/null || true
+    else
+        echo "ss/netstat not available"
+    fi
+    subsection "Fail2Ban"
+    if have fail2ban-client; then
+        sudo fail2ban-client status 2>/dev/null || fail2ban-client status 2>/dev/null || true
+    else
+        echo "fail2ban-client not available"
+    fi
+    subsection "Network connectivity"
+    ping -c 2 -W 2 8.8.8.8 >/dev/null 2>&1 && echo "internet reachable" || echo "internet check failed"
+}
+
+print_desktop_gpu() {
+    section "Desktop and GPU"
+    subsection "Display manager/session"
+    systemctl get-default 2>/dev/null || true
+    systemctl is-active lightdm 2>/dev/null || true
+    systemctl is-active gdm3 2>/dev/null || true
+    echo "XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-unavailable}"
+    echo "XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-unavailable}"
+    pgrep -x Xorg >/dev/null 2>&1 && echo "Xorg detected" || echo "Xorg not detected"
+    pgrep -f wayland >/dev/null 2>&1 && echo "Wayland-related process detected" || echo "Wayland not detected"
+    subsection "NVIDIA"
+    if have nvidia-smi; then
+        nvidia-smi || true
+    else
+        echo "nvidia-smi not found"
+    fi
+}
+
+print_logs() {
+    section "Recent Logs"
+    subsection "Important recent errors"
+    if have journalctl; then
+        journalctl --since "$JOURNAL_SINCE" --no-pager -n 800 2>/dev/null | \
+            grep -Ei 'fail(ed)?|error|segfault|denied|timed out|mariadb|apache2|bitcoind|electrs|timeshift|smart|kernel|nvidia' | \
+            grep -Evi 'sshd.*Failed password|invalid user|maximum authentication attempts|apparmor="ALLOWED"' | \
+            tail -n 50 || true
+    else
+        echo "journalctl not available"
+    fi
+    subsection "SSH/auth noise"
+    if have journalctl; then
+        journalctl --since "$JOURNAL_SINCE" --no-pager 2>/dev/null | \
+            grep -Ei 'sshd.*invalid user|Failed password|maximum authentication attempts' | tail -n 25 || true
+    fi
+}
+
+print_footer() {
+    section "Report Summary"
+    echo "Report generated successfully."
+    echo "Suggested follow-up commands:"
+    echo "  cc update --dry-run"
+    echo "  cc doctor --full"
+    echo "  cc monthly-health --stdout"
+}
+
+generate_report() {
+    print_header
+    print_basics
+    print_storage
+    print_updates
+    print_backups
+    print_services
+    print_security_network
+    print_desktop_gpu
+    print_logs
+    print_footer
+}
+
+if [ "$OUTPUT" = "stdout" ]; then
     generate_report
 else
     mkdir -p "$REPORT_DIR"
     generate_report > "$REPORT_FILE"
+    ln -sfn "$REPORT_FILE" "$LATEST_LINK"
     cc_log "Monthly health report written: $REPORT_FILE"
+    cc_log "Latest report link: $LATEST_LINK"
 fi
