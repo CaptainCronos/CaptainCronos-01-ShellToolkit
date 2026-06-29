@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : smart
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show SMART storage health guidance.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+case "${1:-}" in
+    --help|-h)
+        echo "Usage: cc smart"
+        echo
+        echo "Shows SMART storage health guidance. Detailed summary parser pending."
+        exit 0
+        ;;
+    --version)
+        cc_version
+        exit 0
+        ;;
+esac
+
+cc_banner
+echo
+if command -v smartctl >/dev/null 2>&1; then
+    cc_log "SMART tooling found."
+    cc_log "Detailed SMART summary parser pending."
+else
+    cc_warn "SMART tooling not found. Install smartmontools."
+fi
+
+echo
+echo "Manual checks:"
+echo "  sudo smartctl -H /dev/sdX"
+echo "  sudo smartctl -A /dev/sdX"
+echo "  sudo smartctl -l selftest /dev/sdX"
+echo
+echo "Use cc drives to identify devices."
