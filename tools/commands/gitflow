@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : gitflow
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Launch the interactive Git assistant.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/bash/bash_functions"
+
+case "${1:-}" in
+    --help|-h)
+        if declare -F _cc_gitflow_help >/dev/null 2>&1; then
+            _cc_gitflow_help
+        else
+            echo "Usage: cc gitflow [repo-directory]"
+            echo
+            echo "Launches the interactive Captain Cronos Git assistant."
+        fi
+        exit 0
+        ;;
+    --version)
+        cc_version
+        exit 0
+        ;;
+esac
+
+gitflow "${1:-$PWD}"
