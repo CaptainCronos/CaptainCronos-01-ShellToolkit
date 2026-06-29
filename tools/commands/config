@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : config
+# Version     : 1.0.0-alpha1
+# Category    : Core
+# Requires    : bash
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : View and update toolkit configuration.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-config.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc config show
+  cc config init
+  cc config get KEY [DEFAULT]
+  cc config set KEY VALUE
+
+Configuration file:
+  ~/.captaincronos/config
+EOF_HELP
+}
+
+ACTION="${1:-show}"
+case "$ACTION" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    init)
+        cc_config_init
+        cc_log "Configuration initialized: $(cc_config_file)"
+        ;;
+    show)
+        cc_config_show
+        ;;
+    get)
+        shift || true
+        key="${1:-}"
+        default="${2:-}"
+        [ -n "$key" ] || { usage; exit 1; }
+        cc_config_get "$key" "$default"
+        ;;
+    set)
+        shift || true
+        key="${1:-}"
+        value="${2:-}"
+        [ -n "$key" ] || { usage; exit 1; }
+        [ -n "$value" ] || { usage; exit 1; }
+        cc_config_set "$key" "$value"
+        cc_log "Set $key"
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
