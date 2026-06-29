@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : registry
+# Version     : 1.0.0-alpha1
+# Category    : Documentation
+# Requires    : bash
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Display command metadata registry information.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-metadata.sh"
+
+MODE="table"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc registry [table|tsv|markdown]
+
+Shows the command metadata registry generated from tools/commands headers.
+EOF_HELP
+}
+
+case "${1:-table}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    table|tsv|markdown)
+        MODE="$1"
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+
+case "$MODE" in
+    tsv)
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "command" "script" "version" "category" "requires" "repository" "purpose"
+        cc_registry_tsv
+        ;;
+    markdown)
+        cc_registry_markdown
+        ;;
+    table)
+        cc_banner
+        echo
+        printf '%-24s %-18s %-18s %s\n' "Command" "Version" "Category" "Purpose"
+        printf '%-24s %-18s %-18s %s\n' "-------" "-------" "--------" "-------"
+        cc_registry_tsv | while IFS=$'\t' read -r cmd script version category requires repository purpose; do
+            printf '%-24s %-18s %-18s %s\n' "cc $cmd" "$version" "$category" "$purpose"
+        done
+        ;;
+esac
