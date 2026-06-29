@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : helpme-refresh
+# Version     : 1.0.0-alpha1
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Patch installed helpme output for Phase 2 command architecture.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+usage() {
+    echo "Usage: cc helpme-refresh [--apply]"
+    echo
+    echo "Patches ~/.bash_functions so helpme lists the new cc command architecture."
+    echo "Default is dry-run."
+}
+
+case "${1:---dry-run}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    --dry-run)
+        APPLY=0
+        ;;
+    --apply)
+        APPLY=1
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+
+TARGET="$HOME/.bash_functions"
+SOURCE="$PROJECT_ROOT/bash/bash_functions"
+
+if [ ! -f "$TARGET" ]; then
+    cc_error "Missing installed functions file: $TARGET"
+    exit 1
+fi
+
+if [ "$APPLY" -eq 0 ]; then
+    cc_log "DRY RUN: would patch $TARGET"
+    cc_log "After apply, run: source ~/.bash_functions"
+    exit 0
+fi
+
+BACKUP="$TARGET.pre-helpme-phase2.$(date +%Y%m%d-%H%M%S).bak"
+cp -a "$TARGET" "$BACKUP"
+
+python3 - "$TARGET" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+engineering = r'''    _cc_help_engineering() {
+        echo "CC Command Framework"
+        echo "--------------------"
+        printf "%-28s %s\n" "cc help" "Show dispatcher help and discovered command modules."
+        printf "%-28s %s\n" "cc version" "Display toolkit version information."
+        printf "%-28s %s\n" "cc repo" "Show repository path, branch, and origin."
+        printf "%-28s %s\n" "cc status" "Show repository status summary."
+        printf "%-28s %s\n" "cc verify" "Verify repository structure and Bash syntax."
+        printf "%-28s %s\n" "cc doctor" "Run toolkit health checks."
+        printf "%-28s %s\n" "cc gitflow" "Interactive Git assistant."
+        echo
+        echo "Install / Baseline"
+        echo "------------------"
+        printf "%-28s %s\n" "cc install" "Install shell toolkit files."
+        printf "%-28s %s\n" "cc toolkit-update" "Pull latest toolkit changes and reinstall."
+        printf "%-28s %s\n" "cc update" "Run managed maintenance orchestrator."
+        printf "%-28s %s\n" "cc baseline" "Capture OS baseline shell files."
+        printf "%-28s %s\n" "cc defaults" "Promote active shell files to deployable defaults."
+        echo
+        echo "System Administration"
+        echo "---------------------"
+        printf "%-28s %s\n" "cc system-update" "Run OS/package/app update workflow."
+        printf "%-28s %s\n" "cc kernel-cleanup" "Review or purge obsolete kernels safely."
+        printf "%-28s %s\n" "cc drives" "Show storage inventory."
+        printf "%-28s %s\n" "cc smart" "Show SMART drive health summary."
+        printf "%-28s %s\n" "cc monthly-health" "Generate host health report."
+        printf "%-28s %s\n" "cc monthly-health-timer" "Retire or manage optional standalone monthly timer."
+    }'''
+
+install = r'''        install|installer|update|maintenance)
+            _cc_help_version
+            echo "Maintenance / Update Commands"
+            echo "-----------------------------"
+            printf "%-28s %s\n" "cc update" "Managed maintenance orchestrator; defaults to dry-run."
+            printf "%-28s %s\n" "cc update --apply" "Run full maintenance workflow."
+            printf "%-28s %s\n" "cc toolkit-update" "Old direct toolkit pull/reinstall behavior."
+            printf "%-28s %s\n" "cc system-update" "OS, package, app, and CLI Safe Boot update workflow."
+            printf "%-28s %s\n" "cc kernel-cleanup" "Dry-run obsolete kernel review."
+            printf "%-28s %s\n" "cc kernel-cleanup --apply" "Purge obsolete kernel candidates."
+            printf "%-28s %s\n" "cc monthly-health" "Generate monthly host health report."
+            printf "%-28s %s\n" "cc monthly-health-timer retire" "Remove optional standalone user timer."
+            echo
+            echo "Legacy direct scripts"
+            echo "---------------------"
+            printf "%-28s %s\n" "install/install.sh" "Install shell toolkit files."
+            printf "%-28s %s\n" "install/update.sh" "Pull latest changes and reinstall."
+            printf "%-28s %s\n" "install/verify.sh" "Verify structure and syntax."
+            printf "%-28s %s\n" "install/create-baseline.sh" "Capture OS baseline files."
+            printf "%-28s %s\n" "install/promote-defaults.sh" "Promote bash files to deployable defaults."
+            ;;'''
+
+text = re.sub(r'    _cc_help_engineering\(\) \{.*?\n    \}', engineering, text, count=1, flags=re.S)
+text = re.sub(r'        install\|installer\|update\).*?\n            ;;', install, text, count=1, flags=re.S)
+
+usage_extra = '''            echo "  helpme maintenance"
+            echo "  helpme install"'''
+text = text.replace('            echo "  helpme install"', usage_extra, 1)
+
+path.write_text(text)
+PY
+
+cc_log "Patched $TARGET"
+cc_log "Backup: $BACKUP"
+cc_log "Reload with: source ~/.bash_functions"
