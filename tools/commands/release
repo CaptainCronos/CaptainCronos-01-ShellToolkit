@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : release
+# Version     : 1.0.0-alpha1
+# Category    : Engineering
+# Requires    : bash git
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Plan and run the toolkit release workflow.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+ACTION="plan"
+APPLY=0
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc release [plan|check] [--apply]
+
+Actions:
+  plan   Show the release workflow checklist.
+  check  Run pre-release verification checks.
+
+This is the first release-engine stage. Version bumping, tagging, and push automation are intentionally not automatic yet.
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h) usage; exit 0 ;;
+        --version) echo "1.0.0-alpha1"; exit 0 ;;
+        --apply) APPLY=1; shift ;;
+        plan|check) ACTION="$1"; shift ;;
+        *) usage; exit 1 ;;
+    esac
+done
+
+release_plan() {
+    cc_banner
+    echo
+    echo "Release workflow"
+    echo "----------------"
+    echo "1. Ensure working tree is clean."
+    echo "2. Update VERSION."
+    echo "3. Run cc docs build --apply."
+    echo "4. Run cc verify."
+    echo "5. Run cc doctor."
+    echo "6. Run cc repos status."
+    echo "7. Commit version and generated documentation."
+    echo "8. Create Git tag."
+    echo "9. Push commit and tag."
+}
+
+release_check() {
+    cc_banner
+    echo
+    echo "Pre-release checks"
+    echo "------------------"
+    bash "$PROJECT_ROOT/tools/cc" version
+    echo
+    bash "$PROJECT_ROOT/tools/cc" verify
+    echo
+    bash "$PROJECT_ROOT/tools/cc" doctor
+    echo
+    bash "$PROJECT_ROOT/tools/cc" docs lint
+    echo
+    if [ -n "$(git status --short)" ]; then
+        cc_warn "Working tree is not clean."
+        git status --short
+        exit 1
+    fi
+    cc_log "Working tree clean."
+}
+
+case "$ACTION" in
+    plan) release_plan ;;
+    check) release_check ;;
+esac
