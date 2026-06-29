@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : drive-qualify
+# Version     : 0.1.0-placeholder
+# Category    : Storage
+# Requires    : bash smartctl
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Placeholder for drive qualification workflow.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc drive-qualify /dev/sdX
+
+Placeholder for the future drive qualification workflow.
+
+Planned workflow:
+  1. Capture drive identity.
+  2. Save pre-test SMART report.
+  3. Run SMART short test.
+  4. Run SMART long test.
+  5. Optional destructive burn-in workflow.
+  6. Save post-test SMART report.
+  7. Generate qualification report under ~/.captaincronos/reports/drives.
+EOF_HELP
+}
+
+case "${1:-}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "0.1.0-placeholder"
+        exit 0
+        ;;
+esac
+
+DEVICE="${1:-}"
+[ -n "$DEVICE" ] || { usage; exit 1; }
+
+cc_banner
+cc_warn "drive-qualify is a placeholder. No tests were started."
+echo
+printf '%-14s %s\n' "Device:" "$DEVICE"
+printf '%-14s %s\n' "Next step:" "Use cc drive-smart $DEVICE for read-only SMART summary."
+printf '%-14s %s\n' "Future:" "short test, long test, burn-in, and archived qualification report."
