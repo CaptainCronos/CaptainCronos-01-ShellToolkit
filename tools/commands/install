@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : install
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Install the Shell Toolkit locally.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+case "${1:-}" in
+    --help|-h)
+        install/install.sh --help
+        exit 0
+        ;;
+    --version)
+        install/install.sh --version
+        exit 0
+        ;;
+esac
+
+exec install/install.sh "$@"
