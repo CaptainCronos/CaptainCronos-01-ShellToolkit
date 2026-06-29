@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : drive-inventory
+# Version     : 1.0.0-alpha1
+# Category    : Storage
+# Requires    : bash lsblk smartctl awk sed grep
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show physical drive inventory with identity and SMART basics.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+FORMAT="table"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc drive-inventory [table|csv|markdown]
+
+Shows attached block devices with model, serial, size, transport, mountpoints, and SMART basics.
+
+This is read-only inventory output. It does not start SMART tests or modify disks.
+EOF_HELP
+}
+
+if [ "$#" -gt 0 ]; then
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "1.0.0-alpha1"
+            exit 0
+            ;;
+        table|csv|markdown)
+            FORMAT="$1"
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+fi
+
+if ! command -v lsblk >/dev/null 2>&1; then
+    cc_error "lsblk not found."
+    exit 1
+fi
+
+smart_value() {
+    local dev="$1" key="$2"
+    if ! command -v smartctl >/dev/null 2>&1; then
+        echo "unknown"
+        return 0
+    fi
+    sudo smartctl -a "$dev" 2>/dev/null | awk -F: -v key="$key" '$0 ~ key {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}' || true
+}
+
+smart_attr() {
+    local dev="$1" names="$2"
+    if ! command -v smartctl >/dev/null 2>&1; then
+        echo "unknown"
+        return 0
+    fi
+    sudo smartctl -a "$dev" 2>/dev/null | awk -v names="$names" '
+        BEGIN { split(names, n, "|") }
+        /^[ ]*[0-9]+/ {
+            for (i in n) {
+                if ($2 == n[i]) {
+                    print $NF
+                    exit
+                }
+            }
+        }
+    ' || true
+}
+
+drive_rows() {
+    lsblk -dn -o NAME,MODEL,SERIAL,SIZE,TRAN,TYPE 2>/dev/null | while read -r name model serial size tran type; do
+        [ "$type" = "disk" ] || continue
+        dev="/dev/$name"
+        health="$(smart_value "$dev" 'SMART overall-health self-assessment test result|SMART Health Status')"
+        hours="$(smart_attr "$dev" 'Power_On_Hours|Power_On_Hours_and_Msec')"
+        temp="$(smart_attr "$dev" 'Temperature_Celsius|Airflow_Temperature_Cel')"
+        mounts="$(lsblk -nr -o MOUNTPOINT "$dev" 2>/dev/null | grep -v '^$' | paste -sd ',' -)"
+        [ -n "$health" ] || health="unknown"
+        [ -n "$hours" ] || hours="unknown"
+        [ -n "$temp" ] || temp="unknown"
+        [ -n "$mounts" ] || mounts="-"
+        [ -n "$tran" ] || tran="-"
+        [ -n "$model" ] || model="unknown"
+        [ -n "$serial" ] || serial="unknown"
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$dev" "$model" "$serial" "$size" "$tran" "$health" "$hours" "$mounts"
+    done
+}
+
+case "$FORMAT" in
+    table)
+        cc_banner
+        echo
+        printf '%-12s %-22s %-20s %-8s %-8s %-10s %-10s %s\n' "Device" "Model" "Serial" "Size" "Tran" "SMART" "Hours" "Mounts"
+        printf '%-12s %-22s %-20s %-8s %-8s %-10s %-10s %s\n' "------" "-----" "------" "----" "----" "-----" "-----" "------"
+        drive_rows | while IFS=$'\t' read -r dev model serial size tran health hours mounts; do
+            printf '%-12s %-22s %-20s %-8s %-8s %-10s %-10s %s\n' "$dev" "$model" "$serial" "$size" "$tran" "$health" "$hours" "$mounts"
+        done
+        ;;
+    csv)
+        echo "device,model,serial,size,transport,smart,hours,mounts"
+        drive_rows | while IFS=$'\t' read -r dev model serial size tran health hours mounts; do
+            printf '"%s","%s","%s","%s","%s","%s","%s","%s"\n' "$dev" "$model" "$serial" "$size" "$tran" "$health" "$hours" "$mounts"
+        done
+        ;;
+    markdown)
+        echo "| Device | Model | Serial | Size | Transport | SMART | Hours | Mounts |"
+        echo "|---|---|---|---|---|---|---|---|"
+        drive_rows | while IFS=$'\t' read -r dev model serial size tran health hours mounts; do
+            echo "| $dev | $model | $serial | $size | $tran | $health | $hours | $mounts |"
+        done
+        ;;
+esac
