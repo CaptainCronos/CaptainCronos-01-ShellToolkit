@@ -1,0 +1,7 @@
+[Unit]
+Description=Captain Cronos Monthly Health Report
+Documentation=CaptainCronos-01-ShellToolkit
+
+[Service]
+Type=oneshot
+ExecStart=%h/bin/cc monthly-health
