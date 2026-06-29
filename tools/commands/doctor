@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : doctor
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Run repository and installation health checks.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+case "${1:-}" in
+    --help|-h)
+        echo "Usage: cc doctor"
+        echo
+        echo "Runs repository health checks, including required files, Bash syntax, Git status, and installed command availability."
+        exit 0
+        ;;
+    --version)
+        cc_version
+        exit 0
+        ;;
+esac
+
+cc_banner
+
+cc_log "Running install/verify.sh..."
+install/verify.sh
+
+cc_log "Checking Git status..."
+if [ -n "$(git status --short)" ]; then
+    cc_warn "Working tree has uncommitted changes:"
+    git status --short
+else
+    cc_log "Working tree clean."
+fi
+
+cc_log "Checking script syntax..."
+for script in install/*.sh tools/cc tools/commands/*; do
+    [ -f "$script" ] || continue
+    bash -n "$script"
+done
+
+cc_log "Checking installed command front-end..."
+if [ -x "$HOME/bin/cc" ]; then
+    cc_log "Installed command found: $HOME/bin/cc"
+else
+    cc_warn "Installed command missing or not executable: $HOME/bin/cc"
+    cc_warn "Run: install/install.sh"
+fi
+
+cc_log "Doctor check complete."
