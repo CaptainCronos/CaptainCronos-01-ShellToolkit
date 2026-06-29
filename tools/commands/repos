@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : repos
-# Version     : 1.2.0-alpha1
+# Version     : 1.2.1-alpha1
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Inventory and manage local Git repositories.
 # ==============================================================================
@@ -45,7 +45,6 @@ Actions:
   doctor     Run cc doctor for toolkit repositories that contain tools/cc.
 
 Examples:
-  cc repos
   cc repos status
   cc repos health
   cc repos inventory --out ~/repo-inventory.md
@@ -63,7 +62,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "1.2.0-alpha1"
+            echo "1.2.1-alpha1"
             exit 0
             ;;
         --root)
@@ -121,14 +120,29 @@ repo_state() {
     fi
 }
 
+repo_upstream() {
+    local repo="$1" branch upstream
+    upstream="$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+    if [ -n "$upstream" ]; then
+        echo "$upstream"
+        return 0
+    fi
+    branch="$(repo_branch "$repo")"
+    if [ "$branch" != "detached" ] && git -C "$repo" show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+        echo "origin/$branch"
+        return 0
+    fi
+    echo ""
+}
+
 repo_counts() {
     local repo="$1" upstream
-    upstream="$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+    upstream="$(repo_upstream "$repo")"
     if [ -z "$upstream" ]; then
         echo "0 0 0"
         return 0
     fi
-    git -C "$repo" rev-list --left-right --count HEAD..."$upstream" 2>/dev/null | awk '{print $1" "$2" 1}' || echo "0 0 0"
+    git -C "$repo" rev-list --left-right --count HEAD..."$upstream" 2>/dev/null | awk '{print $1, $2, 1}' || echo "0 0 0"
 }
 
 repo_ahead_behind() {
@@ -153,7 +167,17 @@ repo_size() {
 }
 
 repo_default_remote_branch() {
-    git -C "$1" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#refs/remotes/origin/##' || echo unknown
+    local repo="$1" default
+    default="$(git -C "$repo" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#refs/remotes/origin/##' || true)"
+    if [ -n "$default" ]; then
+        echo "$default"
+    elif git -C "$repo" show-ref --verify --quiet refs/remotes/origin/main; then
+        echo main
+    elif git -C "$repo" show-ref --verify --quiet refs/remotes/origin/master; then
+        echo master
+    else
+        echo unknown
+    fi
 }
 
 repo_branch_counts() {
@@ -166,7 +190,7 @@ repo_branch_counts() {
 repo_type() {
     local repo="$1" name
     name="$(basename "$repo")"
-    if [ -x "$repo/tools/cc" ]; then
+    if [ -f "$repo/tools/cc" ] || [[ "$name" == *ShellToolkit* ]]; then
         echo "Toolkit"
     elif [ -f "$repo/docs/developer/CC-STD-001-Script-Header.md" ] || [[ "$name" == *Standards* ]]; then
         echo "Standards"
@@ -184,7 +208,7 @@ repo_type() {
 }
 
 repo_health() {
-    local repo="$1" score=100 branch state origin counts ahead behind upstream_flag
+    local repo="$1" score=100 branch state origin counts ahead behind upstream_flag default_branch
     branch="$(repo_branch "$repo")"
     state="$(repo_state "$repo")"
     origin="$(repo_origin "$repo")"
@@ -192,6 +216,7 @@ repo_health() {
     ahead="$(echo "$counts" | awk '{print $1}')"
     behind="$(echo "$counts" | awk '{print $2}')"
     upstream_flag="$(echo "$counts" | awk '{print $3}')"
+    default_branch="$(repo_default_remote_branch "$repo")"
 
     [ "$state" = "dirty" ] && score=$((score - 25))
     [ "$branch" = "detached" ] && score=$((score - 20))
@@ -199,6 +224,7 @@ repo_health() {
     [ "$upstream_flag" = "0" ] && score=$((score - 15))
     [ "$ahead" -gt 0 ] 2>/dev/null && score=$((score - 10))
     [ "$behind" -gt 0 ] 2>/dev/null && score=$((score - 10))
+    [ "$default_branch" = "unknown" ] && score=$((score - 5))
     git -C "$repo" diff --name-only --diff-filter=U 2>/dev/null | grep -q . && score=$((score - 40))
 
     [ "$score" -lt 0 ] && score=0
@@ -335,7 +361,7 @@ repo_pull() {
         echo "SKIP: working tree is dirty"
         return 0
     fi
-    if ! git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+    if [ -z "$(repo_upstream "$repo")" ]; then
         echo "SKIP: no upstream configured"
         return 0
     fi
@@ -433,7 +459,7 @@ case "$ACTION" in
     verify|doctor)
         while read -r repo; do
             [ -n "$repo" ] || continue
-            [ -x "$repo/tools/cc" ] || continue
+            [ -f "$repo/tools/cc" ] || continue
             echo
             echo "[$(basename "$repo")] cc $ACTION"
             bash "$repo/tools/cc" "$ACTION" || true
