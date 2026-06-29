@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : baseline
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Capture operating-system baseline shell files.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+case "${1:-}" in
+    --help|-h)
+        echo "Usage: cc baseline"
+        echo
+        echo "Captures operating-system baseline shell files."
+        exit 0
+        ;;
+    --version)
+        cc_version
+        exit 0
+        ;;
+esac
+
+exec install/create-baseline.sh "$@"
