@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Captain Cronos Monthly Health Report
+
+[Timer]
+OnCalendar=monthly
+Persistent=true
+RandomizedDelaySec=30min
+Unit=captaincronos-monthly-health.service
+
+[Install]
+WantedBy=timers.target
