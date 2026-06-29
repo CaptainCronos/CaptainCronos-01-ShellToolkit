@@ -6,8 +6,6 @@
 # CAPTAIN CRONOS TOOLKIT
 # =============================
 
-# @alias cc Show Captain Cronos Toolkit help.
-alias cc='helpme'
 
 # @alias h Show Captain Cronos Toolkit help.
 alias h='helpme'
