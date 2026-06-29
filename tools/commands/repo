@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : repo
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show repository path and Git remote information.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+case "${1:-}" in
+    --help|-h)
+        echo "Usage: cc repo"
+        echo
+        echo "Shows the repository path, current branch, and origin remote."
+        exit 0
+        ;;
+    --version)
+        cc_version
+        exit 0
+        ;;
+esac
+
+cc_banner
+printf '%-14s %s\n' "Repository:" "$PROJECT_ROOT"
+printf '%-14s %s\n' "Branch:" "$(git branch --show-current 2>/dev/null || echo unknown)"
+printf '%-14s %s\n' "Origin:" "$(git remote get-url origin 2>/dev/null || echo none)"
