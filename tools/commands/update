@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : update
-# Version     : reads VERSION
+# Version     : 2.0.0-alpha1
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Pull latest changes and run the toolkit updater.
+# Purpose     : Run managed toolkit and system maintenance workflow.
 # ==============================================================================
 
 set -euo pipefail
@@ -15,19 +15,117 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
-case "${1:-}" in
-    --help|-h)
-        install/update.sh --help 2>/dev/null || {
-            echo "Usage: cc update"
-            echo
-            echo "Pulls latest repository changes and runs update workflow."
-        }
-        exit 0
-        ;;
-    --version)
-        cc_version
-        exit 0
-        ;;
-esac
+MODE="dry-run"
+RUN_TOOLKIT=1
+RUN_SYSTEM=1
+RUN_KERNEL=1
+RUN_HEALTH=1
 
-exec install/update.sh "$@"
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc update [--dry-run|--apply] [--toolkit-only|--system-only|--health-only]
+
+Default:
+  cc update runs in --dry-run mode.
+
+Workflow:
+  1. toolkit-update       Pull latest toolkit changes and reinstall command files.
+  2. system-update        Run managed OS/app update workflow.
+  3. kernel-cleanup       Review obsolete kernels. Applies only with --apply.
+  4. verify               Verify repository structure and Bash syntax.
+  5. doctor               Run toolkit health checks.
+  6. drives / smart       Show storage inventory and SMART summary.
+  7. status               Show repository status.
+
+Notes:
+  Use cc toolkit-update for the old direct toolkit pull/reinstall behavior.
+  Use cc system-update for package/app updates only.
+  Use cc kernel-cleanup separately before trusting automated cleanup.
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "2.0.0-alpha1"
+            exit 0
+            ;;
+        --dry-run)
+            MODE="dry-run"
+            shift
+            ;;
+        --apply)
+            MODE="apply"
+            shift
+            ;;
+        --toolkit-only)
+            RUN_TOOLKIT=1; RUN_SYSTEM=0; RUN_KERNEL=0; RUN_HEALTH=0
+            shift
+            ;;
+        --system-only)
+            RUN_TOOLKIT=0; RUN_SYSTEM=1; RUN_KERNEL=1; RUN_HEALTH=0
+            shift
+            ;;
+        --health-only)
+            RUN_TOOLKIT=0; RUN_SYSTEM=0; RUN_KERNEL=0; RUN_HEALTH=1
+            shift
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+run_cc() {
+    local name="$1"
+    shift
+    echo
+    echo "============================================================"
+    echo "cc $name $*"
+    echo "============================================================"
+    bash "$PROJECT_ROOT/tools/cc" "$name" "$@"
+}
+
+cc_banner
+echo "Maintenance mode: $MODE"
+
+if [ "$RUN_TOOLKIT" -eq 1 ]; then
+    if [ "$MODE" = "apply" ]; then
+        run_cc toolkit-update
+    else
+        run_cc toolkit-update --dry-run || true
+    fi
+fi
+
+if [ "$RUN_SYSTEM" -eq 1 ]; then
+    if [ "$MODE" = "apply" ]; then
+        run_cc system-update
+    else
+        run_cc system-update --dry-run
+    fi
+fi
+
+if [ "$RUN_KERNEL" -eq 1 ]; then
+    if [ "$MODE" = "apply" ]; then
+        run_cc kernel-cleanup --apply
+    else
+        run_cc kernel-cleanup --dry-run
+    fi
+fi
+
+if [ "$RUN_HEALTH" -eq 1 ]; then
+    run_cc verify
+    run_cc doctor
+    run_cc drives
+    run_cc smart
+    run_cc status
+fi
+
+echo
+echo "Maintenance workflow complete."
