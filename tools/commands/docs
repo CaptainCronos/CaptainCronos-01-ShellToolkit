@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : docs
+# Version     : 1.0.0-alpha1
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Generate toolkit documentation and command references.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+ACTION="build"
+OUT_DIR="$PROJECT_ROOT/docs/generated"
+APPLY=0
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc docs [build|inventory|reference|changelog|lint] [--apply] [--out DIR]
+
+Actions:
+  inventory  Generate command inventory.
+  reference  Generate command reference from command help output.
+  changelog  Generate recent Git history summary.
+  lint       Check command headers and Bash syntax.
+  build      Generate all documentation outputs.
+
+Options:
+  --apply    Write generated files under docs/generated.
+  --out DIR  Override output directory.
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h) usage; exit 0 ;;
+        --version) echo "1.0.0-alpha1"; exit 0 ;;
+        --apply) APPLY=1; shift ;;
+        --out) shift; OUT_DIR="${1:-}"; [ -n "$OUT_DIR" ] || { usage; exit 1; }; shift ;;
+        build|inventory|reference|changelog|lint) ACTION="$1"; shift ;;
+        *) usage; exit 1 ;;
+    esac
+done
+
+command_list() {
+    find "$PROJECT_ROOT/tools/commands" -maxdepth 1 -type f -printf '%f\n' 2>/dev/null | sort
+}
+
+script_field() {
+    local file="$1" field="$2"
+    awk -v field="$field" '
+        $0 ~ "^# " field "[[:space:]]*:" {
+            sub("^# " field "[[:space:]]*:[[:space:]]*", "")
+            print
+            exit
+        }
+    ' "$file"
+}
+
+write_output() {
+    local name="$1"
+    shift
+    if [ "$APPLY" -eq 1 ]; then
+        mkdir -p "$OUT_DIR"
+        "$@" > "$OUT_DIR/$name"
+        cc_log "Generated: $OUT_DIR/$name"
+    else
+        "$@"
+    fi
+}
+
+generate_inventory() {
+    local cmd file version purpose
+    echo "# Captain Cronos Command Inventory"
+    echo
+    echo "Generated: $(date)"
+    echo
+    echo "| Command | Version | Purpose |"
+    echo "|---|---|---|"
+    while read -r cmd; do
+        [ -n "$cmd" ] || continue
+        file="$PROJECT_ROOT/tools/commands/$cmd"
+        version="$(script_field "$file" "Version")"
+        purpose="$(script_field "$file" "Purpose")"
+        [ -n "$version" ] || version="unknown"
+        [ -n "$purpose" ] || purpose="unknown"
+        echo "| cc $cmd | $version | $purpose |"
+    done < <(command_list)
+}
+
+generate_reference() {
+    local cmd
+    echo "# Captain Cronos Command Reference"
+    echo
+    echo "Generated: $(date)"
+    echo
+    while read -r cmd; do
+        [ -n "$cmd" ] || continue
+        echo "## cc $cmd"
+        echo
+        echo "~~~text"
+        bash "$PROJECT_ROOT/tools/cc" "$cmd" --help 2>&1 || true
+        echo "~~~"
+        echo
+    done < <(command_list)
+}
+
+generate_changelog() {
+    echo "# Recent Change Summary"
+    echo
+    echo "Generated: $(date)"
+    echo
+    echo "~~~text"
+    git log --oneline --decorate -n 40
+    echo "~~~"
+}
+
+generate_lint() {
+    local cmd file issues=0
+    echo "# Documentation Lint Report"
+    echo
+    echo "Generated: $(date)"
+    echo
+    while read -r cmd; do
+        [ -n "$cmd" ] || continue
+        file="$PROJECT_ROOT/tools/commands/$cmd"
+        grep -q '^# Script[[:space:]]*:' "$file" || { echo "WARN: cc $cmd missing Script header"; issues=$((issues + 1)); }
+        grep -q '^# Version[[:space:]]*:' "$file" || { echo "WARN: cc $cmd missing Version header"; issues=$((issues + 1)); }
+        grep -q '^# Purpose[[:space:]]*:' "$file" || { echo "WARN: cc $cmd missing Purpose header"; issues=$((issues + 1)); }
+        bash -n "$file" 2>/dev/null || { echo "ERROR: cc $cmd has Bash syntax problem"; issues=$((issues + 1)); }
+    done < <(command_list)
+    echo
+    echo "Issues: $issues"
+}
+
+generate_index() {
+    echo "# Generated Documentation Index"
+    echo
+    echo "Generated: $(date)"
+    echo
+    echo "- COMMAND_INVENTORY.md"
+    echo "- COMMAND_REFERENCE.md"
+    echo "- CHANGE_SUMMARY.md"
+    echo "- DOCS_LINT.md"
+}
+
+cc_banner
+printf '%-14s %s\n' "Action:" "$ACTION"
+printf '%-14s %s\n' "Apply:" "$APPLY"
+printf '%-14s %s\n' "Output:" "$OUT_DIR"
+echo
+
+case "$ACTION" in
+    inventory) write_output COMMAND_INVENTORY.md generate_inventory ;;
+    reference) write_output COMMAND_REFERENCE.md generate_reference ;;
+    changelog) write_output CHANGE_SUMMARY.md generate_changelog ;;
+    lint) write_output DOCS_LINT.md generate_lint ;;
+    build)
+        write_output COMMAND_INVENTORY.md generate_inventory
+        write_output COMMAND_REFERENCE.md generate_reference
+        write_output CHANGE_SUMMARY.md generate_changelog
+        write_output DOCS_LINT.md generate_lint
+        write_output README.md generate_index
+        ;;
+esac
