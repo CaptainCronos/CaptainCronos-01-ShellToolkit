@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : doctor
-# Version     : reads VERSION
+# Version     : 2.0.0-alpha1
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Run repository and installation health checks.
+# Purpose     : Run repository, installation, and host health checks.
 # ==============================================================================
 
 set -euo pipefail
@@ -15,22 +15,42 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
+FULL=0
+
+usage() {
+    echo "Usage: cc doctor [--full]"
+    echo
+    echo "Runs repository, command syntax, installation, and basic host health checks."
+    echo "Use --full to include storage inventory and SMART summary."
+}
+
 case "${1:-}" in
     --help|-h)
-        echo "Usage: cc doctor"
-        echo
-        echo "Runs repository health checks, including required files, Bash syntax, Git status, and installed command availability."
+        usage
         exit 0
         ;;
     --version)
         cc_version
         exit 0
         ;;
+    --full)
+        FULL=1
+        ;;
 esac
+
+run_cc() {
+    local cmd="$1"
+    shift
+    if [ -x "$PROJECT_ROOT/tools/cc" ]; then
+        bash "$PROJECT_ROOT/tools/cc" "$cmd" "$@" || true
+    else
+        cc_warn "tools/cc not executable; skipping cc $cmd"
+    fi
+}
 
 cc_banner
 
-cc_log "Running install/verify.sh..."
+cc_log "Running repository verification..."
 install/verify.sh
 
 cc_log "Checking Git status..."
@@ -53,6 +73,39 @@ if [ -x "$HOME/bin/cc" ]; then
 else
     cc_warn "Installed command missing or not executable: $HOME/bin/cc"
     cc_warn "Run: install/install.sh"
+fi
+
+cc_log "Checking host basics..."
+printf '%-18s %s\n' "Hostname:" "$(hostname 2>/dev/null || echo unknown)"
+printf '%-18s %s\n' "Kernel:" "$(uname -r 2>/dev/null || echo unknown)"
+printf '%-18s %s\n' "Uptime:" "$(uptime -p 2>/dev/null || echo unknown)"
+printf '%-18s %s\n' "Load:" "$(awk '{print $1" "$2" "$3}' /proc/loadavg 2>/dev/null || echo unknown)"
+
+if [ -f /var/run/reboot-required ]; then
+    cc_warn "Reboot required."
+else
+    cc_log "No reboot marker found."
+fi
+
+cc_log "Checking disk pressure..."
+df -hT | awk 'NR==1 || /^\/dev\//' | awk 'NR==1 {print; next} {gsub(/%/,"",$6); print; if ($6+0 >= 90) high=1} END {if (high) exit 2}' || cc_warn "One or more filesystems are at or above 90%."
+
+cc_log "Checking SMART tooling..."
+if command -v smartctl >/dev/null 2>&1; then
+    cc_log "smartctl found."
+else
+    cc_warn "smartctl not found. Install smartmontools for SMART checks."
+fi
+
+if [ "$FULL" -eq 1 ]; then
+    echo
+    echo "Storage Inventory"
+    echo "-----------------"
+    run_cc drives
+    echo
+    echo "SMART Summary"
+    echo "-------------"
+    run_cc smart
 fi
 
 cc_log "Doctor check complete."
