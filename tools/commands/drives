@@ -14,13 +14,12 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
-source "$PROJECT_ROOT/bash/bash_functions"
 
 case "${1:-}" in
     --help|-h)
         echo "Usage: cc drives"
         echo
-        echo "Shows block devices, filesystems, labels, UUIDs, usage, and mount points."
+        echo "Shows physical block devices, filesystems, labels, UUIDs, usage, and mount points."
         exit 0
         ;;
     --version)
@@ -29,8 +28,14 @@ case "${1:-}" in
         ;;
 esac
 
-if declare -F findharddrives >/dev/null 2>&1; then
-    findharddrives
-else
-    lsblk -e 7 -o NAME,TYPE,SIZE,FSTYPE,LABEL,UUID,FSUSE%,MOUNTPOINTS
-fi
+cc_banner
+
+echo
+echo "Block Devices"
+echo "-------------"
+lsblk -e 7 -o NAME,TYPE,SIZE,FSTYPE,LABEL,UUID,FSUSE%,MOUNTPOINTS
+
+echo
+echo "Filesystem Usage"
+echo "----------------"
+df -hT | awk 'NR==1 || /^\/dev\//'
