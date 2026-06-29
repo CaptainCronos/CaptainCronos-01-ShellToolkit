@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : repos
-# Version     : 1.0.0-alpha1
+# Version     : 1.1.0-alpha1
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Inventory and manage local Git repositories.
 # ==============================================================================
@@ -18,29 +18,39 @@ source "$PROJECT_ROOT/lib/cc-common.sh"
 ROOT="${CAPTAIN_CRONOS_GIT_ROOT:-$HOME/GitHub}"
 ACTION="list"
 APPLY=0
+OUT=""
+BUNDLE_DIR="${CAPTAIN_CRONOS_REPO_BUNDLE_DIR:-$HOME/.captaincronos/repo-bundles}"
 
 usage() {
     cat <<'EOF_HELP'
 Usage:
-  cc repos [list|status|pull|fetch|verify|doctor] [--root PATH] [--apply]
+  cc repos [list|status|inventory|fetch|pull|sync|backup|verify|doctor] [options]
 
-Default root:
-  ~/GitHub
+Options:
+  --root PATH      Repository root. Default: ~/GitHub
+  --out FILE       Output file for inventory. Supports .md and .csv
+  --bundle-dir DIR Bundle output directory. Default: ~/.captaincronos/repo-bundles
+  --apply          Apply mutating actions. Default is dry-run.
 
 Actions:
-  list      List detected Git repositories.
-  status    Show branch, dirty/clean state, and origin for each repo.
-  fetch     Fetch all remotes and prune stale refs. Dry-run by default.
-  pull      Pull --ff-only for clean repositories. Dry-run by default.
-  verify    Run cc verify for toolkit repositories that contain tools/cc.
-  doctor    Run cc doctor for toolkit repositories that contain tools/cc.
+  list       List detected Git repositories.
+  status     Show branch, clean/dirty state, ahead/behind, and origin.
+  inventory  Generate repository inventory table. Use --out to save.
+  fetch      Fetch all remotes and prune stale refs. Dry-run by default.
+  pull       Pull --ff-only for clean repositories. Dry-run by default.
+  sync       Fetch then pull --ff-only for clean repositories. Dry-run by default.
+  backup     Create git bundle backups for clean repositories. Dry-run by default.
+  verify     Run cc verify for toolkit repositories that contain tools/cc.
+  doctor     Run cc doctor for toolkit repositories that contain tools/cc.
 
 Examples:
   cc repos
   cc repos status
+  cc repos inventory --out ~/repo-inventory.md
+  cc repos inventory --out ~/repo-inventory.csv
   cc repos fetch --apply
-  cc repos pull --apply
-  cc repos --root ~/GitHub status
+  cc repos sync --apply
+  cc repos backup --apply
 EOF_HELP
 }
 
@@ -51,7 +61,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "1.0.0-alpha1"
+            echo "1.1.0-alpha1"
             exit 0
             ;;
         --root)
@@ -60,11 +70,23 @@ while [ "$#" -gt 0 ]; do
             [ -n "$ROOT" ] || { usage; exit 1; }
             shift
             ;;
+        --out)
+            shift
+            OUT="${1:-}"
+            [ -n "$OUT" ] || { usage; exit 1; }
+            shift
+            ;;
+        --bundle-dir)
+            shift
+            BUNDLE_DIR="${1:-}"
+            [ -n "$BUNDLE_DIR" ] || { usage; exit 1; }
+            shift
+            ;;
         --apply)
             APPLY=1
             shift
             ;;
-        list|status|pull|fetch|verify|doctor)
+        list|status|inventory|pull|fetch|sync|backup|verify|doctor)
             ACTION="$1"
             shift
             ;;
@@ -105,11 +127,119 @@ repo_ahead_behind() {
     git -C "$repo" rev-list --left-right --count HEAD..."$upstream" 2>/dev/null | awk '{print "ahead:" $1 " behind:" $2}'
 }
 
-cc_banner
-printf '%-14s %s\n' "Repo root:" "$ROOT"
-printf '%-14s %s\n' "Action:" "$ACTION"
-printf '%-14s %s\n' "Apply:" "$APPLY"
-echo
+repo_last_commit() {
+    git -C "$1" log -1 --format='%cs %h %s' 2>/dev/null || echo none
+}
+
+repo_size() {
+    du -sh "$1" 2>/dev/null | awk '{print $1}'
+}
+
+repo_default_remote_branch() {
+    git -C "$1" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#refs/remotes/origin/##' || echo unknown
+}
+
+csv_escape() {
+    printf '%s' "$1" | sed 's/"/""/g; s/^/"/; s/$/"/'
+}
+
+print_header() {
+    cc_banner
+    printf '%-14s %s\n' "Repo root:" "$ROOT"
+    printf '%-14s %s\n' "Action:" "$ACTION"
+    printf '%-14s %s\n' "Apply:" "$APPLY"
+    [ -n "$OUT" ] && printf '%-14s %s\n' "Output:" "$OUT"
+    echo
+}
+
+inventory_md() {
+    echo "# Repository Inventory"
+    echo
+    echo "Generated: $(date)"
+    echo "Root: $ROOT"
+    echo
+    echo "| Repository | Branch | State | Sync | Origin | Last Commit | Size |"
+    echo "|---|---|---|---|---|---|---|"
+    while read -r repo; do
+        [ -n "$repo" ] || continue
+        echo "| $(basename "$repo") | $(repo_branch "$repo") | $(repo_state "$repo") | $(repo_ahead_behind "$repo") | $(repo_origin "$repo") | $(repo_last_commit "$repo" | sed 's/|/-/g') | $(repo_size "$repo") |"
+    done < <(find_repos)
+}
+
+inventory_csv() {
+    echo "repository,path,branch,state,sync,origin,last_commit,size"
+    while read -r repo; do
+        [ -n "$repo" ] || continue
+        printf '%s,%s,%s,%s,%s,%s,%s,%s\n' \
+            "$(csv_escape "$(basename "$repo")")" \
+            "$(csv_escape "$repo")" \
+            "$(csv_escape "$(repo_branch "$repo")")" \
+            "$(csv_escape "$(repo_state "$repo")")" \
+            "$(csv_escape "$(repo_ahead_behind "$repo")")" \
+            "$(csv_escape "$(repo_origin "$repo")")" \
+            "$(csv_escape "$(repo_last_commit "$repo")")" \
+            "$(csv_escape "$(repo_size "$repo")")"
+    done < <(find_repos)
+}
+
+write_inventory() {
+    if [ -z "$OUT" ]; then
+        inventory_md
+        return 0
+    fi
+    mkdir -p "$(dirname "$OUT")"
+    case "$OUT" in
+        *.csv) inventory_csv > "$OUT" ;;
+        *) inventory_md > "$OUT" ;;
+    esac
+    cc_log "Inventory written: $OUT"
+}
+
+repo_fetch() {
+    local repo="$1"
+    if [ "$APPLY" -eq 1 ]; then
+        git -C "$repo" fetch --all --prune
+    else
+        echo "DRY RUN: git -C '$repo' fetch --all --prune"
+    fi
+}
+
+repo_pull() {
+    local repo="$1"
+    if [ "$(repo_state "$repo")" != "clean" ]; then
+        echo "SKIP: working tree is dirty"
+        return 0
+    fi
+    if ! git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+        echo "SKIP: no upstream configured"
+        return 0
+    fi
+    if [ "$APPLY" -eq 1 ]; then
+        git -C "$repo" pull --ff-only
+    else
+        echo "DRY RUN: git -C '$repo' pull --ff-only"
+    fi
+}
+
+repo_backup() {
+    local repo="$1" name stamp bundle
+    name="$(basename "$repo")"
+    stamp="$(date +%Y%m%d-%H%M%S)"
+    bundle="$BUNDLE_DIR/${name}-${stamp}.bundle"
+    if [ "$(repo_state "$repo")" != "clean" ]; then
+        echo "SKIP: working tree is dirty"
+        return 0
+    fi
+    if [ "$APPLY" -eq 1 ]; then
+        mkdir -p "$BUNDLE_DIR"
+        git -C "$repo" bundle create "$bundle" --all
+        echo "WROTE: $bundle"
+    else
+        echo "DRY RUN: git -C '$repo' bundle create '$bundle' --all"
+    fi
+}
+
+print_header
 
 if [ ! -d "$ROOT" ]; then
     cc_error "Repository root not found: $ROOT"
@@ -128,16 +258,15 @@ case "$ACTION" in
             printf '%-36s %-16s %-8s %-22s %s\n' "$(basename "$repo")" "$(repo_branch "$repo")" "$(repo_state "$repo")" "$(repo_ahead_behind "$repo")" "$(repo_origin "$repo")"
         done < <(find_repos)
         ;;
+    inventory)
+        write_inventory
+        ;;
     fetch)
         while read -r repo; do
             [ -n "$repo" ] || continue
             echo
             echo "[$(basename "$repo")] $repo"
-            if [ "$APPLY" -eq 1 ]; then
-                git -C "$repo" fetch --all --prune
-            else
-                echo "DRY RUN: git -C '$repo' fetch --all --prune"
-            fi
+            repo_fetch "$repo"
         done < <(find_repos)
         ;;
     pull)
@@ -145,19 +274,25 @@ case "$ACTION" in
             [ -n "$repo" ] || continue
             echo
             echo "[$(basename "$repo")] $repo"
-            if [ "$(repo_state "$repo")" != "clean" ]; then
-                echo "SKIP: working tree is dirty"
-                continue
-            fi
-            if ! git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
-                echo "SKIP: no upstream configured"
-                continue
-            fi
-            if [ "$APPLY" -eq 1 ]; then
-                git -C "$repo" pull --ff-only
-            else
-                echo "DRY RUN: git -C '$repo' pull --ff-only"
-            fi
+            repo_pull "$repo"
+        done < <(find_repos)
+        ;;
+    sync)
+        while read -r repo; do
+            [ -n "$repo" ] || continue
+            echo
+            echo "[$(basename "$repo")] $repo"
+            repo_fetch "$repo"
+            repo_pull "$repo"
+        done < <(find_repos)
+        ;;
+    backup)
+        printf '%-14s %s\n' "Bundle dir:" "$BUNDLE_DIR"
+        while read -r repo; do
+            [ -n "$repo" ] || continue
+            echo
+            echo "[$(basename "$repo")] $repo"
+            repo_backup "$repo"
         done < <(find_repos)
         ;;
     verify|doctor)
