@@ -6,7 +6,7 @@
 # Script      : monthly-health-timer
 # Version     : reads VERSION
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Install or manage the monthly health report systemd user timer.
+# Purpose     : Retire or inspect the standalone monthly health user timer.
 # ==============================================================================
 
 set -euo pipefail
@@ -20,16 +20,27 @@ TIMER_NAME="captaincronos-monthly-health.timer"
 UNIT_DIR="$HOME/.config/systemd/user"
 
 usage() {
-    echo "Usage: cc monthly-health-timer install|status|run|enable|disable"
+    echo "Usage: cc monthly-health-timer status|retire|run-once|install-standalone|enable|disable"
+    echo
+    echo "Recommended architecture: run cc monthly-health from the existing daily-backup-report framework."
+    echo "The standalone user timer is retained only as an optional fallback."
 }
 
-install_timer() {
+install_standalone() {
     mkdir -p "$UNIT_DIR"
     cp -f "$PROJECT_ROOT/templates/systemd/user/$SERVICE_NAME" "$UNIT_DIR/$SERVICE_NAME"
     cp -f "$PROJECT_ROOT/templates/systemd/user/$TIMER_NAME" "$UNIT_DIR/$TIMER_NAME"
     systemctl --user daemon-reload
     systemctl --user enable --now "$TIMER_NAME"
-    cc_log "Installed and enabled $TIMER_NAME"
+    cc_warn "Standalone timer installed. Prefer daily-backup-report integration when available."
+}
+
+retire_timer() {
+    systemctl --user disable --now "$TIMER_NAME" 2>/dev/null || true
+    rm -f "$UNIT_DIR/$TIMER_NAME" "$UNIT_DIR/$SERVICE_NAME"
+    systemctl --user daemon-reload
+    cc_log "Standalone monthly-health timer retired."
+    cc_log "Use cc monthly-health manually or from daily-backup-report."
 }
 
 case "${1:-status}" in
@@ -41,16 +52,19 @@ case "${1:-status}" in
         cc_version
         exit 0
         ;;
-    install)
-        install_timer
-        ;;
     status)
-        systemctl --user status "$TIMER_NAME" --no-pager || true
-        echo
         systemctl --user list-timers --all | grep -E 'NEXT|captaincronos-monthly-health' || true
+        echo
+        systemctl --user list-unit-files | grep -E 'captaincronos-monthly-health' || true
         ;;
-    run)
-        systemctl --user start "$SERVICE_NAME"
+    retire|remove|uninstall)
+        retire_timer
+        ;;
+    run|run-once)
+        bash "$PROJECT_ROOT/tools/cc" monthly-health
+        ;;
+    install|install-standalone)
+        install_standalone
         ;;
     enable)
         systemctl --user enable --now "$TIMER_NAME"
