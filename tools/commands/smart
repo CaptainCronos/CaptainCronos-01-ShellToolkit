@@ -6,7 +6,7 @@
 # Script      : smart
 # Version     : reads VERSION
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Show SMART storage health guidance.
+# Purpose     : Summarize SMART health for installed storage devices.
 # ==============================================================================
 
 set -euo pipefail
@@ -15,11 +15,19 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
+usage() {
+    echo "Usage: cc smart [device] [--full] [--logs]"
+    echo
+    echo "Examples:"
+    echo "  cc smart"
+    echo "  cc smart sdd"
+    echo "  cc smart sdd --full"
+    echo "  cc smart sdd --logs"
+}
+
 case "${1:-}" in
     --help|-h)
-        echo "Usage: cc smart"
-        echo
-        echo "Shows SMART storage health guidance. Detailed summary parser pending."
+        usage
         exit 0
         ;;
     --version)
@@ -28,19 +36,145 @@ case "${1:-}" in
         ;;
 esac
 
-cc_banner
-echo
-if command -v smartctl >/dev/null 2>&1; then
-    cc_log "SMART tooling found."
-    cc_log "Detailed SMART summary parser pending."
-else
-    cc_warn "SMART tooling not found. Install smartmontools."
+if ! command -v smartctl >/dev/null 2>&1; then
+    cc_warn "smartctl not found. Install smartmontools."
+    exit 0
 fi
 
+cc_smart_devpath() {
+    case "$1" in
+        /dev/*) echo "$1" ;;
+        *) echo "/dev/$1" ;;
+    esac
+}
+
+cc_smart_read() {
+    local mode="$1"
+    local dev="$2"
+    if smartctl "$mode" "$dev" >/dev/null 2>&1; then
+        smartctl "$mode" "$dev" 2>/dev/null || true
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo smartctl "$mode" "$dev" 2>/dev/null || true
+    else
+        smartctl "$mode" "$dev" 2>/dev/null || true
+    fi
+}
+
+cc_smart_health() {
+    awk '
+        /SMART overall-health self-assessment test result:/ {print $NF; found=1; exit}
+        /SMART Health Status:/ {print $NF; found=1; exit}
+        END {if (!found) print "UNKNOWN"}
+    '
+}
+
+cc_smart_temp() {
+    awk '
+        /Temperature_Celsius/ {print $NF "C"; found=1; exit}
+        /Airflow_Temperature_Cel/ {print $NF "C"; found=1; exit}
+        /Current Drive Temperature:/ {print $(NF-1) "C"; found=1; exit}
+        /Composite Temperature:/ {print $(NF-1) "C"; found=1; exit}
+        END {if (!found) print "--"}
+    '
+}
+
+cc_smart_hours() {
+    awk '
+        /Power_On_Hours/ {print $NF; found=1; exit}
+        /Power On Hours:/ {print $NF; found=1; exit}
+        /number of hours powered up/ {print int($NF); found=1; exit}
+        END {if (!found) print "--"}
+    '
+}
+
+cc_smart_life() {
+    awk '
+        /Percentage Used:/ {gsub("%", "", $3); if ($3 ~ /^[0-9]+$/) print (100-$3) "%"; found=1; exit}
+        /Percent_Lifetime_Remain/ {print $NF "%"; found=1; exit}
+        /Media_Wearout_Indicator/ {print $NF "%"; found=1; exit}
+        END {if (!found) print "--"}
+    '
+}
+
+cc_smart_test() {
+    awk '
+        /# 1/ {
+            if ($0 ~ /Completed without error/) {print "PASS"; found=1; exit}
+            if ($0 ~ /Completed/) {print "CHECK"; found=1; exit}
+            if ($0 ~ /in progress/) {print "RUNNING"; found=1; exit}
+        }
+        END {if (!found) print "UNKNOWN"}
+    '
+}
+
+cc_smart_type() {
+    local dev="$1"
+    local rota
+    rota="$(lsblk -ndo ROTA "$dev" 2>/dev/null | awk '{print $1}')"
+    if [ "$rota" = "0" ]; then
+        echo "SSD"
+    elif [ "$rota" = "1" ]; then
+        echo "HDD"
+    else
+        echo "DISK"
+    fi
+}
+
+cc_smart_summary_one() {
+    local dev="$1"
+    local name type health_data attr_data log_data health temp hours life test
+    name="$(basename "$dev")"
+    type="$(cc_smart_type "$dev")"
+    health_data="$(cc_smart_read -H "$dev")"
+    attr_data="$(cc_smart_read -A "$dev")"
+    log_data="$(cc_smart_read -l "$dev")"
+    health="$(printf '%s\n' "$health_data" | cc_smart_health)"
+    temp="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_temp)"
+    hours="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_hours)"
+    life="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_life)"
+    test="$(printf '%s\n' "$log_data" | cc_smart_test)"
+    printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s\n' "$name" "$type" "$health" "$test" "$temp" "$hours" "$life"
+}
+
+cc_smart_detail() {
+    local dev="$1"
+    local mode="${2:-}"
+    dev="$(cc_smart_devpath "$dev")"
+    cc_banner
+    echo
+    echo "SMART detail: $dev"
+    echo "------------------"
+    case "$mode" in
+        --full)
+            cc_smart_read -a "$dev"
+            ;;
+        --logs)
+            cc_smart_read -l "$dev"
+            ;;
+        *)
+            cc_smart_read -H "$dev"
+            echo
+            cc_smart_read -A "$dev"
+            echo
+            cc_smart_read -l "$dev"
+            ;;
+    esac
+}
+
+if [ -n "${1:-}" ]; then
+    cc_smart_detail "$1" "${2:-}"
+    exit 0
+fi
+
+cc_banner
+
 echo
-echo "Manual checks:"
-echo "  sudo smartctl -H /dev/sdX"
-echo "  sudo smartctl -A /dev/sdX"
-echo "  sudo smartctl -l selftest /dev/sdX"
-echo
-echo "Use cc drives to identify devices."
+echo "Drive SMART Summary"
+echo "-------------------"
+printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s\n' "Device" "Type" "Health" "Test" "Temp" "Hours" "Life"
+printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s\n' "------" "----" "------" "----" "----" "-----" "----"
+
+while read -r name type; do
+    [ "$type" = "disk" ] || continue
+    cc_smart_summary_one "/dev/$name"
+done < <(lsblk -ndo NAME,TYPE 2>/dev/null)
