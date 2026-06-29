@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : status
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show repository status summary.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+case "${1:-}" in
+    --help|-h)
+        echo "Usage: cc status"
+        echo
+        echo "Shows branch, origin, recent commits, and working tree status."
+        exit 0
+        ;;
+    --version)
+        cc_version
+        exit 0
+        ;;
+esac
+
+cc_banner
+printf '%-14s %s\n' "Repository:" "$PROJECT_ROOT"
+printf '%-14s %s\n' "Branch:" "$(git branch --show-current 2>/dev/null || echo unknown)"
+printf '%-14s %s\n' "Origin:" "$(git remote get-url origin 2>/dev/null || echo none)"
+echo
+echo "Recent commits"
+echo "--------------"
+git log --oneline -5 2>/dev/null || true
+echo
+echo "Working tree"
+echo "------------"
+if [ -n "$(git status --short)" ]; then
+    git status --short
+else
+    echo "clean"
+fi
