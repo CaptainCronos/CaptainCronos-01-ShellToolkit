@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : monthly-health
+# Version     : reads VERSION
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Generate a monthly host health report.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+usage() {
+    echo "Usage: cc monthly-health [--stdout]"
+    echo
+    echo "Generates a monthly host health report under ~/.captaincronos/reports/monthly-health."
+    echo "Use --stdout to print the report instead of writing a file."
+}
+
+case "${1:-}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        cc_version
+        exit 0
+        ;;
+esac
+
+REPORT_DIR="$HOME/.captaincronos/reports/monthly-health"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+REPORT_FILE="$REPORT_DIR/monthly-health-$STAMP.log"
+
+section() {
+    echo
+    echo "========================================"
+    echo "$1"
+    echo "========================================"
+    echo
+}
+
+run_section() {
+    local title="$1"
+    shift
+    section "$title"
+    "$@" 2>&1 || true
+}
+
+generate_report() {
+    section "Captain Cronos Monthly Health Report"
+    echo "Generated: $(date)"
+    echo "Host: $(hostname 2>/dev/null || echo unknown)"
+    echo "Kernel: $(uname -r 2>/dev/null || echo unknown)"
+    echo "Toolkit: $(bash "$PROJECT_ROOT/tools/cc" version 2>/dev/null | awk '/Toolkit/ {print $3; exit}' || echo unknown)"
+
+    run_section "Repository Status" bash "$PROJECT_ROOT/tools/cc" status
+    run_section "Toolkit Doctor" bash "$PROJECT_ROOT/tools/cc" doctor
+    run_section "Drive Inventory" bash "$PROJECT_ROOT/tools/cc" drives
+    run_section "SMART Summary" bash "$PROJECT_ROOT/tools/cc" smart
+
+    run_section "Uptime and Load" uptime
+    run_section "Memory" free -h
+    run_section "Mounted Filesystems" df -hT
+
+    if command -v systemctl >/dev/null 2>&1; then
+        section "Timers"
+        systemctl list-timers --all 2>/dev/null | grep -E 'timeshift|bitcoin|captain|monthly' || true
+    fi
+
+    if command -v ss >/dev/null 2>&1; then
+        section "Listening TCP Ports"
+        ss -tln 2>/dev/null || true
+    fi
+
+    if command -v journalctl >/dev/null 2>&1; then
+        section "Recent Errors"
+        journalctl --since "24 hours ago" --no-pager -n 500 2>/dev/null | grep -Ei 'fail|error|denied|timed out|segfault' | tail -n 30 || true
+    fi
+
+    section "Health Report Complete"
+}
+
+if [ "${1:-}" = "--stdout" ]; then
+    generate_report
+else
+    mkdir -p "$REPORT_DIR"
+    generate_report > "$REPORT_FILE"
+    cc_log "Monthly health report written: $REPORT_FILE"
+fi
