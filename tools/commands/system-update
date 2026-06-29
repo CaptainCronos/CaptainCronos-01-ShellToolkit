@@ -1,0 +1,256 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : system-update
+# Version     : 1.0.0-alpha1
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Run OS, package, app, and CLI Safe Boot update workflow.
+# ==============================================================================
+
+set -uo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+VERSION="1.0.0-alpha1"
+LOG="${LOG:-$HOME/upgrade.log}"
+DRY_RUN=0
+
+usage() {
+    echo "Usage: cc system-update [--dry-run]"
+    echo
+    echo "Runs the managed system update workflow: apt/nala/aptitude, snap, flatpak, Python venv, Firefox, Thunderbird, and GRUB CLI Safe Boot refresh."
+    echo
+    echo "Notes:"
+    echo "  This command does not purge old kernels. Review kernel cleanup separately after this workflow is stable."
+}
+
+case "${1:-}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "$VERSION"
+        exit 0
+        ;;
+    --dry-run)
+        DRY_RUN=1
+        ;;
+esac
+
+: > "$LOG"
+
+say(){ echo -e "$*" | tee -a "$LOG" ; }
+have(){ command -v "$1" >/dev/null 2>&1; }
+
+run_log() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        say "DRY RUN: $*"
+        return 0
+    fi
+    "$@" 2>&1 | tee -a "$LOG"
+    return ${PIPESTATUS[0]}
+}
+
+pkg_update() {
+    if have nala; then
+        run_log sudo nala update
+    elif have aptitude; then
+        run_log sudo aptitude update
+    else
+        run_log sudo apt update
+    fi
+}
+
+pkg_upgrade() {
+    if have nala; then
+        if ! run_log sudo nala upgrade -y; then
+            say "WARNING: nala failed, trying aptitude/apt..."
+            if have aptitude; then
+                run_log sudo aptitude safe-upgrade -y
+            else
+                run_log sudo apt -y upgrade
+            fi
+        fi
+    else
+        if ! run_log sudo apt -y upgrade; then
+            say "WARNING: apt failed, trying aptitude..."
+            have aptitude && run_log sudo aptitude safe-upgrade -y
+        fi
+    fi
+}
+
+need(){ have "$1" || { say "Missing dependency: $1"; return 1; }; }
+
+extract_tar(){
+    local arc="$1" dest="$2"
+    mkdir -p "$dest"
+    case "$arc" in
+        *.tar.xz|*.txz) tar -xJf "$arc" -C "$dest" ;;
+        *.tar.gz|*.tgz) tar -xzf "$arc" -C "$dest" ;;
+        *.tar.bz2) tar -xjf "$arc" -C "$dest" ;;
+        *) echo "Unsupported archive: $arc"; return 1 ;;
+    esac
+}
+
+install_app_from_tar(){
+    local url="$1" arc="$2" expdir="$3" target="$4"
+    local binname
+    binname="$(basename "$target")"
+    say "Downloading $binname..."
+    if [ "$DRY_RUN" -eq 1 ]; then
+        say "DRY RUN: download $url -> $arc"
+        say "DRY RUN: install $expdir -> $target"
+        return 0
+    fi
+    if ! curl -fL --retry 3 -o "$arc" "$url" >>"$LOG" 2>&1; then
+        say "Download failed"
+        return 1
+    fi
+    extract_tar "$arc" "$PWD" || return 1
+    if pgrep -x "$binname" >/dev/null 2>&1; then
+        pkill -x "$binname" || true
+        sleep 1
+    fi
+    run_log sudo rm -rf "$target"
+    run_log sudo mv "$expdir" "$target"
+    run_log sudo ln -sf "$target/$binname" "/usr/local/bin/$binname"
+    say "Updated $binname"
+}
+
+mark_daily_update(){
+    local stamp_file="$1"
+    mkdir -p "$(dirname "$stamp_file")"
+    date +%F > "$stamp_file"
+}
+
+run_daily_update(){
+    local stamp_file="$1"
+    shift
+    local today
+    today="$(date +%F)"
+    if [ -f "$stamp_file" ] && [ "$(cat "$stamp_file" 2>/dev/null)" = "$today" ]; then
+        say "Skipping $(basename "$stamp_file" .stamp): already updated today"
+        return 0
+    fi
+    if "$@"; then
+        [ "$DRY_RUN" -eq 1 ] || mark_daily_update "$stamp_file"
+    else
+        return 1
+    fi
+}
+
+latest_boot_kernel(){
+    ls /boot/vmlinuz-* 2>/dev/null | sed 's#/boot/vmlinuz-##' | grep -Ev '\.safe$' | sort -V | tail -1
+}
+
+update_cli_safe_boot(){
+    say "Checking GRUB CLI Safe Boot entry..."
+    local kernel root_uuid grub_custom backup_stamp grub_backup_dir safe_kernel
+    if ! have update-grub; then
+        say "WARNING: update-grub not found; skipping CLI Safe Boot update."
+        return 0
+    fi
+    kernel="$(latest_boot_kernel)"
+    if [ -z "${kernel:-}" ]; then
+        say "WARNING: no /boot/vmlinuz-* kernel found; skipping CLI Safe Boot update."
+        return 0
+    fi
+    if [ ! -f "/boot/vmlinuz-${kernel}" ] || [ ! -f "/boot/initrd.img-${kernel}" ]; then
+        say "WARNING: missing kernel/initrd pair for ${kernel}; skipping CLI Safe Boot update."
+        return 0
+    fi
+    root_uuid="$(findmnt -no UUID / 2>/dev/null || true)"
+    if [ -z "${root_uuid:-}" ]; then
+        say "WARNING: could not determine root filesystem UUID; skipping CLI Safe Boot update."
+        return 0
+    fi
+    grub_custom="/etc/grub.d/40_custom"
+    backup_stamp="$(date +%Y%m%d-%H%M%S)"
+    grub_backup_dir="/root/grub-custom-backups"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        say "DRY RUN: would refresh $grub_custom for kernel $kernel"
+        return 0
+    fi
+    run_log sudo mkdir -p "$grub_backup_dir"
+    if compgen -G "/etc/grub.d/40_custom.bak*" >/dev/null; then
+        run_log sudo sh -c 'for f in /etc/grub.d/40_custom.bak*; do [ -e "$f" ] && mv "$f" /root/grub-custom-backups/; done'
+    fi
+    if [ -f "$grub_custom" ]; then
+        run_log sudo cp -a "$grub_custom" "$grub_backup_dir/40_custom.${backup_stamp}"
+    fi
+    sudo tee "$grub_custom" >/dev/null <<GRUBEOF
+#!/bin/sh
+exec tail -n +3 \$0
+
+menuentry "Ubuntu CLI Safe Boot" {
+    linux /boot/vmlinuz-${kernel} root=UUID=${root_uuid} ro systemd.unit=multi-user.target nomodeset
+    initrd /boot/initrd.img-${kernel}
+}
+GRUBEOF
+    run_log sudo chmod 755 "$grub_custom"
+    run_log sudo update-grub
+    safe_kernel="$(grep -A5 "Ubuntu CLI Safe Boot" /boot/grub/grub.cfg 2>/dev/null | awk '/^[[:space:]]*linux[[:space:]]/ {for (i=1; i<=NF; i++) if ($i ~ /^\/boot\/vmlinuz-/) {sub(/^\/boot\/vmlinuz-/, "", $i); print $i; exit}}' || true)"
+    say "Current kernel : $(uname -r)"
+    say "Newest kernel  : ${kernel}"
+    say "Safe boot uses : ${safe_kernel:-unavailable}"
+    if [ "$safe_kernel" = "$kernel" ]; then
+        say "Safe boot status: MATCH"
+    else
+        say "Safe boot status: MISMATCH"
+        say "WARNING: CLI Safe Boot entry was written but could not be verified in grub.cfg."
+    fi
+}
+
+cc_banner
+say "Starting system update (${VERSION})..."
+
+pkg_update || exit 1
+pkg_upgrade || true
+update_cli_safe_boot || true
+
+if have snap; then
+    run_log sudo snap refresh || true
+fi
+
+if have flatpak; then
+    run_log flatpak update -y || true
+    run_log flatpak uninstall --unused -y || true
+fi
+
+if [ -f "$HOME/myenv/bin/activate" ]; then
+    if [ "$DRY_RUN" -eq 1 ]; then
+        say "DRY RUN: would update Python packages in $HOME/myenv"
+    else
+        . "$HOME/myenv/bin/activate"
+        python -m pip list --outdated --format=json 2>>"$LOG" | python -c 'import sys,json; s=sys.stdin.read().strip();
+try: data=json.loads(s) if s else []
+except json.JSONDecodeError: data=[]
+print("\n".join(p["name"] for p in data if "name" in p))' | xargs -r python -m pip install -U || true
+        deactivate
+    fi
+fi
+
+need curl || exit 1
+need tar || exit 1
+
+TMP_DIR="$(mktemp -d)"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/my_upgrade"
+trap 'rm -rf "$TMP_DIR"' EXIT
+cd "$TMP_DIR" || exit 1
+
+run_daily_update "$STATE_DIR/firefox.stamp" install_app_from_tar "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US" "firefox.tar.xz" "firefox" "/opt/firefox" || true
+run_daily_update "$STATE_DIR/thunderbird.stamp" install_app_from_tar "https://download.mozilla.org/?product=thunderbird-latest&os=linux64&lang=en-US" "thunderbird.tar.xz" "thunderbird" "/opt/thunderbird" || true
+
+say "System update complete (${VERSION})."
+cd "$HOME" || true
+
+if [ -f /var/run/reboot-required ]; then
+    echo "reboot required"
+else
+    echo "No reboot needed"
+fi
