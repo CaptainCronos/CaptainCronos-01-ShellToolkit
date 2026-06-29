@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : kernel-cleanup
+# Version     : 1.0.0-alpha1
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Review and optionally purge obsolete kernel packages safely.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+DRY_RUN=1
+KEEP_COUNT="${KEEP_COUNT:-2}"
+LOG="${LOG:-$HOME/kernel-cleanup.log}"
+
+usage() {
+    echo "Usage: cc kernel-cleanup [--dry-run|--apply]"
+    echo
+    echo "Safely reviews obsolete kernel packages. Default is --dry-run."
+    echo "Keeps the running kernel and the newest ${KEEP_COUNT} additional installed kernels."
+    echo
+    echo "Environment: KEEP_COUNT=3 cc kernel-cleanup --dry-run"
+}
+
+case "${1:---dry-run}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    --dry-run)
+        DRY_RUN=1
+        ;;
+    --apply)
+        DRY_RUN=0
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+
+have(){ command -v "$1" >/dev/null 2>&1; }
+log(){ echo "$*" | tee -a "$LOG" ; }
+
+: > "$LOG"
+
+running="$(uname -r)"
+mapfile -t kernels < <(ls /boot/vmlinuz-* 2>/dev/null | sed 's#/boot/vmlinuz-##' | grep -Ev '\.safe$' | sort -V)
+
+cc_banner
+log "Kernel cleanup review"
+log "Running kernel: $running"
+log "Keep newest additional kernels: $KEEP_COUNT"
+log "Dry run: $DRY_RUN"
+log "Log: $LOG"
+log ""
+
+if [ "${#kernels[@]}" -eq 0 ]; then
+    log "No kernels found under /boot."
+    exit 0
+fi
+
+log "Installed kernels:"
+printf '  %s\n' "${kernels[@]}" | tee -a "$LOG"
+log ""
+
+keep=()
+keep+=("$running")
+for k in $(printf '%s\n' "${kernels[@]}" | grep -vxF "$running" | tail -n "$KEEP_COUNT"); do
+    keep+=("$k")
+done
+
+log "Protected kernels:"
+printf '  %s\n' "${keep[@]}" | sort -V | uniq | tee -a "$LOG"
+log ""
+
+purge_kernels=()
+for k in "${kernels[@]}"; do
+    protected=0
+    for p in "${keep[@]}"; do
+        if [ "$k" = "$p" ]; then
+            protected=1
+            break
+        fi
+    done
+    [ "$protected" -eq 0 ] && purge_kernels+=("$k")
+done
+
+if [ "${#purge_kernels[@]}" -eq 0 ]; then
+    log "No obsolete kernels selected for purge."
+    exit 0
+fi
+
+packages=()
+for k in "${purge_kernels[@]}"; do
+    while read -r pkg; do
+        [ -n "$pkg" ] && packages+=("$pkg")
+    done < <(dpkg -l 2>/dev/null | awk -v k="$k" '$1 ~ /^(ii|rc)$/ && $2 ~ k {print $2}')
+done
+
+if [ "${#packages[@]}" -eq 0 ]; then
+    log "Obsolete kernel files found, but no matching dpkg packages selected."
+    exit 0
+fi
+
+log "Candidate purge packages:"
+printf '  %s\n' "${packages[@]}" | sort -u | tee -a "$LOG"
+log ""
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    log "DRY RUN only. To purge candidates, run: cc kernel-cleanup --apply"
+    exit 0
+fi
+
+log "Purging obsolete kernel packages..."
+sudo apt purge -y "${packages[@]}" 2>&1 | tee -a "$LOG"
+sudo apt autoremove --purge -y 2>&1 | tee -a "$LOG"
+sudo apt autoclean 2>&1 | tee -a "$LOG"
+sudo update-grub 2>&1 | tee -a "$LOG"
+log "Kernel cleanup complete."
