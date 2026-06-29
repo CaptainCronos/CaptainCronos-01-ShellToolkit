@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : drive-test
+# Version     : 1.0.0-alpha1
+# Category    : Storage
+# Requires    : bash smartctl awk grep sed
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Start or inspect SMART self-tests for one storage device.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+ACTION="status"
+DEVICE=""
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc drive-test status /dev/sdX
+  cc drive-test short  /dev/sdX
+  cc drive-test long   /dev/sdX
+  cc drive-test abort  /dev/sdX
+
+Actions:
+  status   Show SMART self-test status and recent self-test log.
+  short    Start SMART short self-test.
+  long     Start SMART long self-test.
+  abort    Abort active SMART self-test.
+
+Notes:
+  Starting or aborting tests may require sudo.
+  This command does not run destructive write/read burn-in tests.
+EOF_HELP
+}
+
+case "${1:-}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    status|short|long|abort)
+        ACTION="$1"
+        shift
+        ;;
+esac
+
+DEVICE="${1:-}"
+[ -n "$DEVICE" ] || { usage; exit 1; }
+
+if ! command -v smartctl >/dev/null 2>&1; then
+    cc_error "smartctl not found. Install smartmontools."
+    exit 1
+fi
+
+if [ ! -e "$DEVICE" ]; then
+    cc_error "Device not found: $DEVICE"
+    exit 1
+fi
+
+run_smartctl() {
+    if sudo -n true 2>/dev/null; then
+        sudo smartctl "$@"
+    else
+        smartctl "$@"
+    fi
+}
+
+show_status() {
+    local out
+    out="$(run_smartctl -a "$DEVICE" 2>/dev/null || true)"
+    printf '%-12s %s\n' "Device:" "$DEVICE"
+    echo
+    printf '%s\n' "$out" | awk '
+        /Self-test execution status/ {print; getline; if ($0 ~ /%/) print; next}
+        /Self-test routine in progress/ {print; next}
+        /No self-tests have been logged/ {print; next}
+        /SMART Self-test log/ {show=1; print; next}
+        show && /^#/ {print; count++; if (count >= 5) exit}
+    '
+}
+
+start_test() {
+    local kind="$1" out estimate
+    cc_log "Starting SMART $kind test on $DEVICE"
+    out="$(run_smartctl -t "$kind" "$DEVICE" 2>&1 || true)"
+    printf '%s\n' "$out"
+    estimate="$(printf '%s\n' "$out" | grep -Ei 'Please wait|completion|after' || true)"
+    echo
+    if [ -n "$estimate" ]; then
+        printf '%-12s %s\n' "Estimate:" "$estimate"
+    fi
+    printf '%-12s %s\n' "Check:" "cc drive-test status $DEVICE"
+}
+
+abort_test() {
+    cc_warn "Attempting to abort active SMART self-test on $DEVICE"
+    run_smartctl -X "$DEVICE" || true
+}
+
+case "$ACTION" in
+    status) show_status ;;
+    short) start_test short ;;
+    long) start_test long ;;
+    abort) abort_test ;;
+esac
