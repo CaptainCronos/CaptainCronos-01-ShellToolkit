@@ -4,3 +4,13 @@
 *.orig
 *.original
 *.pre-*
+
+# Runtime logs / scratch output
+*.log
+*.out
+out.txt
+out.log
+
+# Local reports / generated inventories
+repo-inventory.md
+repo-inventory.csv
