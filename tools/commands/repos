@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : repos
+# Version     : 1.0.0-alpha1
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inventory and manage local Git repositories.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+ROOT="${CAPTAIN_CRONOS_GIT_ROOT:-$HOME/GitHub}"
+ACTION="list"
+APPLY=0
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc repos [list|status|pull|fetch|verify|doctor] [--root PATH] [--apply]
+
+Default root:
+  ~/GitHub
+
+Actions:
+  list      List detected Git repositories.
+  status    Show branch, dirty/clean state, and origin for each repo.
+  fetch     Fetch all remotes and prune stale refs. Dry-run by default.
+  pull      Pull --ff-only for clean repositories. Dry-run by default.
+  verify    Run cc verify for toolkit repositories that contain tools/cc.
+  doctor    Run cc doctor for toolkit repositories that contain tools/cc.
+
+Examples:
+  cc repos
+  cc repos status
+  cc repos fetch --apply
+  cc repos pull --apply
+  cc repos --root ~/GitHub status
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "1.0.0-alpha1"
+            exit 0
+            ;;
+        --root)
+            shift
+            ROOT="${1:-}"
+            [ -n "$ROOT" ] || { usage; exit 1; }
+            shift
+            ;;
+        --apply)
+            APPLY=1
+            shift
+            ;;
+        list|status|pull|fetch|verify|doctor)
+            ACTION="$1"
+            shift
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+find_repos() {
+    find "$ROOT" -maxdepth 3 -type d -name .git 2>/dev/null | sed 's#/.git$##' | sort
+}
+
+repo_branch() {
+    git -C "$1" branch --show-current 2>/dev/null || echo unknown
+}
+
+repo_origin() {
+    git -C "$1" remote get-url origin 2>/dev/null || echo none
+}
+
+repo_state() {
+    if [ -n "$(git -C "$1" status --short 2>/dev/null)" ]; then
+        echo dirty
+    else
+        echo clean
+    fi
+}
+
+repo_ahead_behind() {
+    local repo="$1" upstream
+    upstream="$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+    if [ -z "$upstream" ]; then
+        echo "no-upstream"
+        return 0
+    fi
+    git -C "$repo" rev-list --left-right --count HEAD..."$upstream" 2>/dev/null | awk '{print "ahead:" $1 " behind:" $2}'
+}
+
+cc_banner
+printf '%-14s %s\n' "Repo root:" "$ROOT"
+printf '%-14s %s\n' "Action:" "$ACTION"
+printf '%-14s %s\n' "Apply:" "$APPLY"
+echo
+
+if [ ! -d "$ROOT" ]; then
+    cc_error "Repository root not found: $ROOT"
+    exit 1
+fi
+
+case "$ACTION" in
+    list)
+        find_repos
+        ;;
+    status)
+        printf '%-36s %-16s %-8s %-22s %s\n' "Repository" "Branch" "State" "Sync" "Origin"
+        printf '%-36s %-16s %-8s %-22s %s\n' "----------" "------" "-----" "----" "------"
+        while read -r repo; do
+            [ -n "$repo" ] || continue
+            printf '%-36s %-16s %-8s %-22s %s\n' "$(basename "$repo")" "$(repo_branch "$repo")" "$(repo_state "$repo")" "$(repo_ahead_behind "$repo")" "$(repo_origin "$repo")"
+        done < <(find_repos)
+        ;;
+    fetch)
+        while read -r repo; do
+            [ -n "$repo" ] || continue
+            echo
+            echo "[$(basename "$repo")] $repo"
+            if [ "$APPLY" -eq 1 ]; then
+                git -C "$repo" fetch --all --prune
+            else
+                echo "DRY RUN: git -C '$repo' fetch --all --prune"
+            fi
+        done < <(find_repos)
+        ;;
+    pull)
+        while read -r repo; do
+            [ -n "$repo" ] || continue
+            echo
+            echo "[$(basename "$repo")] $repo"
+            if [ "$(repo_state "$repo")" != "clean" ]; then
+                echo "SKIP: working tree is dirty"
+                continue
+            fi
+            if ! git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+                echo "SKIP: no upstream configured"
+                continue
+            fi
+            if [ "$APPLY" -eq 1 ]; then
+                git -C "$repo" pull --ff-only
+            else
+                echo "DRY RUN: git -C '$repo' pull --ff-only"
+            fi
+        done < <(find_repos)
+        ;;
+    verify|doctor)
+        while read -r repo; do
+            [ -n "$repo" ] || continue
+            [ -x "$repo/tools/cc" ] || continue
+            echo
+            echo "[$(basename "$repo")] cc $ACTION"
+            bash "$repo/tools/cc" "$ACTION" || true
+        done < <(find_repos)
+        ;;
+esac
