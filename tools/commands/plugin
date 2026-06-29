@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : plugin
+# Version     : 1.0.0-alpha1
+# Category    : Core
+# Requires    : bash find
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect local toolkit plugin directories.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+PLUGIN_DIR="$PROJECT_ROOT/plugins"
+ACTION="list"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc plugin [list|status|info NAME]
+
+Actions:
+  list        List plugin directories.
+  status      Show plugin directory status and file counts.
+  info NAME   Show detail for one plugin directory.
+
+This command only inspects plugin directories. It does not enable, disable, or execute plugins yet.
+EOF_HELP
+}
+
+if [ "$#" -gt 0 ]; then
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "1.0.0-alpha1"
+            exit 0
+            ;;
+        list|status|info)
+            ACTION="$1"
+            shift
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+fi
+
+plugin_list() {
+    find "$PLUGIN_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort
+}
+
+plugin_file_count() {
+    find "$PLUGIN_DIR/$1" -type f ! -name .gitkeep 2>/dev/null | wc -l | tr -d ' '
+}
+
+plugin_status() {
+    local name="$1" count readme
+    count="$(plugin_file_count "$name")"
+    if [ -f "$PLUGIN_DIR/$name/README.md" ]; then
+        readme="yes"
+    else
+        readme="no"
+    fi
+    if [ "$count" -gt 0 ]; then
+        printf '%-18s %-12s %-8s %-8s\n' "$name" "active" "$count" "$readme"
+    else
+        printf '%-18s %-12s %-8s %-8s\n' "$name" "reserved" "$count" "$readme"
+    fi
+}
+
+case "$ACTION" in
+    list)
+        plugin_list
+        ;;
+    status)
+        cc_banner
+        echo
+        printf '%-18s %-12s %-8s %-8s\n' "Plugin" "Status" "Files" "README"
+        printf '%-18s %-12s %-8s %-8s\n' "------" "------" "-----" "------"
+        while read -r name; do
+            [ -n "$name" ] || continue
+            plugin_status "$name"
+        done < <(plugin_list)
+        ;;
+    info)
+        name="${1:-}"
+        [ -n "$name" ] || { usage; exit 1; }
+        if [ ! -d "$PLUGIN_DIR/$name" ]; then
+            cc_error "Plugin not found: $name"
+            exit 1
+        fi
+        cc_banner
+        echo
+        printf '%-12s %s\n' "Plugin:" "$name"
+        printf '%-12s %s\n' "Path:" "$PLUGIN_DIR/$name"
+        printf '%-12s %s\n' "Files:" "$(plugin_file_count "$name")"
+        echo
+        find "$PLUGIN_DIR/$name" -maxdepth 2 -type f | sort
+        ;;
+esac
