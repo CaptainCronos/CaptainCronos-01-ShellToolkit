@@ -5,6 +5,8 @@
 # ------------------------------------------------------------------------------
 # Script      : cc-metadata.sh
 # Version     : reads VERSION
+# Category    : Core
+# Requires    : bash
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Shared command metadata and registry helpers.
 # ==============================================================================
@@ -33,6 +35,19 @@ cc_command_file() {
     echo "$(cc_command_dir)/$1"
 }
 
+cc_infer_category() {
+    case "$1" in
+        config|registry|version|install|toolkit-update) echo "Core" ;;
+        docs|helpme-refresh) echo "Documentation" ;;
+        release|baseline|defaults) echo "Engineering" ;;
+        repo|repos|gitflow|status) echo "Repository" ;;
+        verify|doctor) echo "Diagnostics" ;;
+        drives|smart|kernel-cleanup) echo "Storage" ;;
+        system-update|update|monthly-health|monthly-health-timer) echo "Maintenance" ;;
+        *) echo "General" ;;
+    esac
+}
+
 cc_command_metadata() {
     local cmd="$1"
     local file category requires script version purpose repository
@@ -47,7 +62,7 @@ cc_command_metadata() {
     [ -n "$script" ] || script="$cmd"
     [ -n "$version" ] || version="unknown"
     [ -n "$purpose" ] || purpose="unknown"
-    [ -n "$category" ] || category="Uncategorized"
+    [ -n "$category" ] || category="$(cc_infer_category "$cmd")"
     [ -n "$requires" ] || requires="bash"
     [ -n "$repository" ] || repository="CaptainCronos-01-ShellToolkit"
 
