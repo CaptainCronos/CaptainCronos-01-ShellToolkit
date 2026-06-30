@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : selftest
+# Version     : 1.0.0-alpha1
+# Category    : Engineering
+# Requires    : bash git awk
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Run the full toolkit engineering self-test suite.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+VERBOSE=0
+JSON=0
+PASSED=0
+FAILED=0
+RESULTS=""
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc selftest [--verbose] [--json]
+
+Runs the toolkit engineering self-test suite.
+
+Checks:
+  - strict command audit
+  - documentation lint
+  - release check
+  - registry load
+  - about command load
+  - roadmap command load
+  - plugin status load
+
+Options:
+  --verbose  Show full command output.
+  --json     Emit simple JSON summary.
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "1.0.0-alpha1"
+            exit 0
+            ;;
+        --verbose)
+            VERBOSE=1
+            shift
+            ;;
+        --json)
+            JSON=1
+            shift
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+run_check() {
+    local label="$1"
+    shift
+    local output rc
+    if [ "$VERBOSE" -eq 1 ]; then
+        echo
+        echo "$label"
+        echo "$(printf '%*s' "${#label}" '' | tr ' ' '-')"
+        if "$@"; then
+            rc=0
+        else
+            rc=$?
+        fi
+    else
+        output="$($@ 2>&1)" && rc=0 || rc=$?
+    fi
+
+    if [ "$rc" -eq 0 ]; then
+        PASSED=$((PASSED + 1))
+        RESULTS="${RESULTS}${label}:PASS\n"
+        [ "$JSON" -eq 1 ] || printf '%-38s %s\n' "$label" "PASS"
+    else
+        FAILED=$((FAILED + 1))
+        RESULTS="${RESULTS}${label}:FAIL\n"
+        [ "$JSON" -eq 1 ] || printf '%-38s %s\n' "$label" "FAIL"
+        if [ "$VERBOSE" -eq 0 ] && [ -n "${output:-}" ]; then
+            echo
+            echo "$output"
+            echo
+        fi
+    fi
+}
+
+if [ "$JSON" -eq 0 ]; then
+    cc_banner
+    echo
+    echo "Captain Cronos Engineering Self-Test"
+    echo "====================================="
+    echo
+fi
+
+run_check "Strict command audit" bash "$PROJECT_ROOT/tools/cc" audit --strict
+run_check "Documentation lint" bash "$PROJECT_ROOT/tools/cc" docs lint
+run_check "Release check" bash "$PROJECT_ROOT/tools/cc" release check
+run_check "Registry load" bash "$PROJECT_ROOT/tools/cc" registry
+run_check "About load" bash "$PROJECT_ROOT/tools/cc" about
+run_check "Roadmap load" bash "$PROJECT_ROOT/tools/cc" roadmap
+run_check "Plugin status load" bash "$PROJECT_ROOT/tools/cc" plugin status
+
+if [ "$JSON" -eq 1 ]; then
+    status="PASS"
+    [ "$FAILED" -eq 0 ] || status="FAIL"
+    printf '{"status":"%s","passed":%s,"failed":%s}\n' "$status" "$PASSED" "$FAILED"
+else
+    echo
+    echo "------------------------------------"
+    printf '%-14s %s\n' "Tests Passed:" "$PASSED"
+    printf '%-14s %s\n' "Tests Failed:" "$FAILED"
+    echo
+    if [ "$FAILED" -eq 0 ]; then
+        echo "Overall Status: PASS"
+    else
+        echo "Overall Status: FAIL"
+    fi
+fi
+
+[ "$FAILED" -eq 0 ]
