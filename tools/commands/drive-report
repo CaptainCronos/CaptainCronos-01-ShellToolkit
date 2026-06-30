@@ -4,11 +4,11 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-report
-# Version     : 1.0.0-alpha1
+# Version     : 1.1.0-alpha1
 # Category    : Storage
-# Requires    : bash smartctl date mkdir
+# Requires    : bash smartctl date mkdir awk sed grep
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Save SMART and inventory reports for one storage device.
+# Purpose     : Save SMART reports and update drive asset records.
 # ==============================================================================
 
 set -euo pipefail
@@ -17,6 +17,7 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-config.sh"
+source "$PROJECT_ROOT/lib/cc-assets.sh"
 
 DEVICE=""
 REPORT_ROOT="$(cc_config_get REPORT_DIR "$HOME/.captaincronos/reports")/drives"
@@ -30,10 +31,8 @@ Usage:
 Creates an archived drive report under:
   ~/.captaincronos/reports/drives/
 
-Report contents:
-  summary.txt      concise drive SMART summary
-  smartctl-a.txt   full smartctl -a output
-  metadata.txt     report metadata
+Also creates/updates a drive asset record under:
+  ~/.captaincronos/assets/drives/
 EOF_HELP
 }
 
@@ -43,7 +42,7 @@ case "${1:-}" in
         exit 0
         ;;
     --version)
-        echo "1.0.0-alpha1"
+        echo "1.1.0-alpha1"
         exit 0
         ;;
 esac
@@ -61,6 +60,7 @@ safe_name="$(basename "$DEVICE" | tr '/' '_')"
 stamp="$(date +%Y%m%d-%H%M%S)"
 out_dir="$REPORT_ROOT/${safe_name}-${stamp}"
 mkdir -p "$out_dir"
+cc_assets_init
 
 {
     echo "Captain Cronos Drive Report"
@@ -73,6 +73,45 @@ mkdir -p "$out_dir"
 bash "$PROJECT_ROOT/tools/cc" drive-smart "$DEVICE" > "$out_dir/summary.txt" 2>&1 || true
 sudo smartctl -a "$DEVICE" > "$out_dir/smartctl-a.txt" 2>&1 || smartctl -a "$DEVICE" > "$out_dir/smartctl-a.txt" 2>&1 || true
 
+summary_value() {
+    awk -F: -v key="$1" '$1 ~ key {sub(/^[ \t]+/, "", $2); print $2; exit}' "$out_dir/summary.txt"
+}
+
+model="$(summary_value '^Model')"
+serial="$(summary_value '^Serial')"
+size="$(summary_value '^Size')"
+hours="$(summary_value '^Hours')"
+temp="$(summary_value '^Temp')"
+smart="$(summary_value '^SMART')"
+result="$(summary_value '^Result')"
+
+[ -n "$serial" ] || serial="$safe_name"
+asset_file="$(cc_asset_dir drives)/$(cc_asset_safe_name "$serial").yaml"
+
+cat > "$asset_file" <<EOF_ASSET
+asset_type: drive
+serial: "$serial"
+model: "$model"
+size: "$size"
+current_device: "$DEVICE"
+last_seen: "$(date -Iseconds)"
+host: "$(hostname 2>/dev/null || echo unknown)"
+smart: "$smart"
+result: "$result"
+power_on_hours: "$hours"
+temperature: "$temp"
+last_report: "$out_dir"
+qualified: "unknown"
+qualified_date: ""
+location:
+  system: "$(hostname 2>/dev/null || echo unknown)"
+  bay: ""
+  pool: ""
+notes:
+  - "Asset record created or updated by cc drive-report."
+EOF_ASSET
+
 cc_log "Drive report created: $out_dir"
+cc_log "Drive asset updated: $asset_file"
 echo
 cat "$out_dir/summary.txt"
