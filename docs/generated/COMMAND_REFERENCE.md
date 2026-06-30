@@ -1,6 +1,76 @@
 # Captain Cronos Command Reference
 
-Generated: Mon Jun 29 06:58:00 PM EDT 2026
+Generated: Tue Jun 30 07:00:05 AM EDT 2026
+
+## cc about
+
+~~~text
+Usage:
+  cc about
+
+Shows toolkit overview, major components, and documentation locations.
+~~~
+
+## cc asset
+
+~~~text
+Usage:
+  cc asset init
+  cc asset list [TYPE]
+  cc asset show TYPE NAME
+  cc asset path [TYPE]
+  cc asset search TYPE QUERY
+  cc asset inventory TYPE
+  cc asset set TYPE NAME key=value [key=value ...]
+
+Types:
+  drives
+  systems
+  repositories
+  licenses
+  purchases
+
+Examples:
+  cc asset init
+  cc asset list drives
+  cc asset search drives TEAM
+  cc asset inventory drives
+  cc asset set drives SERIAL.yaml location.bay=A1 location.pool=tank qualified=yes
+~~~
+
+## cc audit
+
+~~~text
+Usage:
+  cc audit [summary|commands] [--strict]
+  cc audit fix [--apply]
+
+Runs consistency checks across tools/commands.
+
+Default checks:
+  - Bash syntax
+  - Script header
+  - Version header
+  - Repository header
+  - Purpose header
+  - --help support
+  - --version support
+
+Strict checks add:
+  - executable bit
+  - Category header
+  - Requires header
+
+Fix mode:
+  - Adds executable bit to tools/commands/*
+  - Adds missing Category and Requires headers for known commands
+  - Dry-run by default unless --apply is supplied
+
+Notes:
+  Most toolkit commands are dispatched by cc and do not require executable bits
+  during normal operation, but repository command files should be executable for
+  packaging and strict audit compliance.
+~~~
 
 ## cc baseline
 
@@ -58,6 +128,68 @@ Runs repository, command syntax, installation, and basic host health checks.
 Use --full to include storage inventory and SMART summary.
 ~~~
 
+## cc drive-burnin
+
+~~~text
+Usage:
+  cc drive-burnin plan /dev/sdX
+  cc drive-burnin start /dev/sdX
+  cc drive-burnin status /dev/sdX
+
+Phase 1 framework only.
+
+Actions:
+  plan    Show the intended drive acceptance workflow.
+  start   Capture initial report and start non-destructive qualification.
+  status  Show current SMART self-test status.
+~~~
+
+## cc drive-inventory
+
+~~~text
+Usage:
+  cc drive-inventory [table|csv|markdown]
+
+Shows attached block devices with model, serial, size, transport, mountpoints, and SMART basics.
+
+This is read-only inventory output. It does not start SMART tests or modify disks.
+~~~
+
+## cc drive-qualify
+
+~~~text
+Usage:
+  cc drive-qualify start [--long] /dev/sdX
+  cc drive-qualify status /dev/sdX
+  cc drive-qualify complete /dev/sdX
+  cc drive-qualify /dev/sdX
+
+Actions:
+  start     Capture pre-test report, start short SMART test, and optionally start long test.
+  status    Show SMART self-test status.
+  complete  Capture final report and mark asset qualified when SMART result is GOOD.
+
+Options:
+  --long    Start a SMART long test after the initial report instead of only a short test.
+
+Notes:
+  This is non-destructive. It does not run badblocks or write/read burn-in.
+~~~
+
+## cc drive-report
+
+~~~text
+Usage:
+  cc drive-report /dev/sdX
+  cc drive-report /dev/nvme0n1
+
+Creates an archived drive report under:
+  ~/.captaincronos/reports/drives/
+
+Also creates/updates a drive asset record under:
+  ~/.captaincronos/assets/drives/
+~~~
+
 ## cc drives
 
 ~~~text
@@ -66,17 +198,58 @@ Usage: cc drives
 Shows physical block devices, filesystems, labels, UUIDs, usage, and mount points.
 ~~~
 
+## cc drive-smart
+
+~~~text
+Usage:
+  cc drive-smart /dev/sdX
+  cc drive-smart /dev/nvme0n1
+
+Shows a concise SMART health summary for one drive.
+~~~
+
+## cc drive-test
+
+~~~text
+Usage:
+  cc drive-test status /dev/sdX
+  cc drive-test short  /dev/sdX
+  cc drive-test long   /dev/sdX
+  cc drive-test abort  /dev/sdX
+
+Actions:
+  status   Show SMART self-test status and recent self-test log.
+  short    Start SMART short self-test.
+  long     Start SMART long self-test.
+  abort    Abort active SMART self-test.
+
+Notes:
+  Starting or aborting tests may require sudo.
+  This command does not run destructive write/read burn-in tests.
+~~~
+
 ## cc gitflow
 
 ~~~text
+Usage:
+  cc gitflow [repo-directory]
+
+Launches the interactive Captain Cronos Git assistant.
+
+Examples:
+  cc gitflow
+  cc gitflow ~/GitHub/CaptainCronos-01-ShellToolkit
 ~~~
 
 ## cc helpme-refresh
 
 ~~~text
-Usage: cc helpme-refresh [--apply]
+Usage:
+  cc helpme-refresh [--apply]
 
-Patches ~/.bash_functions so helpme lists the new cc command architecture.
+Refreshes the installed helpme function in ~/.bash_functions so it lists the
+current Captain Cronos command families.
+
 Default is dry-run.
 ~~~
 
@@ -222,6 +395,15 @@ Examples:
   cc repos fetch --apply
   cc repos sync --apply
   cc repos backup --apply
+~~~
+
+## cc roadmap
+
+~~~text
+Usage:
+  cc roadmap [markdown]
+
+Shows the project roadmap from docs/ROADMAP.md.
 ~~~
 
 ## cc smart

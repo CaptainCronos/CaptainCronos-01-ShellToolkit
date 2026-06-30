@@ -1,9 +1,34 @@
 # Recent Change Summary
 
-Generated: Mon Jun 29 06:58:00 PM EDT 2026
+Generated: Tue Jun 30 07:00:05 AM EDT 2026
 
 ~~~text
-3be878a (HEAD -> main, origin/main, origin/HEAD) Add plugin inspection command
+858c5cc (HEAD -> main, origin/main, origin/HEAD) Standardize command metadata and executable permissions
+8a7b4ae Standardize command metadata and executable permissions
+5ccec52 Add audit fixer for executable bits and metadata headers
+c154fd8 Refine audit consistency checks
+74c140d Add command consistency audit
+12737a5 Refresh helpme by command family
+0163951 Add metadata header to roadmap command
+04825cb Add roadmap command
+7b4195c Add about command
+fc2ee31 Add plugin developer guide
+aaeecd4 Add architecture guide
+2cac7f2 Add administrator guide
+0b72bdb Add project roadmap
+c0e3351 Add drive acceptance workflow placeholder
+6930d41 Add asset search set and inventory actions
+6309ff0 Implement non-destructive drive qualification workflow
+a52b940 Create drive asset records from drive reports
+4c66f47 Add asset inventory command
+837e1d3 Add asset inventory helper library
+e147393 Add drive report generation command
+7fb5c0c Add drive inventory command
+48dfdbd Add SMART drive test command
+f620d3b Add drive qualification placeholder command
+17d0584 Add drive SMART summary command
+cb90b36 Regenerate docs after plugin framework updates
+3be878a Add plugin inspection command
 5d4ceca Add bitcoin plugin skeleton
 fb00691 Add maintenance plugin skeleton
 2c7ca55 Add repository plugin skeleton
@@ -18,29 +43,4 @@ a86b97e Add configuration command
 40e7358 Generate documentation for 1.2.0-alpha1
 09ffb8e Bump toolkit version to 1.2.0-alpha1
 1cbc91a Add documentation automation command
-17546fa Ignore runtime logs and generated inventory files
-f25d0ba Fix repo dashboard awk and toolkit detection
-ef35003 Add repository health dashboard metrics
-e86f398 Expand repository administration command
-4f97885 Add repository administration command
-428277b Expand monthly health report for Phase 2 operations
-d9ba13c Expand doctor with Phase 2 system checks
-58004db Add helpme phase 2 refresh command
-5a1eb7f Convert cc update into maintenance orchestrator
-ec93aba Add toolkit update command
-bf5a0f3 Add safe kernel cleanup review command
-216a12b Add system update command from my_upgrade workflow
-d1e6fc8 Retire standalone monthly health timer by default
-0f6feb8 Add monthly health timer management command
-0838d97 Add monthly health systemd timer template
-1e44398 Add monthly health systemd service template
-fe0a890 Add monthly health command
-a42b460 Complete cc smart summary command
-a6cccee Add cc smart placeholder command
-7acbc64 Fix cc drives command output
-d095cf7 Add cc drives command module
-e134f46 Add cc gitflow command module
-657f30f Bump toolkit to 1.1.0-alpha1
-ff49af3 Add cc defaults command module
-0ab083f Add cc verify command module
 ~~~
