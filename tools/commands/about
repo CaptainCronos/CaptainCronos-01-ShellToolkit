@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : about
+# Version     : 1.0.0-alpha1
+# Category    : Core
+# Requires    : bash
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show toolkit overview and documentation locations.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc about
+
+Shows toolkit overview, major components, and documentation locations.
+EOF_HELP
+}
+
+case "${1:-}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+esac
+
+cc_banner
+cat <<'EOF_ABOUT'
+
+Purpose
+-------
+A modular Linux systems administration framework for repository management,
+maintenance automation, documentation, storage administration, asset inventory,
+and release validation.
+
+Major Components
+----------------
+- Repository Management
+- Documentation Automation
+- Storage Management
+- Asset Database
+- Maintenance Workflows
+- Release Engineering
+- Plugin Framework
+
+Key Commands
+------------
+cc doctor
+cc repos status
+cc docs build --apply
+cc registry
+cc release check
+cc asset inventory drives
+cc drive-inventory
+
+Documentation
+-------------
+docs/ROADMAP.md
+docs/ADMINISTRATOR_GUIDE.md
+docs/ARCHITECTURE.md
+docs/PLUGIN_DEVELOPER_GUIDE.md
+docs/generated/
+
+Repository
+----------
+CaptainCronos-01-ShellToolkit
+EOF_ABOUT
