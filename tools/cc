@@ -5,6 +5,8 @@
 # ------------------------------------------------------------------------------
 # Script      : cc
 # Version     : reads VERSION
+# Category    : Core
+# Requires    : bash git grep sed awk
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Unified command dispatcher for Captain Cronos Shell Toolkit.
 # ==============================================================================
@@ -30,6 +32,7 @@ fi
 
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-deps.sh"
 
 COMMAND_DIR="$PROJECT_ROOT/tools/commands"
 
@@ -60,6 +63,61 @@ show_help() {
     echo "Repository: $PROJECT_ROOT"
 }
 
+script_field() {
+    local file="$1" field="$2"
+    awk -v field="$field" '
+        $0 ~ "^# " field "[[:space:]]*:" {
+            sub("^# " field "[[:space:]]*:[[:space:]]*", "")
+            print
+            exit
+        }
+    ' "$file"
+}
+
+check_command_deps() {
+    local file="$1" command_name="$2" deps dep missing=0 package
+    deps="$(script_field "$file" "Requires")"
+    [ -n "$deps" ] || return 0
+
+    for dep in $deps; do
+        case "$dep" in
+            bash|sh)
+                continue
+                ;;
+        esac
+        if ! cc_dep_exists "$dep"; then
+            if [ "$missing" -eq 0 ]; then
+                cc_error "Missing required dependency for cc $command_name"
+                echo
+                echo "Dependency Check"
+                echo "----------------"
+            fi
+            package="$(cc_dep_package_hint "$dep")"
+            printf '%-18s %s' "$dep" "MISSING"
+            if [ -n "$package" ] && [ "$package" != "$dep" ]; then
+                printf '  install package: %s' "$package"
+            fi
+            printf '\n'
+            missing=$((missing + 1))
+        fi
+    done
+
+    if [ "$missing" -gt 0 ]; then
+        echo
+        echo "Resolve missing dependencies and retry."
+        if command -v apt >/dev/null 2>&1; then
+            echo
+            echo "Ubuntu/Debian hint:"
+            printf '  sudo apt install'
+            for dep in $deps; do
+                cc_dep_exists "$dep" || printf ' %s' "$(cc_dep_package_hint "$dep")"
+            done
+            printf '\n'
+        fi
+        exit 127
+    fi
+}
+
 cmd="${1:-help}"
 shift || true
 
@@ -81,5 +139,7 @@ if [ ! -f "$command_path" ]; then
     show_help
     exit 1
 fi
+
+check_command_deps "$command_path" "$cmd"
 
 bash "$command_path" "$@"
