@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : version
 # Version     : reads VERSION
+# Category    : Core
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Show toolkit version information.
 # ==============================================================================

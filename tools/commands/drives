@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : drives
 # Version     : reads VERSION
+# Category    : Storage
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Show installed storage devices and mount information.
 # ==============================================================================

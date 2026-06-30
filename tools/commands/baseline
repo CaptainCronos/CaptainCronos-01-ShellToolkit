@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : baseline
 # Version     : reads VERSION
+# Category    : Engineering
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Capture operating-system baseline shell files.
 # ==============================================================================

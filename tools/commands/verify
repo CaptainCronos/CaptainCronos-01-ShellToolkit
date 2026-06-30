@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : verify
 # Version     : reads VERSION
+# Category    : Diagnostics
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Verify repository structure and Bash syntax.
 # ==============================================================================

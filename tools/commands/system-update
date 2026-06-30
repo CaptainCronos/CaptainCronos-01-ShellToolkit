@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : system-update
 # Version     : 1.0.0-alpha1
+# Category    : Maintenance
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Run OS, package, app, and CLI Safe Boot update workflow.
 # ==============================================================================

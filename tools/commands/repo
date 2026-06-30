@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : repo
 # Version     : reads VERSION
+# Category    : Repository
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Show repository path and Git remote information.
 # ==============================================================================

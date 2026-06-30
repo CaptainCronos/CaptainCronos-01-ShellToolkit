@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : smart
 # Version     : reads VERSION
+# Category    : Storage
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Summarize SMART health for installed storage devices.
 # ==============================================================================

@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : gitflow
 # Version     : reads VERSION
+# Category    : Repository
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Launch the interactive Git assistant.
 # ==============================================================================

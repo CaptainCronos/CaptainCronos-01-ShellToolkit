@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : install
 # Version     : reads VERSION
+# Category    : Core
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Install the Shell Toolkit locally.
 # ==============================================================================

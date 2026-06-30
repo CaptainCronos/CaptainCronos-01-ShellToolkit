@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 # Script      : kernel-cleanup
 # Version     : 1.0.0-alpha1
+# Category    : Storage
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Review and optionally purge obsolete kernel packages safely.
 # ==============================================================================
