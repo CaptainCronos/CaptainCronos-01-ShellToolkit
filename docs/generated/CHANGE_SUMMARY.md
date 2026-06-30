@@ -1,9 +1,29 @@
 # Recent Change Summary
 
-Generated: Tue Jun 30 07:00:05 AM EDT 2026
+Generated: Tue Jun 30 06:34:29 PM EDT 2026
 
 ~~~text
-858c5cc (HEAD -> main, origin/main, origin/HEAD) Standardize command metadata and executable permissions
+8601d58 (HEAD -> main, origin/main, origin/HEAD) Add framework standard documentation
+55e9254 Add executable permission verification
+05542f9 Make env command executable
+7aaab69 Add environment namespace and PATH hygiene checks
+30e36c5 Add storage namespace command
+0b7219c Add storage namespace command
+eb10f9e Mark new framework commands executable
+e3d2b85 Add live USB workbench preparation command
+51df5b0 Enhance host init with platform profiles
+4235c3e Add capability inspection command
+1cc74ff Add platform status command
+8736da6 Add platform detection library
+a792232 Run dependency checks at install start
+701239b Add dependency status command
+293a521 Enforce command dependencies from metadata
+bda78db Add dependency check helper library
+262f90b Add host init command
+34660a6 Add host environment identity library
+92b9daf Add engineering selftest command
+0bf0bbf Regenerate documentation after command standardization
+858c5cc Standardize command metadata and executable permissions
 8a7b4ae Standardize command metadata and executable permissions
 5ccec52 Add audit fixer for executable bits and metadata headers
 c154fd8 Refine audit consistency checks
@@ -23,24 +43,4 @@ a52b940 Create drive asset records from drive reports
 4c66f47 Add asset inventory command
 837e1d3 Add asset inventory helper library
 e147393 Add drive report generation command
-7fb5c0c Add drive inventory command
-48dfdbd Add SMART drive test command
-f620d3b Add drive qualification placeholder command
-17d0584 Add drive SMART summary command
-cb90b36 Regenerate docs after plugin framework updates
-3be878a Add plugin inspection command
-5d4ceca Add bitcoin plugin skeleton
-fb00691 Add maintenance plugin skeleton
-2c7ca55 Add repository plugin skeleton
-c96f6a8 Add plugin directory skeleton
-724ae6e Infer command categories from registry metadata
-a86b97e Add configuration command
-6420ecd Add configuration helper library
-302e906 Fix registry default argument handling
-5d45f07 Add release planning command
-300a8d0 Add command registry command
-2d56cd3 Add command metadata library
-40e7358 Generate documentation for 1.2.0-alpha1
-09ffb8e Bump toolkit version to 1.2.0-alpha1
-1cbc91a Add documentation automation command
 ~~~

@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Tue Jun 30 07:00:05 AM EDT 2026
+Generated: Tue Jun 30 06:34:29 PM EDT 2026
 
 ## cc about
 
@@ -80,6 +80,19 @@ Usage: cc baseline
 Captures operating-system baseline shell files.
 ~~~
 
+## cc capability
+
+~~~text
+Usage:
+  cc capability [list|check NAME]
+
+Examples:
+  cc capability
+  cc capability list
+  cc capability check smart
+  cc capability check zfs
+~~~
+
 ## cc config
 
 ~~~text
@@ -99,6 +112,20 @@ Configuration file:
 Usage: cc defaults
 
 Promotes active shell files into defaults/v1.
+~~~
+
+## cc deps
+
+~~~text
+Usage:
+  cc deps [summary]
+  cc deps command COMMAND
+  cc deps core
+  cc deps docs
+  cc deps storage
+  cc deps optional
+
+Shows dependency status for toolkit commands and dependency groups.
 ~~~
 
 ## cc docs
@@ -228,6 +255,30 @@ Notes:
   This command does not run destructive write/read burn-in tests.
 ~~~
 
+## cc env
+
+~~~text
+Usage:
+  cc env [summary]
+  cc env path [--fix|--apply]
+  cc env shell
+  cc env host
+  cc env doctor [--fix|--apply]
+
+Environment namespace for host identity, shell files, and PATH health.
+
+PATH policy:
+  PASS  required path is present exactly once
+  WARN  required path is duplicated or directory is missing
+  FAIL  required path is absent from PATH
+
+Fix/apply behavior:
+  - creates required directories when missing
+  - appends guarded PATH entries to ~/.bashrc when missing
+  - removes duplicate PATH entries in the current output guidance
+  - preserves first occurrence order when showing the cleaned PATH
+~~~
+
 ## cc gitflow
 
 ~~~text
@@ -253,6 +304,33 @@ current Captain Cronos command families.
 Default is dry-run.
 ~~~
 
+## cc init
+
+~~~text
+Usage:
+  cc init [--apply] [--host-id ID] [--role ROLE] [--profile PROFILE]
+  cc init --interactive [--apply]
+
+Initializes a portable Captain Cronos host identity.
+
+Roles:
+  developer   Development workstation
+  workbench   Live USB / drive qualification bench
+  server      General Linux server
+  nas         NAS appliance or NAS-adjacent host
+  laptop      Mobile workstation
+
+Profiles:
+  developer
+  workbench
+  server
+  truenas-scale
+  laptop
+  default
+
+Default is dry-run.
+~~~
+
 ## cc install
 
 ~~~text
@@ -266,6 +344,7 @@ Options:
   --dry-run          Show what would be done without copying files.
   --no-backup        Do not create timestamped backups before installing.
   --no-baseline      Do not create baseline files if baseline appears empty.
+  --no-deps          Skip dependency gate. Use only for recovery/testing.
   --no-bashrc        Install aliases/functions only; do not replace ~/.bashrc.
   --no-commands      Do not install command front-end into ~/bin.
   --help, -h         Show this help.
@@ -273,14 +352,15 @@ Options:
 
 What it does:
   1. Loads VERSION from the repository.
-  2. Verifies required repository files.
-  3. Verifies Bash syntax.
-  4. Optionally captures baseline OS shell files.
-  5. Backs up current ~/.bashrc, ~/.bash_aliases, and ~/.bash_functions.
-  6. Installs bash/bashrc, bash/bash_aliases, and bash/bash_functions.
-  7. Installs the cc command front-end into ~/bin.
-  8. Verifies installed files.
-  9. Prints a final install report.
+  2. Verifies required dependencies.
+  3. Verifies required repository files.
+  4. Verifies Bash syntax.
+  5. Optionally captures baseline OS shell files.
+  6. Backs up current ~/.bashrc, ~/.bash_aliases, and ~/.bash_functions.
+  7. Installs bash/bashrc, bash/bash_aliases, and bash/bash_functions.
+  8. Installs the cc command front-end into ~/bin.
+  9. Verifies installed files.
+ 10. Prints a final install report.
 ~~~
 
 ## cc kernel-cleanup
@@ -317,6 +397,15 @@ Usage: cc monthly-health-timer status|retire|run-once|install-standalone|enable|
 
 Recommended architecture: run cc monthly-health from the existing daily-backup-report framework.
 The standalone user timer is retained only as an optional fallback.
+~~~
+
+## cc platform
+
+~~~text
+Usage:
+  cc platform [summary|capabilities]
+
+Shows detected platform, package manager, init system, host identity, and capabilities.
 ~~~
 
 ## cc plugin
@@ -406,6 +495,28 @@ Usage:
 Shows the project roadmap from docs/ROADMAP.md.
 ~~~
 
+## cc selftest
+
+~~~text
+Usage:
+  cc selftest [--verbose] [--json]
+
+Runs the toolkit engineering self-test suite.
+
+Checks:
+  - strict command audit
+  - documentation lint
+  - release check
+  - registry load
+  - about command load
+  - roadmap command load
+  - plugin status load
+
+Options:
+  --verbose  Show full command output.
+  --json     Emit simple JSON summary.
+~~~
+
 ## cc smart
 
 ~~~text
@@ -424,6 +535,46 @@ Examples:
 Usage: cc status
 
 Shows branch, origin, recent commits, and working tree status.
+~~~
+
+## cc storage
+
+~~~text
+Usage:
+  cc storage <action> [options]
+
+Actions:
+  inventory        Show physical drive inventory.
+  drives           Show mounted and installed storage devices.
+  smart DEVICE     Show concise SMART summary for one device.
+  test DEVICE ...  Start or inspect SMART self-tests.
+  report DEVICE    Save SMART report and update drive asset records.
+  qualify DEVICE   Run non-destructive drive qualification workflow.
+  burnin DEVICE    Run or inspect drive burn-in workflow framework.
+  workbench        Prepare or inspect live USB workbench environment.
+  deps             Show storage dependency status.
+  status           Show storage workbench-oriented status summary.
+
+Compatibility:
+  Existing commands remain available:
+    cc drive-inventory
+    cc drives
+    cc drive-smart
+    cc drive-test
+    cc drive-report
+    cc drive-qualify
+    cc drive-burnin
+    cc workbench
+
+Examples:
+  cc storage inventory
+  cc storage smart /dev/sda
+  cc storage test /dev/sda status
+  cc storage test /dev/sda short
+  cc storage test /dev/sda long
+  cc storage report /dev/sda
+  cc storage qualify /dev/sda
+  cc storage workbench status
 ~~~
 
 ## cc system-update
@@ -472,18 +623,42 @@ Notes:
 ## cc verify
 
 ~~~text
-Usage: cc verify
+Usage:
+  cc verify [all]
+  cc verify executable [--apply]
 
-Runs the repository verification workflow.
+Actions:
+  all         Run repository verification workflow.
+  executable Check tools/commands executable permissions.
+
+Options:
+  --apply     Repair executable permissions for tools/commands/*.
 ~~~
 
 ## cc version
 
 ~~~text
-Toolkit : 1.2.0-alpha1
+Toolkit : 1.3.0-alpha1
 Codename: Blackbeard
 Standard: 0.1.0
 Baseline: ubuntu-26.04
 Release : 2026-06-29
+~~~
+
+## cc workbench
+
+~~~text
+Usage:
+  cc workbench [prepare|status] [--apply] [--host-id ID] [--repo URL] [--target DIR] [--no-selftest]
+
+Prepares a live USB / temporary Linux environment for drive qualification.
+
+Default is dry-run.
+
+Examples:
+  cc workbench
+  cc workbench prepare --apply
+  cc workbench prepare --apply --host-id drivebench
+  cc workbench status
 ~~~
 
