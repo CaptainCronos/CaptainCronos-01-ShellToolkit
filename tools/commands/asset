@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : asset
-# Version     : 1.0.0-alpha1
+# Version     : 1.1.0-alpha1
 # Category    : Core
-# Requires    : bash find cat mkdir
+# Requires    : bash find cat mkdir awk grep sed
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Manage local lifecycle asset inventory records.
 # ==============================================================================
@@ -29,6 +29,9 @@ Usage:
   cc asset list [TYPE]
   cc asset show TYPE NAME
   cc asset path [TYPE]
+  cc asset search TYPE QUERY
+  cc asset inventory TYPE
+  cc asset set TYPE NAME key=value [key=value ...]
 
 Types:
   drives
@@ -40,8 +43,9 @@ Types:
 Examples:
   cc asset init
   cc asset list drives
-  cc asset path drives
-  cc asset show drives SERIAL.yaml
+  cc asset search drives TEAM
+  cc asset inventory drives
+  cc asset set drives SERIAL.yaml location.bay=A1 location.pool=tank qualified=yes
 EOF_HELP
 }
 
@@ -52,10 +56,10 @@ if [ "$#" -gt 0 ]; then
             exit 0
             ;;
         --version)
-            echo "1.0.0-alpha1"
+            echo "1.1.0-alpha1"
             exit 0
             ;;
-        init|list|show|path)
+        init|list|show|path|search|inventory|set)
             ACTION="$1"
             shift
             ;;
@@ -68,6 +72,68 @@ fi
 
 TYPE="${1:-}"
 NAME="${2:-}"
+
+asset_file_path() {
+    local type="$1" name="$2"
+    if [ -f "$(cc_asset_dir "$type")/$name" ]; then
+        echo "$(cc_asset_dir "$type")/$name"
+    elif [ -f "$(cc_asset_dir "$type")/$name.yaml" ]; then
+        echo "$(cc_asset_dir "$type")/$name.yaml"
+    else
+        echo "$(cc_asset_dir "$type")/$name"
+    fi
+}
+
+yaml_value() {
+    local file="$1" key="$2"
+    awk -F: -v key="$key" '$1 == key {sub(/^[ \t]+/, "", $2); gsub(/^"|"$/, "", $2); print $2; exit}' "$file"
+}
+
+yaml_nested_value() {
+    local file="$1" section="$2" key="$3"
+    awk -F: -v section="$section" -v key="$key" '
+        $1 == section {inside=1; next}
+        inside && /^[^ ]/ {inside=0}
+        inside && $1 ~ "^[ ]+" key "$" {sub(/^[ \t]+/, "", $2); gsub(/^"|"$/, "", $2); print $2; exit}
+    ' "$file"
+}
+
+set_yaml_value() {
+    local file="$1" key="$2" value="$3" tmp found
+    tmp="${file}.tmp.$$"
+    found=0
+    awk -v key="$key" -v value="$value" '
+        BEGIN {found=0}
+        $0 ~ "^" key ":" {print key ": \"" value "\""; found=1; next}
+        {print}
+        END {if (!found) print key ": \"" value "\""}
+    ' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
+
+set_nested_yaml_value() {
+    local file="$1" section="$2" key="$3" value="$4" tmp
+    tmp="${file}.tmp.$$"
+    awk -v section="$section" -v key="$key" -v value="$value" '
+        BEGIN {inside=0; section_seen=0; key_set=0}
+        $0 == section ":" {inside=1; section_seen=1; print; next}
+        inside && /^[^ ]/ {
+            if (!key_set) {print "  " key ": \"" value "\""; key_set=1}
+            inside=0
+        }
+        inside && $0 ~ "^[ ]+" key ":" {print "  " key ": \"" value "\""; key_set=1; next}
+        {print}
+        END {
+            if (!section_seen) {
+                print section ":"
+                print "  " key ": \"" value "\""
+            } else if (inside && !key_set) {
+                print "  " key ": \"" value "\""
+            }
+        }
+    ' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
 
 case "$ACTION" in
     init)
@@ -85,10 +151,7 @@ case "$ACTION" in
     list)
         cc_assets_init
         if [ -n "$TYPE" ]; then
-            if [ ! -d "$(cc_asset_dir "$TYPE")" ]; then
-                cc_error "Asset type not found: $TYPE"
-                exit 1
-            fi
+            [ -d "$(cc_asset_dir "$TYPE")" ] || { cc_error "Asset type not found: $TYPE"; exit 1; }
             cc_asset_list "$TYPE"
         else
             find "$(cc_assets_root)" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
@@ -97,8 +160,57 @@ case "$ACTION" in
     show)
         [ -n "$TYPE" ] || { usage; exit 1; }
         [ -n "$NAME" ] || { usage; exit 1; }
-        file="$(cc_asset_dir "$TYPE")/$NAME"
+        file="$(asset_file_path "$TYPE" "$NAME")"
         [ -f "$file" ] || { cc_error "Asset not found: $file"; exit 1; }
         cat "$file"
+        ;;
+    search)
+        [ -n "$TYPE" ] || { usage; exit 1; }
+        query="${2:-}"
+        [ -n "$query" ] || { usage; exit 1; }
+        grep -Ril -- "$query" "$(cc_asset_dir "$TYPE")" 2>/dev/null | sort || true
+        ;;
+    inventory)
+        [ -n "$TYPE" ] || { usage; exit 1; }
+        if [ "$TYPE" = "drives" ]; then
+            printf '%-24s %-24s %-10s %-12s %-8s %-10s %s\n' "Serial" "Model" "Size" "Qualified" "Bay" "Pool" "Device"
+            printf '%-24s %-24s %-10s %-12s %-8s %-10s %s\n' "------" "-----" "----" "---------" "---" "----" "------"
+            cc_asset_list drives | while read -r file; do
+                [ -f "$file" ] || continue
+                serial="$(yaml_value "$file" serial)"
+                model="$(yaml_value "$file" model)"
+                size="$(yaml_value "$file" size)"
+                qualified="$(yaml_value "$file" qualified)"
+                device="$(yaml_value "$file" current_device)"
+                bay="$(yaml_nested_value "$file" location bay)"
+                pool="$(yaml_nested_value "$file" location pool)"
+                printf '%-24s %-24s %-10s %-12s %-8s %-10s %s\n' "$serial" "$model" "$size" "$qualified" "$bay" "$pool" "$device"
+            done
+        else
+            cc_asset_list "$TYPE"
+        fi
+        ;;
+    set)
+        [ -n "$TYPE" ] || { usage; exit 1; }
+        [ -n "$NAME" ] || { usage; exit 1; }
+        file="$(asset_file_path "$TYPE" "$NAME")"
+        [ -f "$file" ] || { cc_error "Asset not found: $file"; exit 1; }
+        shift 2 || true
+        [ "$#" -gt 0 ] || { usage; exit 1; }
+        for pair in "$@"; do
+            key="${pair%%=*}"
+            value="${pair#*=}"
+            [ "$key" != "$value" ] || { cc_error "Expected key=value: $pair"; exit 1; }
+            case "$key" in
+                location.*)
+                    subkey="${key#location.}"
+                    set_nested_yaml_value "$file" location "$subkey" "$value"
+                    ;;
+                *)
+                    set_yaml_value "$file" "$key" "$value"
+                    ;;
+            esac
+            cc_log "Set $key"
+        done
         ;;
 esac
