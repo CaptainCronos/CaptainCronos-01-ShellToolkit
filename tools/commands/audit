@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : audit
+# Version     : 1.0.0-alpha1
+# Category    : Engineering
+# Requires    : bash awk grep find
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Run command consistency checks across toolkit commands.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+MODE="summary"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc audit [summary|commands]
+
+Runs consistency checks across tools/commands.
+
+Checks:
+  - executable command file
+  - Bash syntax
+  - standard metadata headers
+  - --help support
+  - --version support
+EOF_HELP
+}
+
+case "${1:-summary}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    summary|commands)
+        MODE="${1:-summary}"
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+
+command_files() {
+    find tools/commands -maxdepth 1 -type f -printf '%f\n' | sort
+}
+
+has_header() {
+    local file="$1" header="$2"
+    grep -qE "^# ${header}[[:space:]]*:" "$file"
+}
+
+check_command() {
+    local cmd="$1" file="tools/commands/$cmd" issues=0
+    local executable="ok" syntax="ok" script="ok" version="ok" category="ok" requires="ok" repository="ok" purpose="ok" help="ok" verflag="ok"
+
+    [ -x "$file" ] || { executable="warn"; issues=$((issues + 1)); }
+    bash -n "$file" >/dev/null 2>&1 || { syntax="fail"; issues=$((issues + 1)); }
+    has_header "$file" Script || { script="warn"; issues=$((issues + 1)); }
+    has_header "$file" Version || { version="warn"; issues=$((issues + 1)); }
+    has_header "$file" Category || { category="warn"; issues=$((issues + 1)); }
+    has_header "$file" Requires || { requires="warn"; issues=$((issues + 1)); }
+    has_header "$file" Repository || { repository="warn"; issues=$((issues + 1)); }
+    has_header "$file" Purpose || { purpose="warn"; issues=$((issues + 1)); }
+    bash "$file" --help >/dev/null 2>&1 || { help="warn"; issues=$((issues + 1)); }
+    bash "$file" --version >/dev/null 2>&1 || { verflag="warn"; issues=$((issues + 1)); }
+
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$cmd" "$issues" "$executable" "$syntax" "$script" "$version" "$category" "$requires" "$repository" "$purpose" "$help" "$verflag"
+}
+
+rows() {
+    command_files | while read -r cmd; do
+        [ -n "$cmd" ] || continue
+        check_command "$cmd"
+    done
+}
+
+case "$MODE" in
+    summary)
+        cc_banner
+        echo
+        echo "Command Consistency Audit"
+        echo "-------------------------"
+        total=0
+        clean=0
+        warn=0
+        fail=0
+        while IFS=$'\t' read -r cmd issues executable syntax script version category requires repository purpose help verflag; do
+            total=$((total + 1))
+            if [ "$syntax" = "fail" ]; then
+                fail=$((fail + 1))
+            elif [ "$issues" -eq 0 ]; then
+                clean=$((clean + 1))
+            else
+                warn=$((warn + 1))
+            fi
+        done < <(rows)
+        printf '%-12s %s\n' "Commands:" "$total"
+        printf '%-12s %s\n' "Clean:" "$clean"
+        printf '%-12s %s\n' "Warnings:" "$warn"
+        printf '%-12s %s\n' "Failures:" "$fail"
+        echo
+        if [ "$warn" -gt 0 ] || [ "$fail" -gt 0 ]; then
+            echo "Run detail: cc audit commands"
+        fi
+        [ "$fail" -eq 0 ] || exit 1
+        ;;
+    commands)
+        cc_banner
+        echo
+        printf '%-22s %-6s %-5s %-6s %-6s %-7s %-8s %-8s %-10s %-8s %-6s %-8s\n' \
+            "Command" "Issues" "Exec" "Syntax" "Script" "Version" "Category" "Requires" "Repository" "Purpose" "Help" "VerFlag"
+        printf '%-22s %-6s %-5s %-6s %-6s %-7s %-8s %-8s %-10s %-8s %-6s %-8s\n' \
+            "-------" "------" "----" "------" "------" "-------" "--------" "--------" "----------" "-------" "----" "-------"
+        rows | while IFS=$'\t' read -r cmd issues executable syntax script version category requires repository purpose help verflag; do
+            printf '%-22s %-6s %-5s %-6s %-6s %-7s %-8s %-8s %-10s %-8s %-6s %-8s\n' \
+                "$cmd" "$issues" "$executable" "$syntax" "$script" "$version" "$category" "$requires" "$repository" "$purpose" "$help" "$verflag"
+        done
+        ;;
+esac
