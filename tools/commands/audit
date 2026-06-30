@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : audit
-# Version     : 1.0.0-alpha1
+# Version     : 1.1.0-alpha1
 # Category    : Engineering
 # Requires    : bash awk grep find
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -18,40 +18,59 @@ cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
 MODE="summary"
+STRICT=0
 
 usage() {
     cat <<'EOF_HELP'
 Usage:
-  cc audit [summary|commands]
+  cc audit [summary|commands] [--strict]
 
 Runs consistency checks across tools/commands.
 
-Checks:
-  - executable command file
+Default checks:
   - Bash syntax
-  - standard metadata headers
+  - Script header
+  - Version header
+  - Repository header
+  - Purpose header
   - --help support
   - --version support
+
+Strict checks add:
+  - executable bit
+  - Category header
+  - Requires header
+
+Notes:
+  Most toolkit commands are dispatched by cc and do not require executable bits
+  in the repository. Use --strict when preparing a packaging/release cleanup.
 EOF_HELP
 }
 
-case "${1:-summary}" in
-    --help|-h)
-        usage
-        exit 0
-        ;;
-    --version)
-        echo "1.0.0-alpha1"
-        exit 0
-        ;;
-    summary|commands)
-        MODE="${1:-summary}"
-        ;;
-    *)
-        usage
-        exit 1
-        ;;
-esac
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "1.1.0-alpha1"
+            exit 0
+            ;;
+        --strict)
+            STRICT=1
+            shift
+            ;;
+        summary|commands)
+            MODE="$1"
+            shift
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
 
 command_files() {
     find tools/commands -maxdepth 1 -type f -printf '%f\n' | sort
@@ -64,14 +83,20 @@ has_header() {
 
 check_command() {
     local cmd="$1" file="tools/commands/$cmd" issues=0
-    local executable="ok" syntax="ok" script="ok" version="ok" category="ok" requires="ok" repository="ok" purpose="ok" help="ok" verflag="ok"
+    local executable="skip" syntax="ok" script="ok" version="ok" category="skip" requires="skip" repository="ok" purpose="ok" help="ok" verflag="ok"
 
-    [ -x "$file" ] || { executable="warn"; issues=$((issues + 1)); }
+    if [ "$STRICT" -eq 1 ]; then
+        executable="ok"
+        category="ok"
+        requires="ok"
+        [ -x "$file" ] || { executable="warn"; issues=$((issues + 1)); }
+        has_header "$file" Category || { category="warn"; issues=$((issues + 1)); }
+        has_header "$file" Requires || { requires="warn"; issues=$((issues + 1)); }
+    fi
+
     bash -n "$file" >/dev/null 2>&1 || { syntax="fail"; issues=$((issues + 1)); }
     has_header "$file" Script || { script="warn"; issues=$((issues + 1)); }
     has_header "$file" Version || { version="warn"; issues=$((issues + 1)); }
-    has_header "$file" Category || { category="warn"; issues=$((issues + 1)); }
-    has_header "$file" Requires || { requires="warn"; issues=$((issues + 1)); }
     has_header "$file" Repository || { repository="warn"; issues=$((issues + 1)); }
     has_header "$file" Purpose || { purpose="warn"; issues=$((issues + 1)); }
     bash "$file" --help >/dev/null 2>&1 || { help="warn"; issues=$((issues + 1)); }
@@ -94,6 +119,8 @@ case "$MODE" in
         echo
         echo "Command Consistency Audit"
         echo "-------------------------"
+        printf '%-12s %s\n' "Strict:" "$STRICT"
+        echo
         total=0
         clean=0
         warn=0
