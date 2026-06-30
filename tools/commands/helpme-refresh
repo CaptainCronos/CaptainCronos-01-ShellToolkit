@@ -4,9 +4,11 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : helpme-refresh
-# Version     : 1.0.0-alpha1
+# Version     : 1.1.0-alpha1
+# Category    : Documentation
+# Requires    : bash python3
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Patch installed helpme output for Phase 2 command architecture.
+# Purpose     : Refresh installed helpme output for the current command architecture.
 # ==============================================================================
 
 set -euo pipefail
@@ -15,11 +17,19 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
+APPLY=0
+TARGET="$HOME/.bash_functions"
+
 usage() {
-    echo "Usage: cc helpme-refresh [--apply]"
-    echo
-    echo "Patches ~/.bash_functions so helpme lists the new cc command architecture."
-    echo "Default is dry-run."
+    cat <<'EOF_HELP'
+Usage:
+  cc helpme-refresh [--apply]
+
+Refreshes the installed helpme function in ~/.bash_functions so it lists the
+current Captain Cronos command families.
+
+Default is dry-run.
+EOF_HELP
 }
 
 case "${1:---dry-run}" in
@@ -28,7 +38,7 @@ case "${1:---dry-run}" in
         exit 0
         ;;
     --version)
-        echo "1.0.0-alpha1"
+        echo "1.1.0-alpha1"
         exit 0
         ;;
     --dry-run)
@@ -43,21 +53,18 @@ case "${1:---dry-run}" in
         ;;
 esac
 
-TARGET="$HOME/.bash_functions"
-SOURCE="$PROJECT_ROOT/bash/bash_functions"
-
 if [ ! -f "$TARGET" ]; then
     cc_error "Missing installed functions file: $TARGET"
     exit 1
 fi
 
 if [ "$APPLY" -eq 0 ]; then
-    cc_log "DRY RUN: would patch $TARGET"
+    cc_log "DRY RUN: would refresh helpme in $TARGET"
     cc_log "After apply, run: source ~/.bash_functions"
     exit 0
 fi
 
-BACKUP="$TARGET.pre-helpme-phase2.$(date +%Y%m%d-%H%M%S).bak"
+BACKUP="$TARGET.pre-helpme-refresh.$(date +%Y%m%d-%H%M%S).bak"
 cp -a "$TARGET" "$BACKUP"
 
 python3 - "$TARGET" <<'PY'
@@ -68,67 +75,234 @@ from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text()
 
-engineering = r'''    _cc_help_engineering() {
-        echo "CC Command Framework"
-        echo "--------------------"
-        printf "%-28s %s\n" "cc help" "Show dispatcher help and discovered command modules."
-        printf "%-28s %s\n" "cc version" "Display toolkit version information."
-        printf "%-28s %s\n" "cc repo" "Show repository path, branch, and origin."
-        printf "%-28s %s\n" "cc status" "Show repository status summary."
-        printf "%-28s %s\n" "cc verify" "Verify repository structure and Bash syntax."
-        printf "%-28s %s\n" "cc doctor" "Run toolkit health checks."
-        printf "%-28s %s\n" "cc gitflow" "Interactive Git assistant."
-        echo
-        echo "Install / Baseline"
-        echo "------------------"
-        printf "%-28s %s\n" "cc install" "Install shell toolkit files."
-        printf "%-28s %s\n" "cc toolkit-update" "Pull latest toolkit changes and reinstall."
-        printf "%-28s %s\n" "cc update" "Run managed maintenance orchestrator."
-        printf "%-28s %s\n" "cc baseline" "Capture OS baseline shell files."
-        printf "%-28s %s\n" "cc defaults" "Promote active shell files to deployable defaults."
-        echo
-        echo "System Administration"
-        echo "---------------------"
-        printf "%-28s %s\n" "cc system-update" "Run OS/package/app update workflow."
-        printf "%-28s %s\n" "cc kernel-cleanup" "Review or purge obsolete kernels safely."
-        printf "%-28s %s\n" "cc drives" "Show storage inventory."
-        printf "%-28s %s\n" "cc smart" "Show SMART drive health summary."
-        printf "%-28s %s\n" "cc monthly-health" "Generate host health report."
-        printf "%-28s %s\n" "cc monthly-health-timer" "Retire or manage optional standalone monthly timer."
-    }'''
+new_block = r'''# @name helpme
+# @group Shell
+# @desc Show Captain Cronos Toolkit help by command family, command detail, search results, docs, or stats.
+# @usage helpme [topic|command|search <term>|stats|aliases|functions|version]
+# @example helpme
+# @example helpme storage
+# @example helpme repository
+# @example helpme drive-smart
+# @example helpme search backup
+# @example helpme stats
+helpme() {
+    local cmd term repo version_file cc_bin
 
-install = r'''        install|installer|update|maintenance)
+    _cc_help_version() {
+        repo="${CAPTAIN_CRONOS_REPO:-$HOME/GitHub/CaptainCronos-01-ShellToolkit}"
+        version_file="$repo/VERSION"
+        if [ -f "$version_file" ]; then
+            # shellcheck disable=SC1090
+            . "$version_file"
+        fi
+        echo "Captain Cronos Shell Toolkit"
+        echo "Version : ${TOOLKIT_VERSION:-unknown}"
+        echo "Codename: ${TOOLKIT_CODENAME:-unknown}"
+        echo
+    }
+
+    _cc_help_row() {
+        printf "%-30s %s\n" "$1" "$2"
+    }
+
+    _cc_help_core() {
+        echo "CORE"
+        echo "----"
+        _cc_help_row "cc about" "Show toolkit overview and documentation locations."
+        _cc_help_row "cc config" "View and update toolkit configuration."
+        _cc_help_row "cc install" "Install the toolkit locally."
+        _cc_help_row "cc plugin" "Inspect plugin directories."
+        _cc_help_row "cc update" "Run managed toolkit and system maintenance workflow."
+        _cc_help_row "cc version" "Show toolkit version information."
+    }
+
+    _cc_help_repository() {
+        echo "REPOSITORY"
+        echo "----------"
+        _cc_help_row "cc repo" "Show repository path and remote information."
+        _cc_help_row "cc repos" "Inventory and manage local Git repositories."
+        _cc_help_row "cc gitflow" "Launch the interactive Git assistant."
+        _cc_help_row "cc status" "Show repository status summary."
+        _cc_help_row "cc release" "Plan and check release workflow."
+    }
+
+    _cc_help_storage() {
+        echo "STORAGE"
+        echo "-------"
+        _cc_help_row "cc drives" "Show installed storage devices and mounts."
+        _cc_help_row "cc smart" "Summarize SMART health for installed drives."
+        _cc_help_row "cc drive-smart" "Show concise SMART summary for one drive."
+        _cc_help_row "cc drive-test" "Start or inspect SMART self-tests."
+        _cc_help_row "cc drive-report" "Archive SMART report and update drive asset."
+        _cc_help_row "cc drive-inventory" "Show physical drive inventory."
+        _cc_help_row "cc drive-qualify" "Run non-destructive drive qualification workflow."
+        _cc_help_row "cc drive-burnin" "Phase 1 drive acceptance workflow framework."
+        _cc_help_row "cc asset" "Manage lifecycle asset records."
+    }
+
+    _cc_help_docs() {
+        echo "DOCUMENTATION"
+        echo "-------------"
+        _cc_help_row "cc docs" "Generate inventories, references, changelog, and lint reports."
+        _cc_help_row "cc registry" "Display command metadata registry."
+        _cc_help_row "cc roadmap" "Show project roadmap."
+        _cc_help_row "cc about" "Show toolkit overview."
+        echo
+        echo "Manual guides"
+        echo "-------------"
+        _cc_help_row "docs/ADMINISTRATOR_GUIDE.md" "Operator guide."
+        _cc_help_row "docs/ARCHITECTURE.md" "Toolkit architecture."
+        _cc_help_row "docs/PLUGIN_DEVELOPER_GUIDE.md" "Plugin and command development standard."
+        _cc_help_row "docs/ROADMAP.md" "Project roadmap."
+    }
+
+    _cc_help_maintenance() {
+        echo "MAINTENANCE"
+        echo "-----------"
+        _cc_help_row "cc doctor" "Run repository, installation, and host health checks."
+        _cc_help_row "cc monthly-health" "Generate monthly host health report."
+        _cc_help_row "cc monthly-health-timer" "Inspect or retire standalone monthly timer."
+        _cc_help_row "cc system-update" "Run OS, package, app, and CLI update workflow."
+        _cc_help_row "cc kernel-cleanup" "Review or purge obsolete kernel packages safely."
+        _cc_help_row "cc toolkit-update" "Pull latest toolkit changes and reinstall local commands."
+    }
+
+    _cc_help_engineering() {
+        echo "ENGINEERING"
+        echo "-----------"
+        _cc_help_row "cc baseline" "Capture operating-system baseline shell files."
+        _cc_help_row "cc defaults" "Promote active shell files into deployable defaults."
+        _cc_help_row "cc verify" "Verify repository structure and Bash syntax."
+        _cc_help_row "cc release check" "Run pre-release verification checks."
+        _cc_help_row "cc docs lint" "Check command headers and Bash syntax."
+    }
+
+    _cc_help_all() {
+        _cc_help_version
+        _cc_help_core; echo
+        _cc_help_repository; echo
+        _cc_help_storage; echo
+        _cc_help_maintenance; echo
+        _cc_help_docs; echo
+        _cc_help_engineering
+        echo
+        echo "Shell helpers"
+        echo "-------------"
+        _cc_help_row "helpme aliases" "Show documented aliases."
+        _cc_help_row "helpme functions" "Show documented shell functions."
+        _cc_help_row "helpme search <term>" "Search aliases, functions, and command families."
+        _cc_help_row "helpme <command>" "Show detailed help for a command when available."
+    }
+
+    _cc_help_cc_command() {
+        local name="$1"
+        name="${name#cc }"
+        name="${name#cc-}"
+        cc_bin="$(command -v cc 2>/dev/null || true)"
+        if [ -n "$cc_bin" ]; then
+            cc "$name" --help 2>/dev/null && return 0
+        fi
+        return 1
+    }
+
+    _cc_help_search_static() {
+        {
+            _cc_help_core
+            _cc_help_repository
+            _cc_help_storage
+            _cc_help_maintenance
+            _cc_help_docs
+            _cc_help_engineering
+        } | awk -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q {print}'
+    }
+
+    case "${1:-}" in
+        ""|list|all)
+            _cc_help_all
+            ;;
+        version|--version)
             _cc_help_version
-            echo "Maintenance / Update Commands"
-            echo "-----------------------------"
-            printf "%-28s %s\n" "cc update" "Managed maintenance orchestrator; defaults to dry-run."
-            printf "%-28s %s\n" "cc update --apply" "Run full maintenance workflow."
-            printf "%-28s %s\n" "cc toolkit-update" "Old direct toolkit pull/reinstall behavior."
-            printf "%-28s %s\n" "cc system-update" "OS, package, app, and CLI Safe Boot update workflow."
-            printf "%-28s %s\n" "cc kernel-cleanup" "Dry-run obsolete kernel review."
-            printf "%-28s %s\n" "cc kernel-cleanup --apply" "Purge obsolete kernel candidates."
-            printf "%-28s %s\n" "cc monthly-health" "Generate monthly host health report."
-            printf "%-28s %s\n" "cc monthly-health-timer retire" "Remove optional standalone user timer."
-            echo
-            echo "Legacy direct scripts"
-            echo "---------------------"
-            printf "%-28s %s\n" "install/install.sh" "Install shell toolkit files."
-            printf "%-28s %s\n" "install/update.sh" "Pull latest changes and reinstall."
-            printf "%-28s %s\n" "install/verify.sh" "Verify structure and syntax."
-            printf "%-28s %s\n" "install/create-baseline.sh" "Capture OS baseline files."
-            printf "%-28s %s\n" "install/promote-defaults.sh" "Promote bash files to deployable defaults."
-            ;;'''
+            ;;
+        core)
+            _cc_help_version; _cc_help_core
+            ;;
+        repo|repository|repositories)
+            _cc_help_version; _cc_help_repository
+            ;;
+        storage|drive|drives|disk|disks|nas)
+            _cc_help_version; _cc_help_storage
+            ;;
+        maintenance|maint|install|installer|update)
+            _cc_help_version; _cc_help_maintenance
+            ;;
+        docs|documentation)
+            _cc_help_version; _cc_help_docs
+            ;;
+        engineering|engineer|dev|diagnostics|verify)
+            _cc_help_version; _cc_help_engineering
+            ;;
+        github|git|workflow|gitflow)
+            _cc_gitflow_help
+            ;;
+        aliases)
+            _cc_alias_table | awk -F '\t' '{ printf "%-16s %s\n", $1, $2 }'
+            ;;
+        functions)
+            _cc_function_table | awk -F '\t' '{ printf "%-16s %-12s %s\n", $2, $1, $3 }'
+            ;;
+        search)
+            shift
+            term="$*"
+            if [ -z "$term" ]; then
+                echo "Usage: helpme search <term>"
+                return 1
+            fi
+            echo "Search results for: $term"
+            echo "------------------------"
+            {
+                _cc_alias_table | awk -F '\t' '{ print "alias\t" $1 "\t" $2 }'
+                _cc_function_table | awk -F '\t' '{ print "function\t" $2 "\t" $3 }'
+                _cc_help_search_static | awk 'NF { print "command\t" $1 "\t" substr($0, index($0,$2)) }'
+            } | awk -F '\t' -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q { printf "%-12s %-24s %s\n", $1, $2, $3 }'
+            ;;
+        stats)
+            _cc_help_version
+            echo "Toolkit Statistics"
+            echo "=================="
+            printf "Aliases       : %s\n" "$(_cc_alias_names | wc -l)"
+            printf "Functions     : %s\n" "$(_cc_function_names | wc -l)"
+            if command -v cc >/dev/null 2>&1; then
+                printf "Commands      : %s\n" "$(cc registry tsv 2>/dev/null | tail -n +2 | wc -l)"
+            fi
+            printf "Function file : %s\n" "$(_cc_meta_file)"
+            printf "Alias file    : %s\n" "$(_cc_alias_file)"
+            ;;
+        *)
+            cmd="$1"
+            if _cc_help_cc_command "$cmd"; then
+                return 0
+            fi
+            if _cc_command_help "$cmd"; then
+                return 0
+            fi
+            if _cc_alias_help "$cmd"; then
+                return 0
+            fi
+            echo "No help entry for: $cmd"
+            echo "Try: helpme search $cmd"
+            return 1
+            ;;
+    esac
+}'''
 
-text = re.sub(r'    _cc_help_engineering\(\) \{.*?\n    \}', engineering, text, count=1, flags=re.S)
-text = re.sub(r'        install\|installer\|update\).*?\n            ;;', install, text, count=1, flags=re.S)
-
-usage_extra = '''            echo "  helpme maintenance"
-            echo "  helpme install"'''
-text = text.replace('            echo "  helpme install"', usage_extra, 1)
-
+pattern = re.compile(r'# @name helpme\n# @group Shell\n# @desc .*?\nhelpme\(\) \{.*?\n\}', re.S)
+match = pattern.search(text)
+if not match:
+    raise SystemExit("Could not find helpme block to replace")
+text = text[:match.start()] + new_block + text[match.end():]
 path.write_text(text)
 PY
 
-cc_log "Patched $TARGET"
+cc_log "Refreshed helpme in $TARGET"
 cc_log "Backup: $BACKUP"
 cc_log "Reload with: source ~/.bash_functions"
