@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : audit
-# Version     : 1.1.0-alpha1
+# Version     : 1.2.0-alpha1
 # Category    : Engineering
-# Requires    : bash awk grep find
+# Requires    : bash awk grep find python3 chmod
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Run command consistency checks across toolkit commands.
 # ==============================================================================
@@ -19,11 +19,13 @@ source "$PROJECT_ROOT/lib/cc-common.sh"
 
 MODE="summary"
 STRICT=0
+APPLY=0
 
 usage() {
     cat <<'EOF_HELP'
 Usage:
   cc audit [summary|commands] [--strict]
+  cc audit fix [--apply]
 
 Runs consistency checks across tools/commands.
 
@@ -41,9 +43,15 @@ Strict checks add:
   - Category header
   - Requires header
 
+Fix mode:
+  - Adds executable bit to tools/commands/*
+  - Adds missing Category and Requires headers for known commands
+  - Dry-run by default unless --apply is supplied
+
 Notes:
   Most toolkit commands are dispatched by cc and do not require executable bits
-  in the repository. Use --strict when preparing a packaging/release cleanup.
+  during normal operation, but repository command files should be executable for
+  packaging and strict audit compliance.
 EOF_HELP
 }
 
@@ -54,14 +62,18 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "1.1.0-alpha1"
+            echo "1.2.0-alpha1"
             exit 0
             ;;
         --strict)
             STRICT=1
             shift
             ;;
-        summary|commands)
+        --apply)
+            APPLY=1
+            shift
+            ;;
+        summary|commands|fix)
             MODE="$1"
             shift
             ;;
@@ -113,6 +125,91 @@ rows() {
     done
 }
 
+fix_known_metadata() {
+    python3 - "$PROJECT_ROOT" "$APPLY" <<'PY'
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+apply = sys.argv[2] == "1"
+cmd_dir = root / "tools" / "commands"
+
+meta = {
+    "about": ("Core", "bash"),
+    "asset": ("Core", "bash find cat mkdir awk grep sed"),
+    "audit": ("Engineering", "bash awk grep find python3 chmod"),
+    "baseline": ("Engineering", "bash"),
+    "config": ("Core", "bash"),
+    "defaults": ("Engineering", "bash"),
+    "docs": ("Documentation", "bash git find awk"),
+    "doctor": ("Diagnostics", "bash git awk df smartctl"),
+    "drive-burnin": ("Storage", "bash smartctl date mkdir"),
+    "drive-inventory": ("Storage", "bash lsblk smartctl awk sed grep"),
+    "drive-qualify": ("Storage", "bash smartctl awk grep sed date mkdir"),
+    "drive-report": ("Storage", "bash smartctl date mkdir awk sed grep"),
+    "drives": ("Storage", "bash lsblk df awk"),
+    "drive-smart": ("Storage", "bash smartctl awk grep sed"),
+    "drive-test": ("Storage", "bash smartctl awk grep sed"),
+    "gitflow": ("Repository", "bash git"),
+    "helpme-refresh": ("Documentation", "bash python3"),
+    "install": ("Core", "bash"),
+    "kernel-cleanup": ("Storage", "bash apt dpkg uname awk"),
+    "monthly-health": ("Maintenance", "bash date mkdir df uname uptime"),
+    "monthly-health-timer": ("Maintenance", "bash systemctl"),
+    "plugin": ("Core", "bash find"),
+    "registry": ("Documentation", "bash awk find"),
+    "release": ("Engineering", "bash git"),
+    "repo": ("Repository", "bash git"),
+    "repos": ("Repository", "bash git awk find du"),
+    "roadmap": ("Documentation", "bash cat"),
+    "smart": ("Storage", "bash smartctl lsblk awk sudo"),
+    "status": ("Repository", "bash git"),
+    "system-update": ("Maintenance", "bash apt flatpak snap"),
+    "toolkit-update": ("Core", "bash git"),
+    "update": ("Maintenance", "bash git"),
+    "verify": ("Diagnostics", "bash find bash"),
+    "version": ("Core", "bash"),
+}
+
+def has_header(text, name):
+    return any(line.startswith(f"# {name}") and ":" in line for line in text.splitlines())
+
+changed = []
+for path in sorted(cmd_dir.iterdir()):
+    if not path.is_file():
+        continue
+    cmd = path.name
+    if cmd not in meta:
+        continue
+    category, requires = meta[cmd]
+    text = path.read_text()
+    lines = text.splitlines()
+    if has_header(text, "Category") and has_header(text, "Requires"):
+        continue
+    out = []
+    inserted = False
+    for line in lines:
+        out.append(line)
+        if line.startswith("# Version") and not has_header(text, "Category"):
+            out.append(f"# Category    : {category}")
+        if line.startswith("# Category") and not has_header(text, "Requires"):
+            out.append(f"# Requires    : {requires}")
+        if line.startswith("# Version") and has_header(text, "Category") and not has_header(text, "Requires"):
+            # If Category existed above or elsewhere, Requires will be added after Category only.
+            pass
+    new_text = "\n".join(out) + ("\n" if text.endswith("\n") else "")
+    if new_text != text:
+        changed.append(str(path.relative_to(root)))
+        if apply:
+            path.write_text(new_text)
+
+for item in changed:
+    print(item)
+if not changed:
+    print("No metadata changes needed.")
+PY
+}
+
 case "$MODE" in
     summary)
         cc_banner
@@ -156,5 +253,23 @@ case "$MODE" in
             printf '%-22s %-6s %-5s %-6s %-6s %-7s %-8s %-8s %-10s %-8s %-6s %-8s\n' \
                 "$cmd" "$issues" "$executable" "$syntax" "$script" "$version" "$category" "$requires" "$repository" "$purpose" "$help" "$verflag"
         done
+        ;;
+    fix)
+        cc_banner
+        echo
+        printf '%-12s %s\n' "Apply:" "$APPLY"
+        echo
+        if [ "$APPLY" -eq 0 ]; then
+            cc_log "DRY RUN: would chmod +x tools/commands/* and add missing metadata headers."
+            echo
+            fix_known_metadata
+            echo
+            cc_log "Re-run with: cc audit fix --apply"
+            exit 0
+        fi
+        chmod +x tools/commands/*
+        cc_log "Applied executable bit to tools/commands/*"
+        fix_known_metadata
+        cc_log "Audit fix complete. Review with: git diff -- tools/commands"
         ;;
 esac
