@@ -6,6 +6,7 @@
 # Script      : toolkit-update
 # Version     : reads VERSION
 # Category    : Core
+# Requires    : bash git
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Pull latest toolkit changes and reinstall local command files.
 # ==============================================================================

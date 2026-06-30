@@ -6,6 +6,7 @@
 # Script      : defaults
 # Version     : reads VERSION
 # Category    : Engineering
+# Requires    : bash
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Promote active shell files into deployable defaults.
 # ==============================================================================

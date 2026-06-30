@@ -6,6 +6,7 @@
 # Script      : monthly-health-timer
 # Version     : reads VERSION
 # Category    : Maintenance
+# Requires    : bash systemctl
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Retire or inspect the standalone monthly health user timer.
 # ==============================================================================

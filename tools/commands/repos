@@ -6,6 +6,7 @@
 # Script      : repos
 # Version     : 1.2.1-alpha1
 # Category    : Repository
+# Requires    : bash git awk find du
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Inventory and manage local Git repositories.
 # ==============================================================================

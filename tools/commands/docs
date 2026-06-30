@@ -6,6 +6,7 @@
 # Script      : docs
 # Version     : 1.0.0-alpha1
 # Category    : Documentation
+# Requires    : bash git find awk
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Generate toolkit documentation and command references.
 # ==============================================================================

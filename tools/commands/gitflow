@@ -6,6 +6,7 @@
 # Script      : gitflow
 # Version     : reads VERSION
 # Category    : Repository
+# Requires    : bash git
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Launch the interactive Git assistant.
 # ==============================================================================
@@ -15,17 +16,23 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
-source "$PROJECT_ROOT/bash/bash_functions"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc gitflow [repo-directory]
+
+Launches the interactive Captain Cronos Git assistant.
+
+Examples:
+  cc gitflow
+  cc gitflow ~/GitHub/CaptainCronos-01-ShellToolkit
+EOF_HELP
+}
 
 case "${1:-}" in
     --help|-h)
-        if declare -F _cc_gitflow_help >/dev/null 2>&1; then
-            _cc_gitflow_help
-        else
-            echo "Usage: cc gitflow [repo-directory]"
-            echo
-            echo "Launches the interactive Captain Cronos Git assistant."
-        fi
+        usage
         exit 0
         ;;
     --version)
@@ -33,5 +40,12 @@ case "${1:-}" in
         exit 0
         ;;
 esac
+
+source "$PROJECT_ROOT/bash/bash_functions"
+
+if ! declare -F gitflow >/dev/null 2>&1; then
+    cc_error "gitflow function not available after sourcing bash_functions"
+    exit 1
+fi
 
 gitflow "${1:-$PWD}"
