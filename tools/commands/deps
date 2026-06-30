@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : deps
+# Version     : 1.0.0-alpha1
+# Category    : Diagnostics
+# Requires    : bash awk grep find command
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show dependency status for toolkit commands and profiles.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-deps.sh"
+
+ACTION="summary"
+TARGET=""
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc deps [summary]
+  cc deps command COMMAND
+  cc deps core
+  cc deps docs
+  cc deps storage
+  cc deps optional
+
+Shows dependency status for toolkit commands and dependency groups.
+EOF_HELP
+}
+
+script_field() {
+    local file="$1" field="$2"
+    awk -v field="$field" '
+        $0 ~ "^# " field "[[:space:]]*:" {
+            sub("^# " field "[[:space:]]*:[[:space:]]*", "")
+            print
+            exit
+        }
+    ' "$file"
+}
+
+show_group() {
+    local title="$1"
+    shift
+    echo "$title"
+    echo "$(printf '%*s' "${#title}" '' | tr ' ' '-')"
+    cc_dep_check_list "$@" || true
+}
+
+show_command() {
+    local cmd="$1" file deps
+    file="$PROJECT_ROOT/tools/commands/$cmd"
+    [ -f "$file" ] || { cc_error "Unknown command: $cmd"; exit 1; }
+    deps="$(script_field "$file" Requires)"
+    [ -n "$deps" ] || { cc_warn "No Requires header for cc $cmd"; exit 0; }
+    show_group "cc $cmd dependencies" $deps
+}
+
+case "${1:-summary}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    summary|core|docs|storage|optional)
+        ACTION="${1:-summary}"
+        ;;
+    command)
+        ACTION="command"
+        TARGET="${2:-}"
+        [ -n "$TARGET" ] || { usage; exit 1; }
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+
+cc_banner
+
+case "$ACTION" in
+    summary)
+        show_group "Core dependencies" $(cc_dep_core_list)
+        echo
+        show_group "Documentation dependencies" $(cc_dep_docs_list)
+        echo
+        show_group "Storage dependencies" $(cc_dep_storage_list)
+        echo
+        show_group "Optional dependencies" $(cc_dep_optional_list)
+        ;;
+    core)
+        show_group "Core dependencies" $(cc_dep_core_list)
+        ;;
+    docs)
+        show_group "Documentation dependencies" $(cc_dep_docs_list)
+        ;;
+    storage)
+        show_group "Storage dependencies" $(cc_dep_storage_list)
+        ;;
+    optional)
+        show_group "Optional dependencies" $(cc_dep_optional_list)
+        ;;
+    command)
+        show_command "$TARGET"
+        ;;
+esac
