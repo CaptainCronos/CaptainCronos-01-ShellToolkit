@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : capability
+# Version     : 1.0.0-alpha1
+# Category    : Diagnostics
+# Requires    : bash awk grep command
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect detected host capabilities.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-platform.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc capability [list|check NAME]
+
+Examples:
+  cc capability
+  cc capability list
+  cc capability check smart
+  cc capability check zfs
+EOF_HELP
+}
+
+ACTION="${1:-list}"
+NAME="${2:-}"
+
+case "$ACTION" in
+    --help|-h) usage; exit 0 ;;
+    --version) echo "1.0.0-alpha1"; exit 0 ;;
+    list) ;;
+    check) [ -n "$NAME" ] || { usage; exit 1; } ;;
+    *) usage; exit 1 ;;
+esac
+
+case "$ACTION" in
+    list)
+        cc_banner
+        echo "Capabilities"
+        echo "------------"
+        while read -r cap; do
+            [ -n "$cap" ] || continue
+            printf '%-18s %s\n' "$cap" "$(cc_capability_status "$cap")"
+        done < <(cc_capability_list)
+        ;;
+    check)
+        if cc_capability_exists "$NAME"; then
+            echo "yes"
+            exit 0
+        else
+            echo "no"
+            exit 1
+        fi
+        ;;
+esac
