@@ -15,14 +15,16 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-deps.sh"
 
-INSTALL_VERSION="2.1.0-alpha1"
+INSTALL_VERSION="2.2.0-alpha1"
 BACKUP_ROOT="$HOME/.captaincronos/backups"
 BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)"
 USER_BIN="$HOME/bin"
 DRY_RUN="no"
 SKIP_BACKUP="no"
 SKIP_BASELINE="no"
+SKIP_DEPS="no"
 INSTALL_BASHRC="yes"
 INSTALL_COMMANDS="yes"
 
@@ -38,6 +40,7 @@ Options:
   --dry-run          Show what would be done without copying files.
   --no-backup        Do not create timestamped backups before installing.
   --no-baseline      Do not create baseline files if baseline appears empty.
+  --no-deps          Skip dependency gate. Use only for recovery/testing.
   --no-bashrc        Install aliases/functions only; do not replace ~/.bashrc.
   --no-commands      Do not install command front-end into ~/bin.
   --help, -h         Show this help.
@@ -45,14 +48,15 @@ Options:
 
 What it does:
   1. Loads VERSION from the repository.
-  2. Verifies required repository files.
-  3. Verifies Bash syntax.
-  4. Optionally captures baseline OS shell files.
-  5. Backs up current ~/.bashrc, ~/.bash_aliases, and ~/.bash_functions.
-  6. Installs bash/bashrc, bash/bash_aliases, and bash/bash_functions.
-  7. Installs the cc command front-end into ~/bin.
-  8. Verifies installed files.
-  9. Prints a final install report.
+  2. Verifies required dependencies.
+  3. Verifies required repository files.
+  4. Verifies Bash syntax.
+  5. Optionally captures baseline OS shell files.
+  6. Backs up current ~/.bashrc, ~/.bash_aliases, and ~/.bash_functions.
+  7. Installs bash/bashrc, bash/bash_aliases, and bash/bash_functions.
+  8. Installs the cc command front-end into ~/bin.
+  9. Verifies installed files.
+ 10. Prints a final install report.
 EOF_HELP
 }
 
@@ -68,6 +72,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --no-baseline)
             SKIP_BASELINE="yes"
+            shift
+            ;;
+        --no-deps)
+            SKIP_DEPS="yes"
             shift
             ;;
         --no-bashrc)
@@ -138,6 +146,53 @@ ensure_user_bin() {
     mkdir -p "$USER_BIN"
 }
 
+verify_dependencies() {
+    local missing deps dep packages package
+
+    if [ "$SKIP_DEPS" = "yes" ]; then
+        cc_warn "Dependency gate skipped by request."
+        return 0
+    fi
+
+    deps="$(cc_dep_core_list) $(cc_dep_docs_list)"
+    missing=0
+    packages=""
+
+    echo
+    echo "Installer Dependency Gate"
+    echo "-------------------------"
+
+    for dep in $deps; do
+        if cc_dep_exists "$dep"; then
+            printf '%-18s %s\n' "$dep" "PASS"
+        else
+            printf '%-18s %s\n' "$dep" "MISSING"
+            missing=$((missing + 1))
+            package="$(cc_dep_package_hint "$dep")"
+            case " $packages " in
+                *" $package "*) ;;
+                *) packages="$packages $package" ;;
+            esac
+        fi
+    done
+
+    if [ "$missing" -gt 0 ]; then
+        echo
+        cc_error "Missing required install dependencies: $missing"
+        if command -v apt >/dev/null 2>&1; then
+            echo
+            echo "Ubuntu/Debian hint:"
+            echo "  sudo apt install$packages"
+        fi
+        echo
+        echo "Install aborted before changing files."
+        exit 127
+    fi
+
+    echo
+    cc_log "Dependency gate passed."
+}
+
 verify_bash_sources() {
     cc_require_file bash/bash_aliases
     cc_require_file bash/bash_functions
@@ -205,6 +260,7 @@ print_report() {
     printf '%-18s %s\n' "Toolkit:" "${TOOLKIT_VERSION:-unknown}"
     printf '%-18s %s\n' "Codename:" "${TOOLKIT_CODENAME:-unknown}"
     printf '%-18s %s\n' "Installer:" "$INSTALL_VERSION"
+    printf '%-18s %s\n' "Dependency gate:" "$([ "$SKIP_DEPS" = "yes" ] && echo "skipped" || echo "passed")"
     printf '%-18s %s\n' "Backup dir:" "$([ "$SKIP_BACKUP" = "yes" ] && echo "skipped" || echo "$BACKUP_DIR")"
     printf '%-18s %s\n' "Dry run:" "$DRY_RUN"
     printf '%-18s %s\n' "Install bashrc:" "$INSTALL_BASHRC"
@@ -215,16 +271,17 @@ print_report() {
     echo
     echo "Verify with:"
     echo "  cc version"
-    echo "  cc repo"
+    echo "  cc deps"
+    echo "  cc selftest"
     echo "  cc doctor"
-    echo "  helpme engineering"
-    echo "  lstree --depth 2 ."
 }
 
 cc_load_version
 cc_banner
 
 cc_log "Starting installer v$INSTALL_VERSION"
+
+verify_dependencies
 
 cc_log "Verifying repository framework..."
 install/verify.sh
