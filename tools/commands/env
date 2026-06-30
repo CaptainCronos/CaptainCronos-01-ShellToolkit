@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : env
+# Version     : 1.0.0-alpha1
+# Category    : Core
+# Requires    : bash awk grep mkdir
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect and repair Captain Cronos environment and PATH health.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-environment.sh"
+source "$PROJECT_ROOT/lib/cc-platform.sh"
+
+ACTION="summary"
+SUBACTION=""
+APPLY=0
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc env [summary]
+  cc env path [--fix|--apply]
+  cc env shell
+  cc env host
+  cc env doctor [--fix|--apply]
+
+Environment namespace for host identity, shell files, and PATH health.
+
+PATH policy:
+  PASS  required path is present exactly once
+  WARN  required path is duplicated or directory is missing
+  FAIL  required path is absent from PATH
+
+Fix/apply behavior:
+  - creates required directories when missing
+  - appends guarded PATH entries to ~/.bashrc when missing
+  - removes duplicate PATH entries in the current output guidance
+  - preserves first occurrence order when showing the cleaned PATH
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "1.0.0-alpha1"
+            exit 0
+            ;;
+        summary|path|shell|host|doctor)
+            ACTION="$1"
+            shift
+            ;;
+        --fix|--apply)
+            APPLY=1
+            shift
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+count_path_entry() {
+    local needle="$1" count=0 entry
+    IFS=':' read -r -a entries <<< "$PATH"
+    for entry in "${entries[@]}"; do
+        [ "$entry" = "$needle" ] && count=$((count + 1))
+    done
+    echo "$count"
+}
+
+path_cleaned() {
+    awk -v RS=':' '
+        NF && !seen[$0]++ { out = out (out ? ":" : "") $0 }
+        END { print out }
+    ' <<< "$PATH"
+}
+
+path_status_for() {
+    local label="$1" dir="$2" count status note
+    count="$(count_path_entry "$dir")"
+    status="PASS"
+    note=""
+
+    if [ "$count" -eq 0 ]; then
+        status="FAIL"
+        note="missing from PATH"
+    elif [ "$count" -gt 1 ]; then
+        status="WARN"
+        note="$count entries"
+    elif [ ! -d "$dir" ]; then
+        status="WARN"
+        note="directory missing"
+    fi
+
+    if [ -n "$note" ]; then
+        printf '%-18s %-6s %s\n' "$label" "$status" "$note"
+    else
+        printf '%-18s %-6s\n' "$label" "$status"
+    fi
+}
+
+path_overall() {
+    local fail=0 warn=0 dir count
+    for dir in "$HOME/bin" "$HOME/.local/bin"; do
+        count="$(count_path_entry "$dir")"
+        if [ "$count" -eq 0 ]; then
+            fail=$((fail + 1))
+        elif [ "$count" -gt 1 ] || [ ! -d "$dir" ]; then
+            warn=$((warn + 1))
+        fi
+    done
+    if [ "$fail" -gt 0 ]; then echo FAIL
+    elif [ "$warn" -gt 0 ]; then echo WARN
+    else echo PASS
+    fi
+}
+
+ensure_path_guard() {
+    local file="$1" dir="$2" label="$3"
+    grep -Fq "$dir" "$file" 2>/dev/null && return 0
+    cat >> "$file" <<EOF_GUARD
+
+# Captain Cronos PATH guard: $label
+case ":\$PATH:" in
+    *":$dir:"*) ;;
+    *) export PATH="$dir:\$PATH" ;;
+esac
+EOF_GUARD
+}
+
+fix_path() {
+    mkdir -p "$HOME/bin" "$HOME/.local/bin"
+    touch "$HOME/.bashrc"
+    ensure_path_guard "$HOME/.bashrc" "$HOME/bin" "home bin"
+    ensure_path_guard "$HOME/.bashrc" "$HOME/.local/bin" "local bin"
+}
+
+show_path() {
+    local overall
+    overall="$(path_overall)"
+    echo "PATH Check"
+    echo "----------"
+    path_status_for "~/bin" "$HOME/bin"
+    path_status_for "~/.local/bin" "$HOME/.local/bin"
+    printf '%-18s %-6s\n' "Overall" "$overall"
+    echo
+    echo "Current PATH"
+    echo "------------"
+    echo "$PATH"
+    echo
+    echo "Deduplicated PATH"
+    echo "-----------------"
+    path_cleaned
+
+    if [ "$APPLY" -eq 1 ]; then
+        echo
+        cc_log "Applying PATH directory and ~/.bashrc guards."
+        fix_path
+        cc_log "PATH guard update complete. Reload shell or run: source ~/.bashrc"
+    elif [ "$overall" != "PASS" ]; then
+        echo
+        cc_warn "PATH health is $overall. Run: cc env path --fix"
+    fi
+
+    [ "$overall" != "FAIL" ]
+}
+
+show_shell() {
+    echo "Shell Files"
+    echo "-----------"
+    for file in "$HOME/.bashrc" "$HOME/.bash_aliases" "$HOME/.bash_functions"; do
+        if [ -f "$file" ]; then
+            printf '%-24s PASS\n' "$(basename "$file")"
+        else
+            printf '%-24s WARN missing\n' "$(basename "$file")"
+        fi
+    done
+}
+
+show_host() {
+    echo "Host Environment"
+    echo "----------------"
+    cc_env_summary
+    echo
+    echo "Platform"
+    echo "--------"
+    cc_platform_summary
+}
+
+show_summary() {
+    cc_banner
+    echo
+    show_host
+    echo
+    show_path
+    echo
+    show_shell
+}
+
+case "$ACTION" in
+    summary)
+        show_summary
+        ;;
+    path)
+        cc_banner
+        echo
+        show_path
+        ;;
+    shell)
+        cc_banner
+        echo
+        show_shell
+        ;;
+    host)
+        cc_banner
+        echo
+        show_host
+        ;;
+    doctor)
+        cc_banner
+        echo
+        show_host
+        echo
+        show_path
+        echo
+        show_shell
+        ;;
+esac
