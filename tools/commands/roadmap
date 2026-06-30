@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+case "${1:-}" in
+  --help|-h) echo 'Usage: cc roadmap [markdown]'; exit 0 ;;
+  --version) echo '1.0.0-alpha1'; exit 0 ;;
+  markdown) cat docs/ROADMAP.md; exit 0 ;;
+esac
+if command -v bat >/dev/null 2>&1; then
+  bat --style=plain docs/ROADMAP.md
+else
+  cat docs/ROADMAP.md
+fi
