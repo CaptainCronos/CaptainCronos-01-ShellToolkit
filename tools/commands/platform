@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : platform
+# Version     : 1.0.0-alpha1
+# Category    : Diagnostics
+# Requires    : bash uname hostname awk grep command
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show detected operating platform and host capabilities.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-environment.sh"
+source "$PROJECT_ROOT/lib/cc-platform.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc platform [summary|capabilities]
+
+Shows detected platform, package manager, init system, host identity, and capabilities.
+EOF_HELP
+}
+
+ACTION="${1:-summary}"
+case "$ACTION" in
+    --help|-h) usage; exit 0 ;;
+    --version) echo "1.0.0-alpha1"; exit 0 ;;
+    summary|capabilities) ;;
+    *) usage; exit 1 ;;
+esac
+
+cc_banner
+
+case "$ACTION" in
+    summary)
+        echo "Platform"
+        echo "--------"
+        cc_platform_summary
+        echo
+        echo "Host Identity"
+        echo "-------------"
+        cc_env_summary
+        ;;
+    capabilities)
+        echo "Capabilities"
+        echo "------------"
+        while read -r cap; do
+            [ -n "$cap" ] || continue
+            printf '%-18s %s\n' "$cap" "$(cc_capability_status "$cap")"
+        done < <(cc_capability_list)
+        ;;
+esac
