@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : workbench
+# Version     : 1.0.0-alpha1
+# Category    : Storage
+# Requires    : bash git awk grep command hostname
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Prepare a live USB drive qualification workbench environment.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-deps.sh"
+source "$PROJECT_ROOT/lib/cc-platform.sh"
+
+ACTION="prepare"
+APPLY=0
+RUN_SELFTEST=1
+HOST_ID="drivebench"
+REPO_URL="git@github.com:CaptainCronos/CaptainCronos-01-ShellToolkit.git"
+TARGET_ROOT="$HOME/GitHub"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc workbench [prepare|status] [--apply] [--host-id ID] [--repo URL] [--target DIR] [--no-selftest]
+
+Prepares a live USB / temporary Linux environment for drive qualification.
+
+Default is dry-run.
+
+Examples:
+  cc workbench
+  cc workbench prepare --apply
+  cc workbench prepare --apply --host-id drivebench
+  cc workbench status
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "1.0.0-alpha1"
+            exit 0
+            ;;
+        prepare|status)
+            ACTION="$1"
+            shift
+            ;;
+        --apply)
+            APPLY=1
+            shift
+            ;;
+        --host-id)
+            shift
+            HOST_ID="${1:-}"
+            [ -n "$HOST_ID" ] || { usage; exit 1; }
+            shift
+            ;;
+        --repo)
+            shift
+            REPO_URL="${1:-}"
+            [ -n "$REPO_URL" ] || { usage; exit 1; }
+            shift
+            ;;
+        --target)
+            shift
+            TARGET_ROOT="${1:-}"
+            [ -n "$TARGET_ROOT" ] || { usage; exit 1; }
+            shift
+            ;;
+        --no-selftest)
+            RUN_SELFTEST=0
+            shift
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+REPO_DIR="$TARGET_ROOT/CaptainCronos-01-ShellToolkit"
+
+network_status() {
+    if command -v ip >/dev/null 2>&1 && ip route get 1.1.1.1 >/dev/null 2>&1; then
+        echo PASS
+    else
+        echo WARN
+    fi
+}
+
+check_storage_deps() {
+    local missing dep
+    missing=0
+    for dep in git lsblk smartctl awk grep find; do
+        if ! cc_dep_exists "$dep"; then
+            missing=$((missing + 1))
+        fi
+    done
+    return "$missing"
+}
+
+print_status() {
+    cc_banner
+    echo
+    echo "Workbench Status"
+    echo "----------------"
+    printf '%-18s %s\n' "Hostname:" "$(hostname 2>/dev/null || echo unknown)"
+    printf '%-18s %s\n' "Platform:" "$(cc_platform_name)"
+    printf '%-18s %s\n' "Type:" "$(cc_platform_type)"
+    printf '%-18s %s\n' "Network:" "$(network_status)"
+    printf '%-18s %s\n' "Repo dir:" "$REPO_DIR"
+    printf '%-18s %s\n' "Repo present:" "$([ -d "$REPO_DIR/.git" ] && echo yes || echo no)"
+    printf '%-18s %s\n' "Host ID:" "$HOST_ID"
+    printf '%-18s %s\n' "Storage deps:" "$(check_storage_deps && echo PASS || echo WARN)"
+    echo
+    echo "Storage Dependencies"
+    echo "--------------------"
+    cc_dep_check_list git lsblk smartctl awk grep find || true
+}
+
+prepare_workbench() {
+    print_status
+    echo
+    printf '%-18s %s\n' "Apply:" "$APPLY"
+    printf '%-18s %s\n' "Selftest:" "$RUN_SELFTEST"
+    echo
+
+    if [ "$APPLY" -eq 0 ]; then
+        cc_log "DRY RUN: would prepare live USB workbench environment."
+        cc_log "Would create/update: $REPO_DIR"
+        cc_log "Would run: cc install --no-baseline"
+        cc_log "Would run: cc init --apply --host-id $HOST_ID --role workbench --profile workbench"
+        cc_log "Re-run with: cc workbench prepare --apply"
+        exit 0
+    fi
+
+    mkdir -p "$TARGET_ROOT"
+
+    if [ -d "$REPO_DIR/.git" ]; then
+        cc_log "Updating repository: $REPO_DIR"
+        git -C "$REPO_DIR" pull --rebase
+    else
+        cc_log "Cloning repository: $REPO_URL"
+        git clone "$REPO_URL" "$REPO_DIR"
+    fi
+
+    cd "$REPO_DIR"
+
+    cc_log "Installing toolkit for workbench session."
+    bash install/install.sh --no-baseline
+
+    cc_log "Initializing workbench host identity."
+    bash tools/cc init --apply --host-id "$HOST_ID" --role workbench --profile workbench
+
+    if [ "$RUN_SELFTEST" -eq 1 ]; then
+        cc_log "Running workbench selftest."
+        bash tools/cc selftest
+    fi
+
+    echo
+    echo "Workbench Ready"
+    echo "==============="
+    printf '%-18s %s\n' "Host ID:" "$HOST_ID"
+    printf '%-18s %s\n' "Profile:" "workbench"
+    printf '%-18s %s\n' "Repo:" "$REPO_DIR"
+    echo
+    echo "Suggested next commands:"
+    echo "  cc drive-inventory"
+    echo "  cc drive-smart /dev/sdX"
+    echo "  cc drive-test short /dev/sdX"
+    echo "  cc drive-test long /dev/sdX"
+    echo "  cc drive-report /dev/sdX"
+}
+
+case "$ACTION" in
+    status)
+        print_status
+        ;;
+    prepare)
+        prepare_workbench
+        ;;
+esac
