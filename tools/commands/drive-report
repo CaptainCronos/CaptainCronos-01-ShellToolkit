@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-report
-# Version     : 1.1.0-alpha1
+# Version     : 1.2.0-alpha1
 # Category    : Storage
-# Requires    : bash smartctl date mkdir awk sed grep
+# Requires    : bash smartctl date mkdir awk sed grep hostname uname
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Save SMART reports and update drive asset records.
 # ==============================================================================
@@ -16,11 +16,13 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-environment.sh"
+cc_env_export || true
 source "$PROJECT_ROOT/lib/cc-config.sh"
 source "$PROJECT_ROOT/lib/cc-assets.sh"
 
 DEVICE=""
-REPORT_ROOT="$(cc_config_get REPORT_DIR "$HOME/.captaincronos/reports")/drives"
+REPORT_ROOT="${CC_REPORT_DIR:-$(cc_config_get REPORT_DIR "$HOME/.captaincronos/reports")}/drives"
 
 usage() {
     cat <<'EOF_HELP'
@@ -28,11 +30,9 @@ Usage:
   cc drive-report /dev/sdX
   cc drive-report /dev/nvme0n1
 
-Creates an archived drive report under:
-  ~/.captaincronos/reports/drives/
+Creates an archived drive report under the host report directory.
 
-Also creates/updates a drive asset record under:
-  ~/.captaincronos/assets/drives/
+Also creates/updates a drive asset record and appends asset history.
 EOF_HELP
 }
 
@@ -42,7 +42,7 @@ case "${1:-}" in
         exit 0
         ;;
     --version)
-        echo "1.1.0-alpha1"
+        echo "1.2.0-alpha1"
         exit 0
         ;;
 esac
@@ -53,7 +53,7 @@ DEVICE="${1:-}"
 
 if ! command -v smartctl >/dev/null 2>&1; then
     cc_error "smartctl not found. Install smartmontools."
-    exit 1
+    exit 127
 fi
 
 safe_name="$(basename "$DEVICE" | tr '/' '_')"
@@ -66,6 +66,7 @@ cc_assets_init
     echo "Captain Cronos Drive Report"
     echo "Generated: $(date)"
     echo "Device: $DEVICE"
+    echo "Host ID: ${CC_HOST_ID:-unknown}"
     echo "Host: $(hostname 2>/dev/null || echo unknown)"
     echo "Kernel: $(uname -r 2>/dev/null || echo unknown)"
 } > "$out_dir/metadata.txt"
@@ -86,32 +87,58 @@ smart="$(summary_value '^SMART')"
 result="$(summary_value '^Result')"
 
 [ -n "$serial" ] || serial="$safe_name"
-asset_file="$(cc_asset_dir drives)/$(cc_asset_safe_name "$serial").yaml"
+asset_file="$(cc_asset_file drives "$serial")"
+state="inventory"
+qualified="unknown"
+
+if [ "$result" = "GOOD" ]; then
+    state="inventory"
+fi
+
+if [ -f "$asset_file" ]; then
+    current_state="$(awk -F: '$1=="state" {gsub(/^[ \t]+|"/, "", $2); print $2; exit}' "$asset_file")"
+    [ -n "$current_state" ] && state="$current_state"
+fi
 
 cat > "$asset_file" <<EOF_ASSET
-asset_type: drive
+asset_id: "$serial"
+type: "drives"
+asset_type: "drive"
+state: "$state"
+created: "$( [ -f "$asset_file" ] && awk -F: '$1=="created" {gsub(/^[ \t]+|"/, "", $2); print $2; exit}' "$asset_file" || true )"
+updated: "$(cc_asset_timestamp)"
+host_id: "${CC_HOST_ID:-unknown}"
 serial: "$serial"
 model: "$model"
 size: "$size"
 current_device: "$DEVICE"
-last_seen: "$(date -Iseconds)"
+last_seen: "$(cc_asset_timestamp)"
 host: "$(hostname 2>/dev/null || echo unknown)"
 smart: "$smart"
 result: "$result"
 power_on_hours: "$hours"
 temperature: "$temp"
 last_report: "$out_dir"
-qualified: "unknown"
+qualified: "$qualified"
 qualified_date: ""
 location:
   system: "$(hostname 2>/dev/null || echo unknown)"
   bay: ""
   pool: ""
-notes:
-  - "Asset record created or updated by cc drive-report."
+notes: "Asset record created or updated by cc drive-report."
 EOF_ASSET
+
+# Backfill created timestamp for newly created records.
+if ! grep -q '^created: "[0-9]' "$asset_file"; then
+    tmp="${asset_file}.tmp.$$"
+    awk -v ts="$(cc_asset_timestamp)" '$1=="created:" {$0="created: \"" ts "\""} {print}' "$asset_file" > "$tmp"
+    mv "$tmp" "$asset_file"
+fi
+
+cc_asset_append_history drives "$serial" "report" "device=$DEVICE result=$result smart=$smart report=$out_dir"
 
 cc_log "Drive report created: $out_dir"
 cc_log "Drive asset updated: $asset_file"
+cc_log "Drive asset history updated: $(cc_asset_history_file drives "$serial")"
 echo
 cat "$out_dir/summary.txt"
