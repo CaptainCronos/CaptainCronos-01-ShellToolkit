@@ -6,9 +6,9 @@
 # Script      : verify
 # Version     : reads VERSION
 # Category    : Diagnostics
-# Requires    : bash find bash
+# Requires    : bash find chmod
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Verify repository structure and Bash syntax.
+# Purpose     : Verify repository structure, Bash syntax, and command permissions.
 # ==============================================================================
 
 set -euo pipefail
@@ -17,17 +17,98 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
-case "${1:-}" in
-    --help|-h)
-        echo "Usage: cc verify"
+ACTION="all"
+APPLY=0
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc verify [all]
+  cc verify executable [--apply]
+
+Actions:
+  all         Run repository verification workflow.
+  executable Check tools/commands executable permissions.
+
+Options:
+  --apply     Repair executable permissions for tools/commands/*.
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            cc_version
+            exit 0
+            ;;
+        all|executable)
+            ACTION="$1"
+            shift
+            ;;
+        --apply)
+            APPLY=1
+            shift
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+verify_executable() {
+    local total=0 executable=0 missing=0 file
+
+    cc_banner
+    echo
+    echo "Executable Audit"
+    echo "----------------"
+
+    while IFS= read -r file; do
+        [ -n "$file" ] || continue
+        total=$((total + 1))
+        if [ -x "$file" ]; then
+            executable=$((executable + 1))
+        else
+            missing=$((missing + 1))
+        fi
+    done < <(find tools/commands -maxdepth 1 -type f | sort)
+
+    printf '%-14s %s\n' "Commands:" "$total"
+    printf '%-14s %s\n' "Executable:" "$executable"
+    printf '%-14s %s\n' "Missing:" "$missing"
+
+    if [ "$missing" -gt 0 ]; then
         echo
-        echo "Runs the repository verification workflow."
-        exit 0
+        echo "Missing executable bit:"
+        find tools/commands -maxdepth 1 -type f ! -executable | sort
+
+        if [ "$APPLY" -eq 1 ]; then
+            echo
+            cc_log "Applying executable permissions to tools/commands/*"
+            chmod 755 tools/commands/*
+            cc_log "Executable permissions repaired."
+            return 0
+        fi
+
+        echo
+        cc_warn "Run: cc verify executable --apply"
+        return 1
+    fi
+
+    echo
+    echo "Overall: PASS"
+}
+
+case "$ACTION" in
+    all)
+        install/verify.sh
         ;;
-    --version)
-        cc_version
-        exit 0
+    executable)
+        verify_executable
         ;;
 esac
-
-install/verify.sh
