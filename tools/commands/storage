@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : storage
+# Version     : 1.0.0-alpha1
+# Category    : Storage
+# Requires    : bash
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Namespace wrapper for storage inventory, SMART, testing, reports, and qualification.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc storage <action> [options]
+
+Actions:
+  inventory        Show physical drive inventory.
+  drives           Show mounted and installed storage devices.
+  smart DEVICE     Show concise SMART summary for one device.
+  test DEVICE ...  Start or inspect SMART self-tests.
+  report DEVICE    Save SMART report and update drive asset records.
+  qualify DEVICE   Run non-destructive drive qualification workflow.
+  burnin DEVICE    Run or inspect drive burn-in workflow framework.
+  workbench        Prepare or inspect live USB workbench environment.
+  deps             Show storage dependency status.
+  status           Show storage workbench-oriented status summary.
+
+Compatibility:
+  Existing commands remain available:
+    cc drive-inventory
+    cc drives
+    cc drive-smart
+    cc drive-test
+    cc drive-report
+    cc drive-qualify
+    cc drive-burnin
+    cc workbench
+
+Examples:
+  cc storage inventory
+  cc storage smart /dev/sda
+  cc storage test /dev/sda status
+  cc storage test /dev/sda short
+  cc storage test /dev/sda long
+  cc storage report /dev/sda
+  cc storage qualify /dev/sda
+  cc storage workbench status
+EOF_HELP
+}
+
+run_cc() {
+    bash "$PROJECT_ROOT/tools/cc" "$@"
+}
+
+case "${1:-}" in
+    --help|-h|help|"")
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    inventory)
+        shift
+        run_cc drive-inventory "$@"
+        ;;
+    drives)
+        shift
+        run_cc drives "$@"
+        ;;
+    smart)
+        shift
+        run_cc drive-smart "$@"
+        ;;
+    test)
+        shift
+        run_cc drive-test "$@"
+        ;;
+    report)
+        shift
+        run_cc drive-report "$@"
+        ;;
+    qualify)
+        shift
+        run_cc drive-qualify "$@"
+        ;;
+    burnin|burn-in)
+        shift
+        run_cc drive-burnin "$@"
+        ;;
+    workbench)
+        shift
+        run_cc workbench "$@"
+        ;;
+    deps|dependencies)
+        shift
+        run_cc deps storage "$@"
+        ;;
+    status)
+        shift
+        run_cc workbench status "$@"
+        ;;
+    *)
+        cc_error "Unknown storage action: $1"
+        echo
+        usage
+        exit 1
+        ;;
+esac
