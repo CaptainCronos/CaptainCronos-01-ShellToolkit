@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : init
-# Version     : 1.0.0-alpha1
+# Version     : 1.1.0-alpha1
 # Category    : Core
-# Requires    : bash hostname mkdir install grep
+# Requires    : bash hostname mkdir install grep awk uname command
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Initialize a Captain Cronos host identity and local environment.
 # ==============================================================================
@@ -17,28 +17,37 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-environment.sh"
+source "$PROJECT_ROOT/lib/cc-platform.sh"
 
 APPLY=0
 HOST_ID_INPUT=""
-ROLE="workstation"
-PROFILE="default"
+ROLE=""
+PROFILE=""
+INTERACTIVE=0
+RUN_SELFTEST=0
 
 usage() {
     cat <<'EOF_HELP'
 Usage:
   cc init [--apply] [--host-id ID] [--role ROLE] [--profile PROFILE]
+  cc init --interactive [--apply]
 
 Initializes a portable Captain Cronos host identity.
 
-Creates:
-  ~/.captaincronos/hosts/<host-id>/config
-  ~/.captaincronos/hosts/<host-id>/reports
-  ~/.captaincronos/hosts/<host-id>/assets
-  ~/.captaincronos/hosts/<host-id>/cache
-  ~/.captaincronos/hosts/<host-id>/logs
-  ~/.captaincronos/hosts/<host-id>/plugins
+Roles:
+  developer   Development workstation
+  workbench   Live USB / drive qualification bench
+  server      General Linux server
+  nas         NAS appliance or NAS-adjacent host
+  laptop      Mobile workstation
 
-Also verifies ~/bin and installs the cc launcher when --apply is used.
+Profiles:
+  developer
+  workbench
+  server
+  truenas-scale
+  laptop
+  default
 
 Default is dry-run.
 EOF_HELP
@@ -51,11 +60,19 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "1.0.0-alpha1"
+            echo "1.1.0-alpha1"
             exit 0
             ;;
         --apply)
             APPLY=1
+            shift
+            ;;
+        --interactive)
+            INTERACTIVE=1
+            shift
+            ;;
+        --selftest)
+            RUN_SELFTEST=1
             shift
             ;;
         --host-id)
@@ -88,6 +105,60 @@ if [ -n "$HOST_ID_INPUT" ]; then
     CC_HOST_ID="$(cc_env_safe_id "$HOST_ID_INPUT")"
 fi
 
+infer_role() {
+    case "$(cc_platform_type)" in
+        truenas-scale) echo nas ;;
+        *) echo developer ;;
+    esac
+}
+
+suggest_profile() {
+    if [ -n "$PROFILE" ]; then
+        echo "$PROFILE"
+    else
+        cc_platform_infer_profile
+    fi
+}
+
+interactive_select() {
+    local selection
+    echo
+    echo "Select Role"
+    echo "-----------"
+    echo "1) developer"
+    echo "2) workbench"
+    echo "3) server"
+    echo "4) nas"
+    echo "5) laptop"
+    echo "6) custom/default"
+    printf 'Selection [%s]: ' "${ROLE:-$(infer_role)}"
+    read -r selection || true
+    case "$selection" in
+        1) ROLE="developer"; PROFILE="developer" ;;
+        2) ROLE="workbench"; PROFILE="workbench" ;;
+        3) ROLE="server"; PROFILE="server" ;;
+        4) ROLE="nas"; PROFILE="truenas-scale" ;;
+        5) ROLE="laptop"; PROFILE="laptop" ;;
+        6) ROLE="${ROLE:-custom}"; PROFILE="${PROFILE:-default}" ;;
+        "") ROLE="${ROLE:-$(infer_role)}"; PROFILE="${PROFILE:-$(suggest_profile)}" ;;
+        *) ROLE="$selection"; PROFILE="${PROFILE:-default}" ;;
+    esac
+}
+
+ROLE="${ROLE:-$(infer_role)}"
+PROFILE="${PROFILE:-$(suggest_profile)}"
+
+if [ "$INTERACTIVE" -eq 1 ]; then
+    cc_banner
+    echo
+    echo "Host Initialization"
+    echo "-------------------"
+    printf '%-16s %s\n' "Hostname:" "$(hostname 2>/dev/null || echo unknown)"
+    printf '%-16s %s\n' "Platform:" "$(cc_platform_name)"
+    printf '%-16s %s\n' "Detected type:" "$(cc_platform_type)"
+    interactive_select
+fi
+
 HOST_ID="$(cc_env_host_id)"
 HOST_HOME="$(cc_env_host_home)"
 CONFIG_FILE="$(cc_env_config)"
@@ -99,12 +170,50 @@ path_has_home_bin() {
     esac
 }
 
+profile_defaults() {
+    case "$PROFILE" in
+        developer)
+            echo 'AUTO_DOCS="yes"'
+            echo 'AUTO_PUSH="no"'
+            echo 'READ_ONLY="no"'
+            ;;
+        workbench)
+            echo 'AUTO_DOCS="no"'
+            echo 'AUTO_PUSH="no"'
+            echo 'READ_ONLY="no"'
+            echo 'DRIVE_QUALIFICATION="yes"'
+            ;;
+        truenas-scale)
+            echo 'AUTO_DOCS="no"'
+            echo 'AUTO_PUSH="no"'
+            echo 'READ_ONLY="yes"'
+            echo 'NO_SYSTEM_UPDATE="yes"'
+            ;;
+        laptop)
+            echo 'AUTO_DOCS="no"'
+            echo 'AUTO_PUSH="no"'
+            echo 'READ_ONLY="no"'
+            ;;
+        *)
+            echo 'AUTO_DOCS="no"'
+            echo 'AUTO_PUSH="no"'
+            echo 'READ_ONLY="no"'
+            ;;
+    esac
+}
+
 write_config() {
     cat > "$CONFIG_FILE" <<EOF_CONFIG
 # Captain Cronos host configuration
 HOST_ID="$HOST_ID"
 HOST_ROLE="$ROLE"
 HOST_PROFILE="$PROFILE"
+HOST_PLATFORM="$(cc_platform_type)"
+HOST_OS="$(cc_platform_os_id)"
+HOST_OS_VERSION="$(cc_platform_os_version)"
+HOST_ARCH="$(cc_platform_arch)"
+PACKAGE_MANAGER="$(cc_platform_package_manager)"
+INIT_SYSTEM="$(cc_platform_init_system)"
 REPO_ROOT="$HOME/GitHub"
 REPORT_DIR="$(cc_env_report_dir)"
 ASSET_DIR="$(cc_env_asset_dir)"
@@ -112,18 +221,19 @@ PLUGIN_DIR="$(cc_env_plugin_dir)"
 CACHE_DIR="$(cc_env_cache_dir)"
 LOG_DIR="$(cc_env_log_dir)"
 EDITOR="nano"
-AUTO_DOCS="no"
-AUTO_PUSH="no"
+$(profile_defaults)
 EOF_CONFIG
 }
 
 cc_banner
-printf '%-16s %s\n' "Apply:" "$APPLY"
-printf '%-16s %s\n' "Linux host:" "$(hostname 2>/dev/null || echo unknown)"
-printf '%-16s %s\n' "Host ID:" "$HOST_ID"
-printf '%-16s %s\n' "Role:" "$ROLE"
-printf '%-16s %s\n' "Profile:" "$PROFILE"
-printf '%-16s %s\n' "Host Home:" "$HOST_HOME"
+printf '%-18s %s\n' "Apply:" "$APPLY"
+printf '%-18s %s\n' "Linux host:" "$(hostname 2>/dev/null || echo unknown)"
+printf '%-18s %s\n' "Platform:" "$(cc_platform_type)"
+printf '%-18s %s\n' "Package mgr:" "$(cc_platform_package_manager)"
+printf '%-18s %s\n' "Host ID:" "$HOST_ID"
+printf '%-18s %s\n' "Role:" "$ROLE"
+printf '%-18s %s\n' "Profile:" "$PROFILE"
+printf '%-18s %s\n' "Host Home:" "$HOST_HOME"
 echo
 
 if [ "$APPLY" -eq 0 ]; then
@@ -161,3 +271,15 @@ echo
 cc_log "Captain Cronos host identity initialized."
 echo
 cc_env_summary
+
+echo
+cc_log "Capability summary:"
+while read -r cap; do
+    [ -n "$cap" ] || continue
+    printf '%-18s %s\n' "$cap" "$(cc_capability_status "$cap")"
+done < <(cc_capability_list)
+
+if [ "$RUN_SELFTEST" -eq 1 ]; then
+    echo
+    bash "$PROJECT_ROOT/tools/cc" selftest
+fi
