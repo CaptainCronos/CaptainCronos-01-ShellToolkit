@@ -1,14 +1,47 @@
 #!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : roadmap
+# Version     : 1.0.0-alpha1
+# Category    : Documentation
+# Requires    : bash cat
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show the project roadmap from docs/ROADMAP.md.
+# ==============================================================================
+
 set -euo pipefail
+
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc roadmap [markdown]
+
+Shows the project roadmap from docs/ROADMAP.md.
+EOF_HELP
+}
+
 case "${1:-}" in
-  --help|-h) echo 'Usage: cc roadmap [markdown]'; exit 0 ;;
-  --version) echo '1.0.0-alpha1'; exit 0 ;;
-  markdown) cat docs/ROADMAP.md; exit 0 ;;
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    markdown)
+        cat docs/ROADMAP.md
+        exit 0
+        ;;
 esac
+
 if command -v bat >/dev/null 2>&1; then
-  bat --style=plain docs/ROADMAP.md
+    bat --style=plain docs/ROADMAP.md
 else
-  cat docs/ROADMAP.md
+    cat docs/ROADMAP.md
 fi
