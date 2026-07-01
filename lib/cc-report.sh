@@ -11,6 +11,26 @@
 # Purpose     : Shared report directory, timestamp, and metadata helpers.
 # ==============================================================================
 
+cc_report_version() {
+    if command -v cc_version >/dev/null 2>&1; then
+        cc_version
+    elif [ -f "${PROJECT_ROOT:-}/VERSION" ]; then
+        cat "${PROJECT_ROOT:-}/VERSION"
+    else
+        echo "unknown"
+    fi
+}
+
+cc_report_loaded() {
+    command -v cc_report_timestamp >/dev/null 2>&1 && \
+    command -v cc_report_root >/dev/null 2>&1 && \
+    command -v cc_report_make_dir >/dev/null 2>&1
+}
+
+cc_report_dependencies() {
+    echo "bash date mkdir hostname uname"
+}
+
 cc_report_timestamp() {
     date +%Y%m%d-%H%M%S
 }
