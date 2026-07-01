@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-qualify
-# Version     : 1.0.0-alpha1
+# Version     : 1.1.0-alpha1
 # Category    : Storage
-# Requires    : bash smartctl awk grep sed date mkdir
+# Requires    : bash smartctl awk grep date mkdir tee
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Run non-destructive drive qualification workflow.
 # ==============================================================================
@@ -18,6 +18,9 @@ cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-config.sh"
 source "$PROJECT_ROOT/lib/cc-assets.sh"
+source "$PROJECT_ROOT/lib/cc-yaml.sh"
+source "$PROJECT_ROOT/lib/cc-smart.sh"
+source "$PROJECT_ROOT/lib/cc-storage.sh"
 
 DEVICE=""
 MODE="start"
@@ -34,52 +37,33 @@ Usage:
   cc drive-qualify /dev/sdX
 
 Actions:
-  start     Capture pre-test report, start short SMART test, and optionally start long test.
+  start     Capture pre-test report, start short SMART self-test, and optionally start long self-test.
   status    Show SMART self-test status.
   complete  Capture final report and mark asset qualified when SMART result is GOOD.
 
 Options:
-  --long    Start a SMART long test after the initial report instead of only a short test.
+  --long    Start a SMART long self-test after the initial report instead of only a short self-test.
 
 Notes:
-  This is non-destructive. It does not run badblocks or write/read burn-in.
+  This is non-destructive. It does not run write/read burn-in.
 EOF_HELP
 }
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --help|-h)
-            usage
-            exit 0
-            ;;
-        --version)
-            echo "1.0.0-alpha1"
-            exit 0
-            ;;
-        start|status|complete)
-            MODE="$1"
-            shift
-            ;;
-        --long)
-            START_LONG="yes"
-            shift
-            ;;
-        *)
-            DEVICE="$1"
-            shift
-            ;;
+        --help|-h) usage; exit 0 ;;
+        --version) echo "1.1.0-alpha1"; exit 0 ;;
+        start|status|complete) MODE="$1"; shift ;;
+        --long) START_LONG="yes"; shift ;;
+        *) DEVICE="$1"; shift ;;
     esac
 done
 
 [ -n "$DEVICE" ] || { usage; exit 1; }
-[ -e "$DEVICE" ] || { cc_error "Device not found: $DEVICE"; exit 1; }
+cc_storage_require_smartctl || exit $?
+cc_storage_require_device "$DEVICE" || exit $?
 
-if ! command -v smartctl >/dev/null 2>&1; then
-    cc_error "smartctl not found. Install smartmontools."
-    exit 1
-fi
-
-safe_name="$(basename "$DEVICE")"
+safe_name="$(cc_storage_device_basename "$DEVICE")"
 stamp="$(date +%Y%m%d-%H%M%S)"
 qual_dir="$QUAL_ROOT/${safe_name}-${stamp}"
 
@@ -96,23 +80,19 @@ latest_asset_for_device() {
     echo ""
 }
 
-summary_value() {
-    local file="$1" key="$2"
-    awk -F: -v key="$key" '$1 ~ key {sub(/^[ \t]+/, "", $2); print $2; exit}' "$file"
-}
-
 write_qualification_note() {
     local file="$1" status="$2" report="$3"
     [ -f "$file" ] || return 0
-    tmp="${file}.tmp.$$"
-    awk -v status="$status" -v report="$report" '
-        /^qualified:/ {print "qualified: \"" status "\""; next}
-        /^qualified_date:/ {print "qualified_date: \"" strftime("%Y-%m-%d") "\""; next}
-        /^last_qualification_report:/ {seen=1; print "last_qualification_report: \"" report "\""; next}
-        {print}
-        END {if (!seen) print "last_qualification_report: \"" report "\""}
-    ' "$file" > "$tmp"
-    mv "$tmp" "$file"
+    cc_yaml_set "$file" qualified "$status"
+    cc_yaml_set "$file" qualified_date "$(date +%Y-%m-%d)"
+    cc_yaml_set "$file" last_qualification_report "$report"
+    if [ "$status" = "yes" ]; then
+        cc_yaml_set "$file" state "qualified"
+        cc_asset_append_history drives "$(cc_yaml_get "$file" asset_id)" "state:qualified" "qualification report=$report"
+    else
+        cc_yaml_set "$file" state "watch"
+        cc_asset_append_history drives "$(cc_yaml_get "$file" asset_id)" "state:watch" "qualification review required report=$report"
+    fi
 }
 
 case "$MODE" in
@@ -123,9 +103,9 @@ case "$MODE" in
         cc_log "Qualification directory: $qual_dir"
         echo
         bash "$PROJECT_ROOT/tools/cc" drive-report "$DEVICE" | tee "$qual_dir/precheck-summary.txt"
-        bash "$PROJECT_ROOT/tools/cc" drive-test short "$DEVICE" | tee "$qual_dir/short-test-start.txt" || true
+        cc_storage_test_start "$DEVICE" short | tee "$qual_dir/short-test-start.txt" || true
         if [ "$START_LONG" = "yes" ]; then
-            bash "$PROJECT_ROOT/tools/cc" drive-test long "$DEVICE" | tee "$qual_dir/long-test-start.txt" || true
+            cc_storage_test_start "$DEVICE" long | tee "$qual_dir/long-test-start.txt" || true
         fi
         {
             echo "Drive Qualification Started"
@@ -141,7 +121,7 @@ case "$MODE" in
         cc_log "Qualification started. Check later with: cc drive-qualify status $DEVICE"
         ;;
     status)
-        bash "$PROJECT_ROOT/tools/cc" drive-test status "$DEVICE"
+        cc_storage_test_status "$DEVICE"
         ;;
     complete)
         mkdir -p "$qual_dir"
@@ -150,7 +130,7 @@ case "$MODE" in
         cc_log "Final qualification directory: $qual_dir"
         echo
         bash "$PROJECT_ROOT/tools/cc" drive-report "$DEVICE" | tee "$qual_dir/final-summary.txt"
-        result="$(summary_value "$qual_dir/final-summary.txt" '^Result')"
+        result="$(cc_smart_extract_result "$qual_dir/final-summary.txt")"
         [ -n "$result" ] || result="UNKNOWN"
         if [ "$result" = "GOOD" ]; then
             recommendation="APPROVED FOR SERVICE"
