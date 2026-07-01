@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : asset
-# Version     : 1.2.0-alpha1
+# Version     : 1.3.0-alpha1
 # Category    : Core
-# Requires    : bash find cat mkdir awk grep sed date
+# Requires    : bash find cat mkdir awk grep sed date mv
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Manage local lifecycle asset inventory records.
 # ==============================================================================
@@ -19,6 +19,7 @@ source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-environment.sh"
 cc_env_export || true
 source "$PROJECT_ROOT/lib/cc-assets.sh"
+source "$PROJECT_ROOT/lib/cc-yaml.sh"
 
 ACTION="list"
 TYPE=""
@@ -49,35 +50,18 @@ Types:
 
 Lifecycle states:
   new inventory testing qualified production watch failed retired
-
-Examples:
-  cc asset init
-  cc asset list drives
-  cc asset create drives SERIAL model=TEAM size=8TB state=new
-  cc asset state drives SERIAL qualified "Passed SMART long test"
-  cc asset history drives SERIAL
-  cc asset retire drives SERIAL "Removed from service"
 EOF_HELP
 }
 
 if [ "$#" -gt 0 ]; then
     case "$1" in
-        --help|-h)
-            usage
-            exit 0
-            ;;
-        --version)
-            echo "1.2.0-alpha1"
-            exit 0
-            ;;
+        --help|-h) usage; exit 0 ;;
+        --version) echo "1.3.0-alpha1"; exit 0 ;;
         init|list|show|path|search|inventory|set|create|state|history|retire|export)
             ACTION="$1"
             shift
             ;;
-        *)
-            usage
-            exit 1
-            ;;
+        *) usage; exit 1 ;;
     esac
 fi
 
@@ -102,69 +86,20 @@ asset_file_path() {
     fi
 }
 
-yaml_value() {
-    local file="$1" key="$2"
-    awk -F: -v key="$key" '$1 == key {sub(/^[ \t]+/, "", $2); gsub(/^"|"$/, "", $2); print $2; exit}' "$file"
-}
-
-yaml_nested_value() {
-    local file="$1" section="$2" key="$3"
-    awk -F: -v section="$section" -v key="$key" '
-        $1 == section {inside=1; next}
-        inside && /^[^ ]/ {inside=0}
-        inside && $1 ~ "^[ ]+" key "$" {sub(/^[ \t]+/, "", $2); gsub(/^"|"$/, "", $2); print $2; exit}
-    ' "$file"
-}
-
-set_yaml_value() {
-    local file="$1" key="$2" value="$3" tmp
-    tmp="${file}.tmp.$$"
-    awk -v key="$key" -v value="$value" '
-        BEGIN {found=0}
-        $0 ~ "^" key ":" {print key ": \"" value "\""; found=1; next}
-        {print}
-        END {if (!found) print key ": \"" value "\""}
-    ' "$file" > "$tmp"
-    mv "$tmp" "$file"
-}
-
-set_nested_yaml_value() {
-    local file="$1" section="$2" key="$3" value="$4" tmp
-    tmp="${file}.tmp.$$"
-    awk -v section="$section" -v key="$key" -v value="$value" '
-        BEGIN {inside=0; section_seen=0; key_set=0}
-        $0 == section ":" {inside=1; section_seen=1; print; next}
-        inside && /^[^ ]/ {
-            if (!key_set) {print "  " key ": \"" value "\""; key_set=1}
-            inside=0
-        }
-        inside && $0 ~ "^[ ]+" key ":" {print "  " key ": \"" value "\""; key_set=1; next}
-        {print}
-        END {
-            if (!section_seen) {
-                print section ":"
-                print "  " key ": \"" value "\""
-            } else if (inside && !key_set) {
-                print "  " key ": \"" value "\""
-            }
-        }
-    ' "$file" > "$tmp"
-    mv "$tmp" "$file"
-}
-
 create_asset() {
-    local type="$1" name="$2" file pair key value
+    local type="$1" name="$2" file pair key value ts
     [ -n "$type" ] || { usage; exit 1; }
     [ -n "$name" ] || { usage; exit 1; }
     cc_assets_init
     file="$(asset_file_path "$type" "$name")"
     [ ! -f "$file" ] || { cc_error "Asset already exists: $file"; exit 1; }
+    ts="$(cc_asset_timestamp)"
     cat > "$file" <<EOF_ASSET
 asset_id: "$name"
 type: "$type"
 state: "new"
-created: "$(cc_asset_timestamp)"
-updated: "$(cc_asset_timestamp)"
+created: "$ts"
+updated: "$ts"
 host_id: "${CC_HOST_ID:-unknown}"
 notes: ""
 EOF_ASSET
@@ -173,7 +108,7 @@ EOF_ASSET
         key="${pair%%=*}"
         value="${pair#*=}"
         [ "$key" != "$value" ] || { cc_error "Expected key=value: $pair"; exit 1; }
-        set_yaml_value "$file" "$key" "$value"
+        cc_yaml_set "$file" "$key" "$value"
     done
     cc_asset_append_history "$type" "$name" "create" "asset created"
     cc_log "Created asset: $file"
@@ -194,15 +129,15 @@ set_asset_pairs() {
         case "$key" in
             location.*)
                 subkey="${key#location.}"
-                set_nested_yaml_value "$file" location "$subkey" "$value"
+                cc_yaml_set_nested "$file" location "$subkey" "$value"
                 ;;
             *)
-                set_yaml_value "$file" "$key" "$value"
+                cc_yaml_set "$file" "$key" "$value"
                 ;;
         esac
         cc_log "Set $key"
     done
-    set_yaml_value "$file" updated "$(cc_asset_timestamp)"
+    cc_yaml_set "$file" updated "$(cc_asset_timestamp)"
     cc_asset_append_history "$type" "$name" "set" "$*"
 }
 
@@ -214,8 +149,8 @@ set_asset_state() {
     valid_state "$state" || { cc_error "Invalid state: $state"; exit 1; }
     file="$(asset_file_path "$type" "$name")"
     [ -f "$file" ] || { cc_error "Asset not found: $file"; exit 1; }
-    set_yaml_value "$file" state "$state"
-    set_yaml_value "$file" updated "$(cc_asset_timestamp)"
+    cc_yaml_set "$file" state "$state"
+    cc_yaml_set "$file" updated "$(cc_asset_timestamp)"
     cc_asset_append_history "$type" "$name" "state:$state" "$note"
     cc_log "Asset state set: $state"
 }
@@ -258,31 +193,23 @@ case "$ACTION" in
             printf '%-24s %-24s %-12s %-12s %-8s %-10s %s\n' "------" "-----" "-----" "---------" "---" "----" "------"
             cc_asset_list drives | while read -r file; do
                 [ -f "$file" ] || continue
-                serial="$(yaml_value "$file" serial)"; [ -n "$serial" ] || serial="$(yaml_value "$file" asset_id)"
-                model="$(yaml_value "$file" model)"
-                state="$(yaml_value "$file" state)"
-                qualified="$(yaml_value "$file" qualified)"
-                device="$(yaml_value "$file" current_device)"
-                bay="$(yaml_nested_value "$file" location bay)"
-                pool="$(yaml_nested_value "$file" location pool)"
+                serial="$(cc_yaml_get "$file" serial)"; [ -n "$serial" ] || serial="$(cc_yaml_get "$file" asset_id)"
+                model="$(cc_yaml_get "$file" model)"
+                state="$(cc_yaml_get "$file" state)"
+                qualified="$(cc_yaml_get "$file" qualified)"
+                device="$(cc_yaml_get "$file" current_device)"
+                bay="$(cc_yaml_get_nested "$file" location bay)"
+                pool="$(cc_yaml_get_nested "$file" location pool)"
                 printf '%-24s %-24s %-12s %-12s %-8s %-10s %s\n' "$serial" "$model" "$state" "$qualified" "$bay" "$pool" "$device"
             done
         else
             cc_asset_list "$TYPE"
         fi
         ;;
-    create)
-        create_asset "$@"
-        ;;
-    set)
-        set_asset_pairs "$@"
-        ;;
-    state)
-        set_asset_state "$TYPE" "$NAME" "${3:-}" "${4:-}"
-        ;;
-    retire)
-        set_asset_state "$TYPE" "$NAME" retired "${3:-retired}"
-        ;;
+    create) create_asset "$@" ;;
+    set) set_asset_pairs "$@" ;;
+    state) set_asset_state "$TYPE" "$NAME" "${3:-}" "${4:-}" ;;
+    retire) set_asset_state "$TYPE" "$NAME" retired "${3:-retired}" ;;
     history)
         [ -n "$TYPE" ] || { usage; exit 1; }
         [ -n "$NAME" ] || { usage; exit 1; }
