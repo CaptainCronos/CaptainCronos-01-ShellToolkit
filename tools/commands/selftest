@@ -31,6 +31,7 @@ Usage:
 Runs the toolkit engineering self-test suite.
 
 Checks:
+  - shared library syntax and load checks
   - strict command audit
   - documentation lint
   - release check
@@ -103,6 +104,15 @@ run_check() {
     fi
 }
 
+check_library() {
+    local lib="$1"
+    local path="$PROJECT_ROOT/lib/$lib"
+
+    [ -f "$path" ] || return 1
+    bash -n "$path" || return 1
+    bash -c "set -euo pipefail; source '$PROJECT_ROOT/lib/cc-common.sh'; source '$path'" >/dev/null
+}
+
 if [ "$JSON" -eq 0 ]; then
     cc_banner
     echo
@@ -111,6 +121,13 @@ if [ "$JSON" -eq 0 ]; then
     echo
 fi
 
+run_check "Common library" check_library cc-common.sh
+run_check "Config library" check_library cc-config.sh
+run_check "Storage library" check_library cc-storage.sh
+run_check "SMART library" check_library cc-smart.sh
+run_check "Asset library" check_library cc-assets.sh
+run_check "YAML library" check_library cc-yaml.sh
+run_check "Report library" check_library cc-report.sh
 run_check "Strict command audit" bash "$PROJECT_ROOT/tools/cc" audit --strict
 run_check "Documentation lint" bash "$PROJECT_ROOT/tools/cc" docs lint
 run_check "Release check" bash "$PROJECT_ROOT/tools/cc" release check
