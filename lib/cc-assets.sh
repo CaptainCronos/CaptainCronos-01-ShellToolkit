@@ -11,6 +11,26 @@
 # Purpose     : Shared host-scoped asset inventory helper functions.
 # ==============================================================================
 
+cc_assets_version() {
+    if command -v cc_version >/dev/null 2>&1; then
+        cc_version
+    elif [ -f "${PROJECT_ROOT:-}/VERSION" ]; then
+        cat "${PROJECT_ROOT:-}/VERSION"
+    else
+        echo "unknown"
+    fi
+}
+
+cc_assets_loaded() {
+    command -v cc_assets_root >/dev/null 2>&1 && \
+    command -v cc_assets_init >/dev/null 2>&1 && \
+    command -v cc_asset_append_history >/dev/null 2>&1
+}
+
+cc_assets_dependencies() {
+    echo "bash find mkdir date"
+}
+
 cc_assets_root() {
     if [ -n "${CAPTAIN_CRONOS_ASSETS_DIR:-}" ]; then
         echo "$CAPTAIN_CRONOS_ASSETS_DIR"
