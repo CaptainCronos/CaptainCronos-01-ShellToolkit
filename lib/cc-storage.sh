@@ -6,7 +6,7 @@
 # Script      : cc-storage.sh
 # Version     : reads VERSION
 # Category    : Storage
-# Requires    : bash lsblk awk find smartctl
+# Requires    : bash lsblk awk find smartctl grep paste
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Shared storage device discovery, SMART, and workflow helpers.
 # ==============================================================================
@@ -52,23 +52,70 @@ cc_storage_report_dir_for_device() {
     echo "$(cc_storage_report_root)/${safe_name}-${stamp}"
 }
 
-cc_storage_print_device_table_header() {
-    printf '%-12s %-22s %-20s %-8s %-8s %-10s %s\n' "Device" "Model" "Serial" "Size" "Tran" "SMART" "Mounts"
-    printf '%-12s %-22s %-20s %-8s %-8s %-10s %s\n' "------" "-----" "------" "----" "----" "-----" "------"
-}
-
-cc_storage_lsblk_inventory() {
-    lsblk -dn -o NAME,MODEL,SERIAL,SIZE,TRAN 2>/dev/null | awk '{print}'
-}
-
 cc_storage_mounts_for_device() {
-    local name="$1"
-    lsblk -nr -o NAME,MOUNTPOINT "/dev/$name" 2>/dev/null | awk '$2 != "" {print $2}' | paste -sd, - 2>/dev/null
+    local device="$1"
+    lsblk -nr -o MOUNTPOINT "$device" 2>/dev/null | grep -v '^$' | paste -sd ',' - 2>/dev/null
 }
 
-cc_storage_smart_status_for_device() {
+cc_storage_smart_text_for_device() {
     local device="$1"
     if command -v smartctl >/dev/null 2>&1; then
-        sudo smartctl -H "$device" 2>/dev/null | awk -F: '/SMART overall-health|SMART Health Status/ {gsub(/^[ \t]+/, "", $2); print $2; exit}' || true
+        sudo smartctl -a "$device" 2>/dev/null || smartctl -a "$device" 2>/dev/null || true
     fi
+}
+
+cc_storage_inventory_rows() {
+    lsblk -dn -o NAME,MODEL,SERIAL,SIZE,TRAN,TYPE 2>/dev/null | while read -r name model serial size tran type; do
+        [ "$type" = "disk" ] || continue
+        local dev smart_text health hours temp mounts
+        dev="/dev/$name"
+        smart_text="$(cc_storage_smart_text_for_device "$dev")"
+        health="$(cc_smart_field_first "$smart_text" 'SMART overall-health self-assessment test result|SMART Health Status')"
+        hours="$(cc_smart_attr_raw "$smart_text" 'Power_On_Hours|Power_On_Hours_and_Msec')"
+        [ -n "$hours" ] || hours="$(cc_smart_nvme_metric "$smart_text" 'Power On Hours')"
+        temp="$(cc_smart_attr_raw "$smart_text" 'Temperature_Celsius|Airflow_Temperature_Cel')"
+        [ -n "$temp" ] || temp="$(cc_smart_nvme_metric "$smart_text" 'Temperature')"
+        mounts="$(cc_storage_mounts_for_device "$dev")"
+        [ -n "$health" ] || health="unknown"
+        [ -n "$hours" ] || hours="unknown"
+        [ -n "$temp" ] || temp="unknown"
+        [ -n "$mounts" ] || mounts="-"
+        [ -n "$tran" ] || tran="-"
+        [ -n "$model" ] || model="unknown"
+        [ -n "$serial" ] || serial="unknown"
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$dev" "$model" "$serial" "$size" "$tran" "$health" "$hours" "$mounts"
+    done
+}
+
+cc_storage_inventory_table() {
+    printf '%-12s %-22s %-20s %-8s %-8s %-10s %-10s %s\n' "Device" "Model" "Serial" "Size" "Tran" "SMART" "Hours" "Mounts"
+    printf '%-12s %-22s %-20s %-8s %-8s %-10s %-10s %s\n' "------" "-----" "------" "----" "----" "-----" "-----" "------"
+    cc_storage_inventory_rows | while IFS=$'\t' read -r dev model serial size tran health hours mounts; do
+        printf '%-12s %-22s %-20s %-8s %-8s %-10s %-10s %s\n' "$dev" "$model" "$serial" "$size" "$tran" "$health" "$hours" "$mounts"
+    done
+}
+
+cc_storage_inventory_csv() {
+    echo "device,model,serial,size,transport,smart,hours,mounts"
+    cc_storage_inventory_rows | while IFS=$'\t' read -r dev model serial size tran health hours mounts; do
+        printf '"%s","%s","%s","%s","%s","%s","%s","%s"\n' "$dev" "$model" "$serial" "$size" "$tran" "$health" "$hours" "$mounts"
+    done
+}
+
+cc_storage_inventory_markdown() {
+    echo "| Device | Model | Serial | Size | Transport | SMART | Hours | Mounts |"
+    echo "|---|---|---|---|---|---|---|---|"
+    cc_storage_inventory_rows | while IFS=$'\t' read -r dev model serial size tran health hours mounts; do
+        echo "| $dev | $model | $serial | $size | $tran | $health | $hours | $mounts |"
+    done
+}
+
+cc_storage_inventory_output() {
+    local format="${1:-table}"
+    case "$format" in
+        table) cc_storage_inventory_table ;;
+        csv) cc_storage_inventory_csv ;;
+        markdown) cc_storage_inventory_markdown ;;
+        *) cc_error "Unknown inventory format: $format"; return 2 ;;
+    esac
 }
