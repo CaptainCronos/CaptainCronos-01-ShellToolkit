@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-smart
-# Version     : 1.0.0-alpha1
+# Version     : 1.1.0-alpha1
 # Category    : Storage
-# Requires    : bash smartctl awk grep sed
+# Requires    : bash smartctl awk
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Show a concise SMART summary for one storage device.
 # ==============================================================================
@@ -16,6 +16,7 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-smart.sh"
 
 usage() {
     cat <<'EOF_HELP'
@@ -28,14 +29,8 @@ EOF_HELP
 }
 
 case "${1:-}" in
-    --help|-h)
-        usage
-        exit 0
-        ;;
-    --version)
-        echo "1.0.0-alpha1"
-        exit 0
-        ;;
+    --help|-h) usage; exit 0 ;;
+    --version) echo "1.1.0-alpha1"; exit 0 ;;
 esac
 
 DEVICE="${1:-}"
@@ -43,7 +38,7 @@ DEVICE="${1:-}"
 
 if ! command -v smartctl >/dev/null 2>&1; then
     cc_error "smartctl not found. Install smartmontools."
-    exit 1
+    exit 127
 fi
 
 if [ ! -e "$DEVICE" ]; then
@@ -51,80 +46,4 @@ if [ ! -e "$DEVICE" ]; then
     exit 1
 fi
 
-SMART_OUT="$(sudo smartctl -a "$DEVICE" 2>/dev/null || smartctl -a "$DEVICE" 2>/dev/null || true)"
-
-field_first() {
-    printf '%s\n' "$SMART_OUT" | awk -F: -v key="$1" '$0 ~ key {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}'
-}
-
-attr_raw() {
-    local names="$1"
-    printf '%s\n' "$SMART_OUT" | awk -v names="$names" '
-        BEGIN { split(names, n, "|") }
-        /^[ ]*[0-9]+/ {
-            for (i in n) {
-                if ($2 == n[i]) {
-                    print $NF
-                    exit
-                }
-            }
-        }
-    '
-}
-
-nvme_metric() {
-    local label="$1"
-    printf '%s\n' "$SMART_OUT" | awk -F: -v label="$label" '$0 ~ label {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}'
-}
-
-MODEL="$(field_first 'Device Model|Model Number|Product')"
-SERIAL="$(field_first 'Serial Number')"
-SIZE="$(field_first 'User Capacity|Namespace.*Size/Capacity|Total NVM Capacity')"
-SMART_HEALTH="$(field_first 'SMART overall-health self-assessment test result|SMART Health Status')"
-TEMP="$(attr_raw 'Temperature_Celsius|Airflow_Temperature_Cel')"
-[ -n "$TEMP" ] || TEMP="$(nvme_metric 'Temperature')"
-HOURS="$(attr_raw 'Power_On_Hours|Power_On_Hours_and_Msec')"
-[ -n "$HOURS" ] || HOURS="$(nvme_metric 'Power On Hours')"
-REALLOC="$(attr_raw 'Reallocated_Sector_Ct|Reallocated_Event_Count')"
-PENDING="$(attr_raw 'Current_Pending_Sector')"
-UNCORRECT="$(attr_raw 'Offline_Uncorrectable|Reported_Uncorrect')"
-ERRORS="$(attr_raw 'UDMA_CRC_Error_Count|Hardware_ECC_Recovered|Media_Wearout_Indicator')"
-
-[ -n "$MODEL" ] || MODEL="unknown"
-[ -n "$SERIAL" ] || SERIAL="unknown"
-[ -n "$SIZE" ] || SIZE="unknown"
-[ -n "$SMART_HEALTH" ] || SMART_HEALTH="unknown"
-[ -n "$TEMP" ] || TEMP="unknown"
-[ -n "$HOURS" ] || HOURS="unknown"
-[ -n "$REALLOC" ] || REALLOC="0"
-[ -n "$PENDING" ] || PENDING="0"
-[ -n "$UNCORRECT" ] || UNCORRECT="0"
-[ -n "$ERRORS" ] || ERRORS="0"
-
-SELFTEST="$(printf '%s\n' "$SMART_OUT" | awk '/Self-test execution status|Self-test routine in progress|SMART Self-test log/ {print; exit}')"
-[ -n "$SELFTEST" ] || SELFTEST="not reported"
-
-RESULT="GOOD"
-case "$SMART_HEALTH" in
-    *FAILED*|*BAD*|*FAIL*) RESULT="FAIL" ;;
-    unknown) RESULT="UNKNOWN" ;;
-esac
-if [ "$REALLOC" != "0" ] || [ "$PENDING" != "0" ] || [ "$UNCORRECT" != "0" ]; then
-    RESULT="REVIEW"
-fi
-
-printf '%-12s %s\n' "Device:" "$DEVICE"
-printf '%-12s %s\n' "Model:" "$MODEL"
-printf '%-12s %s\n' "Serial:" "$SERIAL"
-printf '%-12s %s\n' "Size:" "$SIZE"
-printf '%-12s %s\n' "Hours:" "$HOURS"
-printf '%-12s %s\n' "Temp:" "$TEMP"
-echo
-printf '%-12s %s\n' "SMART:" "$SMART_HEALTH"
-printf '%-12s %s\n' "Reallocated:" "$REALLOC"
-printf '%-12s %s\n' "Pending:" "$PENDING"
-printf '%-12s %s\n' "Uncorrect:" "$UNCORRECT"
-printf '%-12s %s\n' "Errors:" "$ERRORS"
-echo
-printf '%-12s %s\n' "Self-test:" "$SELFTEST"
-printf '%-12s %s\n' "Result:" "$RESULT"
+cc_smart_summary_for_device "$DEVICE"
