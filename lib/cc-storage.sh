@@ -11,6 +11,26 @@
 # Purpose     : Shared storage device discovery, SMART, and workflow helpers.
 # ==============================================================================
 
+cc_storage_version() {
+    if command -v cc_version >/dev/null 2>&1; then
+        cc_version
+    elif [ -f "${PROJECT_ROOT:-}/VERSION" ]; then
+        cat "${PROJECT_ROOT:-}/VERSION"
+    else
+        echo "unknown"
+    fi
+}
+
+cc_storage_loaded() {
+    command -v cc_storage_device_exists >/dev/null 2>&1 && \
+    command -v cc_storage_require_device >/dev/null 2>&1 && \
+    command -v cc_storage_inventory_output >/dev/null 2>&1
+}
+
+cc_storage_dependencies() {
+    echo "bash lsblk awk find smartctl grep paste"
+}
+
 cc_storage_device_exists() {
     local device="$1"
     [ -n "$device" ] && [ -e "$device" ]
