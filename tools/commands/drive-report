@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-report
-# Version     : 1.2.0-alpha1
+# Version     : 1.3.0-alpha1
 # Category    : Storage
-# Requires    : bash smartctl date mkdir awk sed grep hostname uname
+# Requires    : bash smartctl date mkdir awk grep hostname uname mv
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Save SMART reports and update drive asset records.
 # ==============================================================================
@@ -20,6 +20,8 @@ source "$PROJECT_ROOT/lib/cc-environment.sh"
 cc_env_export || true
 source "$PROJECT_ROOT/lib/cc-config.sh"
 source "$PROJECT_ROOT/lib/cc-assets.sh"
+source "$PROJECT_ROOT/lib/cc-yaml.sh"
+source "$PROJECT_ROOT/lib/cc-smart.sh"
 
 DEVICE=""
 REPORT_ROOT="${CC_REPORT_DIR:-$(cc_config_get REPORT_DIR "$HOME/.captaincronos/reports")}/drives"
@@ -31,20 +33,13 @@ Usage:
   cc drive-report /dev/nvme0n1
 
 Creates an archived drive report under the host report directory.
-
 Also creates/updates a drive asset record and appends asset history.
 EOF_HELP
 }
 
 case "${1:-}" in
-    --help|-h)
-        usage
-        exit 0
-        ;;
-    --version)
-        echo "1.2.0-alpha1"
-        exit 0
-        ;;
+    --help|-h) usage; exit 0 ;;
+    --version) echo "1.3.0-alpha1"; exit 0 ;;
 esac
 
 DEVICE="${1:-}"
@@ -74,30 +69,27 @@ cc_assets_init
 bash "$PROJECT_ROOT/tools/cc" drive-smart "$DEVICE" > "$out_dir/summary.txt" 2>&1 || true
 sudo smartctl -a "$DEVICE" > "$out_dir/smartctl-a.txt" 2>&1 || smartctl -a "$DEVICE" > "$out_dir/smartctl-a.txt" 2>&1 || true
 
-summary_value() {
-    awk -F: -v key="$1" '$1 ~ key {sub(/^[ \t]+/, "", $2); print $2; exit}' "$out_dir/summary.txt"
-}
-
-model="$(summary_value '^Model')"
-serial="$(summary_value '^Serial')"
-size="$(summary_value '^Size')"
-hours="$(summary_value '^Hours')"
-temp="$(summary_value '^Temp')"
-smart="$(summary_value '^SMART')"
-result="$(summary_value '^Result')"
+model="$(cc_smart_extract_model "$out_dir/summary.txt")"
+serial="$(cc_smart_extract_serial "$out_dir/summary.txt")"
+size="$(cc_smart_extract_size "$out_dir/summary.txt")"
+hours="$(cc_smart_extract_hours "$out_dir/summary.txt")"
+temp="$(cc_smart_extract_temp "$out_dir/summary.txt")"
+smart="$(cc_smart_extract_status "$out_dir/summary.txt")"
+result="$(cc_smart_extract_result "$out_dir/summary.txt")"
 
 [ -n "$serial" ] || serial="$safe_name"
 asset_file="$(cc_asset_file drives "$serial")"
 state="inventory"
 qualified="unknown"
-
-if [ "$result" = "GOOD" ]; then
-    state="inventory"
-fi
+created="$(cc_asset_timestamp)"
 
 if [ -f "$asset_file" ]; then
-    current_state="$(awk -F: '$1=="state" {gsub(/^[ \t]+|"/, "", $2); print $2; exit}' "$asset_file")"
+    current_state="$(cc_yaml_get "$asset_file" state)"
+    current_created="$(cc_yaml_get "$asset_file" created)"
+    current_qualified="$(cc_yaml_get "$asset_file" qualified)"
     [ -n "$current_state" ] && state="$current_state"
+    [ -n "$current_created" ] && created="$current_created"
+    [ -n "$current_qualified" ] && qualified="$current_qualified"
 fi
 
 cat > "$asset_file" <<EOF_ASSET
@@ -105,7 +97,7 @@ asset_id: "$serial"
 type: "drives"
 asset_type: "drive"
 state: "$state"
-created: "$( [ -f "$asset_file" ] && awk -F: '$1=="created" {gsub(/^[ \t]+|"/, "", $2); print $2; exit}' "$asset_file" || true )"
+created: "$created"
 updated: "$(cc_asset_timestamp)"
 host_id: "${CC_HOST_ID:-unknown}"
 serial: "$serial"
@@ -123,17 +115,10 @@ qualified: "$qualified"
 qualified_date: ""
 location:
   system: "$(hostname 2>/dev/null || echo unknown)"
-  bay: ""
-  pool: ""
+  bay: "$( [ -f "$asset_file" ] && cc_yaml_get_nested "$asset_file" location bay || true )"
+  pool: "$( [ -f "$asset_file" ] && cc_yaml_get_nested "$asset_file" location pool || true )"
 notes: "Asset record created or updated by cc drive-report."
 EOF_ASSET
-
-# Backfill created timestamp for newly created records.
-if ! grep -q '^created: "[0-9]' "$asset_file"; then
-    tmp="${asset_file}.tmp.$$"
-    awk -v ts="$(cc_asset_timestamp)" '$1=="created:" {$0="created: \"" ts "\""} {print}' "$asset_file" > "$tmp"
-    mv "$tmp" "$asset_file"
-fi
 
 cc_asset_append_history drives "$serial" "report" "device=$DEVICE result=$result smart=$smart report=$out_dir"
 
