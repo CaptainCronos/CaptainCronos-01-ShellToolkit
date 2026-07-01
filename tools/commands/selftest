@@ -91,11 +91,11 @@ run_check() {
     if [ "$rc" -eq 0 ]; then
         PASSED=$((PASSED + 1))
         RESULTS="${RESULTS}${label}:PASS\n"
-        [ "$JSON" -eq 1 ] || printf '%-38s %s\n' "$label" "PASS"
+        [ "$JSON" -eq 1 ] || cc_status_line "$label" "PASS"
     else
         FAILED=$((FAILED + 1))
         RESULTS="${RESULTS}${label}:FAIL\n"
-        [ "$JSON" -eq 1 ] || printf '%-38s %s\n' "$label" "FAIL"
+        [ "$JSON" -eq 1 ] || cc_status_line "$label" "FAIL"
         if [ "$VERBOSE" -eq 0 ] && [ -n "${output:-}" ]; then
             echo
             echo "$output"
@@ -147,9 +147,13 @@ else
     printf '%-14s %s\n' "Tests Failed:" "$FAILED"
     echo
     if [ "$FAILED" -eq 0 ]; then
-        echo "Overall Status: PASS"
+        printf '%-16s ' "Overall Status:"
+        cc_pass
+        printf '\n'
     else
-        echo "Overall Status: FAIL"
+        printf '%-16s ' "Overall Status:"
+        cc_fail
+        printf '\n'
     fi
 fi
 
