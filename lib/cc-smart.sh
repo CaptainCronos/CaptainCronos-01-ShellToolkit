@@ -11,6 +11,26 @@
 # Purpose     : Shared SMART collection, parsing, and summary helpers.
 # ==============================================================================
 
+cc_smart_version() {
+    if command -v cc_version >/dev/null 2>&1; then
+        cc_version
+    elif [ -f "${PROJECT_ROOT:-}/VERSION" ]; then
+        cat "${PROJECT_ROOT:-}/VERSION"
+    else
+        echo "unknown"
+    fi
+}
+
+cc_smart_loaded() {
+    command -v cc_smart_collect >/dev/null 2>&1 && \
+    command -v cc_smart_summary_from_text >/dev/null 2>&1 && \
+    command -v cc_smart_extract_result >/dev/null 2>&1
+}
+
+cc_smart_dependencies() {
+    echo "bash awk smartctl"
+}
+
 cc_smart_collect() {
     local device="$1"
     sudo smartctl -a "$device" 2>/dev/null || smartctl -a "$device" 2>/dev/null || true
