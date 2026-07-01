@@ -20,9 +20,12 @@ source "$PROJECT_ROOT/lib/cc-common.sh"
 usage() {
     cat <<'EOF_HELP'
 Usage:
-  cc framework [status|checklist]
+  cc framework [status|checklist|verify]
 
-Shows framework milestone status and 1.3 completion progress.
+Actions:
+  status     Show framework milestone progress.
+  checklist  Print the 1.3 framework completion checklist.
+  verify     Run the 1.3 framework quality gates.
 EOF_HELP
 }
 
@@ -30,7 +33,7 @@ ACTION="${1:-status}"
 case "$ACTION" in
     --help|-h) usage; exit 0 ;;
     --version) echo "1.0.0-alpha1"; exit 0 ;;
-    status|checklist) ;;
+    status|checklist|verify) ;;
     *) usage; exit 1 ;;
 esac
 
@@ -92,7 +95,50 @@ show_checklist() {
     fi
 }
 
+run_gate() {
+    local label="$1"
+    shift
+
+    printf '%-30s ' "$label"
+    if "$@" >/tmp/cc-framework-verify.out 2>&1; then
+        echo "PASS"
+        return 0
+    fi
+
+    echo "FAIL"
+    echo
+    cat /tmp/cc-framework-verify.out
+    echo
+    return 1
+}
+
+show_verify() {
+    local failed=0
+
+    cc_banner
+    echo
+    echo "Framework 1.3 Verification"
+    echo "--------------------------"
+
+    run_gate "cc selftest" bash "$PROJECT_ROOT/tools/cc" selftest || failed=$((failed + 1))
+    run_gate "cc audit --strict" bash "$PROJECT_ROOT/tools/cc" audit --strict || failed=$((failed + 1))
+    run_gate "cc docs lint" bash "$PROJECT_ROOT/tools/cc" docs lint || failed=$((failed + 1))
+    run_gate "cc verify executable" bash "$PROJECT_ROOT/tools/cc" verify executable || failed=$((failed + 1))
+    run_gate "cc release check" bash "$PROJECT_ROOT/tools/cc" release check || failed=$((failed + 1))
+
+    rm -f /tmp/cc-framework-verify.out
+    echo
+    if [ "$failed" -eq 0 ]; then
+        echo "Overall Status: PASS"
+    else
+        echo "Overall Status: FAIL"
+    fi
+
+    [ "$failed" -eq 0 ]
+}
+
 case "$ACTION" in
     status) show_status ;;
     checklist) show_checklist ;;
+    verify) show_verify ;;
 esac
