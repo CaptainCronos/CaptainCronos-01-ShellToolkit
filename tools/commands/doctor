@@ -18,6 +18,8 @@ cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
 FULL=0
+WARNINGS=0
+FAILURES=0
 
 usage() {
     echo "Usage: cc doctor [--full]"
@@ -46,37 +48,61 @@ run_cc() {
     if [ -x "$PROJECT_ROOT/tools/cc" ]; then
         bash "$PROJECT_ROOT/tools/cc" "$cmd" "$@" || true
     else
+        WARNINGS=$((WARNINGS + 1))
+        cc_status_line "cc $cmd available" "WARN"
         cc_warn "tools/cc not executable; skipping cc $cmd"
     fi
 }
 
 cc_banner
 
+echo "Captain Cronos Doctor"
+echo "======================"
+echo
+
 cc_log "Running repository verification..."
-install/verify.sh
+if install/verify.sh; then
+    cc_status_line "Repository verification" "PASS"
+else
+    FAILURES=$((FAILURES + 1))
+    cc_status_line "Repository verification" "FAIL"
+fi
 
 cc_log "Checking Git status..."
 if [ -n "$(git status --short)" ]; then
+    WARNINGS=$((WARNINGS + 1))
+    cc_status_line "Working tree clean" "WARN"
     cc_warn "Working tree has uncommitted changes:"
     git status --short
 else
-    cc_log "Working tree clean."
+    cc_status_line "Working tree clean" "PASS"
 fi
 
 cc_log "Checking script syntax..."
+syntax_ok=1
 for script in install/*.sh tools/cc tools/commands/*; do
     [ -f "$script" ] || continue
-    bash -n "$script"
+    bash -n "$script" || syntax_ok=0
 done
+if [ "$syntax_ok" -eq 1 ]; then
+    cc_status_line "Script syntax" "PASS"
+else
+    FAILURES=$((FAILURES + 1))
+    cc_status_line "Script syntax" "FAIL"
+fi
 
 cc_log "Checking installed command front-end..."
 if [ -x "$HOME/bin/cc" ]; then
+    cc_status_line "Installed command" "PASS"
     cc_log "Installed command found: $HOME/bin/cc"
 else
+    WARNINGS=$((WARNINGS + 1))
+    cc_status_line "Installed command" "WARN"
     cc_warn "Installed command missing or not executable: $HOME/bin/cc"
     cc_warn "Run: install/install.sh"
 fi
 
+echo
 cc_log "Checking host basics..."
 printf '%-18s %s\n' "Hostname:" "$(hostname 2>/dev/null || echo unknown)"
 printf '%-18s %s\n' "Kernel:" "$(uname -r 2>/dev/null || echo unknown)"
@@ -84,18 +110,29 @@ printf '%-18s %s\n' "Uptime:" "$(uptime -p 2>/dev/null || echo unknown)"
 printf '%-18s %s\n' "Load:" "$(awk '{print $1" "$2" "$3}' /proc/loadavg 2>/dev/null || echo unknown)"
 
 if [ -f /var/run/reboot-required ]; then
+    WARNINGS=$((WARNINGS + 1))
+    cc_status_line "Reboot marker" "WARN"
     cc_warn "Reboot required."
 else
-    cc_log "No reboot marker found."
+    cc_status_line "Reboot marker" "PASS"
 fi
 
 cc_log "Checking disk pressure..."
-df -hT | awk 'NR==1 || /^\/dev\//' | awk 'NR==1 {print; next} {gsub(/%/,"",$6); print; if ($6+0 >= 90) high=1} END {if (high) exit 2}' || cc_warn "One or more filesystems are at or above 90%."
+if df -hT | awk 'NR==1 || /^\/dev\//' | awk 'NR==1 {print; next} {gsub(/%/,"",$6); print; if ($6+0 >= 90) high=1} END {if (high) exit 2}'; then
+    cc_status_line "Disk pressure" "PASS"
+else
+    WARNINGS=$((WARNINGS + 1))
+    cc_status_line "Disk pressure" "WARN"
+    cc_warn "One or more filesystems are at or above 90%."
+fi
 
 cc_log "Checking SMART tooling..."
 if command -v smartctl >/dev/null 2>&1; then
+    cc_status_line "SMART tooling" "PASS"
     cc_log "smartctl found."
 else
+    WARNINGS=$((WARNINGS + 1))
+    cc_status_line "SMART tooling" "WARN"
     cc_warn "smartctl not found. Install smartmontools for SMART checks."
 fi
 
@@ -110,4 +147,15 @@ if [ "$FULL" -eq 1 ]; then
     run_cc smart
 fi
 
-cc_log "Doctor check complete."
+echo
+printf '%-16s ' "Overall Status:"
+if [ "$FAILURES" -gt 0 ]; then
+    cc_fail
+elif [ "$WARNINGS" -gt 0 ]; then
+    cc_warning
+else
+    cc_pass
+fi
+printf '\n'
+
+[ "$FAILURES" -eq 0 ]
