@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-burnin
-# Version     : 0.1.0-alpha1
+# Version     : 0.2.0-alpha1
 # Category    : Storage
 # Requires    : bash smartctl date mkdir
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -17,6 +17,8 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-config.sh"
+source "$PROJECT_ROOT/lib/cc-smart.sh"
+source "$PROJECT_ROOT/lib/cc-storage.sh"
 
 ACTION="plan"
 DEVICE=""
@@ -40,14 +42,14 @@ EOF_HELP
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --help|-h) usage; exit 0 ;;
-        --version) echo "0.1.0-alpha1"; exit 0 ;;
+        --version) echo "0.2.0-alpha1"; exit 0 ;;
         plan|start|status) ACTION="$1"; shift ;;
         *) DEVICE="$1"; shift ;;
     esac
 done
 
 [ -n "$DEVICE" ] || { usage; exit 1; }
-[ -e "$DEVICE" ] || { cc_error "Device not found: $DEVICE"; exit 1; }
+cc_storage_require_device "$DEVICE" || exit $?
 
 show_plan() {
     cc_banner
@@ -62,6 +64,11 @@ show_plan() {
     echo "  3. Start non-destructive SMART qualification."
     echo "  4. Monitor SMART self-test status."
     echo "  5. Complete qualification and update asset record."
+    echo
+    echo "Commands:"
+    echo "  cc drive-burnin start $DEVICE"
+    echo "  cc drive-burnin status $DEVICE"
+    echo "  cc drive-qualify complete $DEVICE"
 }
 
 start_workflow() {
@@ -79,5 +86,8 @@ start_workflow() {
 case "$ACTION" in
     plan) show_plan ;;
     start) start_workflow ;;
-    status) bash "$PROJECT_ROOT/tools/cc" drive-test status "$DEVICE" ;;
+    status)
+        cc_storage_require_smartctl || exit $?
+        cc_storage_test_status "$DEVICE"
+        ;;
 esac
