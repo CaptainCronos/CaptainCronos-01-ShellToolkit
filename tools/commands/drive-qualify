@@ -21,12 +21,12 @@ source "$PROJECT_ROOT/lib/cc-assets.sh"
 source "$PROJECT_ROOT/lib/cc-yaml.sh"
 source "$PROJECT_ROOT/lib/cc-smart.sh"
 source "$PROJECT_ROOT/lib/cc-storage.sh"
+source "$PROJECT_ROOT/lib/cc-report.sh"
 
 DEVICE=""
 MODE="start"
 START_LONG="no"
-REPORT_ROOT="$(cc_config_get REPORT_DIR "$HOME/.captaincronos/reports")/drives"
-QUAL_ROOT="$REPORT_ROOT/qualification"
+QUAL_ROOT="$(cc_report_root)/drives/qualification"
 
 usage() {
     cat <<'EOF_HELP'
@@ -64,8 +64,7 @@ cc_storage_require_smartctl || exit $?
 cc_storage_require_device "$DEVICE" || exit $?
 
 safe_name="$(cc_storage_device_basename "$DEVICE")"
-stamp="$(date +%Y%m%d-%H%M%S)"
-qual_dir="$QUAL_ROOT/${safe_name}-${stamp}"
+qual_dir="$(cc_report_make_dir "drives/qualification" "$safe_name")"
 
 latest_asset_for_device() {
     local dev="$1" file
@@ -95,6 +94,28 @@ write_qualification_note() {
     fi
 }
 
+write_start_readme() {
+    local file="$1"
+    cc_report_write_metadata "$file" "Drive Qualification Started" "$DEVICE"
+    cc_report_append_kv "$file" "Device" "$DEVICE"
+    cc_report_append_kv "$file" "Long test requested" "$START_LONG"
+    {
+        echo
+        echo "Next commands:"
+        echo "  cc drive-qualify status $DEVICE"
+        echo "  cc drive-qualify complete $DEVICE"
+    } >> "$file"
+}
+
+write_final_report() {
+    local file="$1" result="$2" recommendation="$3" asset_file="$4"
+    cc_report_write_metadata "$file" "Drive Qualification Report" "$DEVICE"
+    cc_report_append_kv "$file" "Device" "$DEVICE"
+    cc_report_append_kv "$file" "Result" "$result"
+    cc_report_append_kv "$file" "Recommendation" "$recommendation"
+    cc_report_append_kv "$file" "Asset" "${asset_file:-not found}"
+}
+
 case "$MODE" in
     start)
         mkdir -p "$qual_dir"
@@ -107,16 +128,7 @@ case "$MODE" in
         if [ "$START_LONG" = "yes" ]; then
             cc_storage_test_start "$DEVICE" long | tee "$qual_dir/long-test-start.txt" || true
         fi
-        {
-            echo "Drive Qualification Started"
-            echo "Device: $DEVICE"
-            echo "Started: $(date)"
-            echo "Long test requested: $START_LONG"
-            echo
-            echo "Next commands:"
-            echo "  cc drive-qualify status $DEVICE"
-            echo "  cc drive-qualify complete $DEVICE"
-        } > "$qual_dir/README.txt"
+        write_start_readme "$qual_dir/README.txt"
         echo
         cc_log "Qualification started. Check later with: cc drive-qualify status $DEVICE"
         ;;
@@ -141,14 +153,7 @@ case "$MODE" in
         fi
         asset_file="$(latest_asset_for_device "$DEVICE")"
         write_qualification_note "$asset_file" "$asset_status" "$qual_dir"
-        {
-            echo "Drive Qualification Report"
-            echo "Generated: $(date)"
-            echo "Device: $DEVICE"
-            echo "Result: $result"
-            echo "Recommendation: $recommendation"
-            echo "Asset: ${asset_file:-not found}"
-        } > "$qual_dir/QUALIFICATION.txt"
+        write_final_report "$qual_dir/QUALIFICATION.txt" "$result" "$recommendation" "$asset_file"
         echo
         cat "$qual_dir/QUALIFICATION.txt"
         ;;
