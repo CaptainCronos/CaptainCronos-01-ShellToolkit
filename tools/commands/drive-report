@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-report
-# Version     : 1.3.0-alpha1
+# Version     : 1.3.1-alpha1
 # Category    : Storage
 # Requires    : bash smartctl date mkdir awk grep hostname uname mv
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -22,9 +22,10 @@ source "$PROJECT_ROOT/lib/cc-config.sh"
 source "$PROJECT_ROOT/lib/cc-assets.sh"
 source "$PROJECT_ROOT/lib/cc-yaml.sh"
 source "$PROJECT_ROOT/lib/cc-smart.sh"
+source "$PROJECT_ROOT/lib/cc-storage.sh"
+source "$PROJECT_ROOT/lib/cc-report.sh"
 
 DEVICE=""
-REPORT_ROOT="${CC_REPORT_DIR:-$(cc_config_get REPORT_DIR "$HOME/.captaincronos/reports")}/drives"
 
 usage() {
     cat <<'EOF_HELP'
@@ -39,35 +40,23 @@ EOF_HELP
 
 case "${1:-}" in
     --help|-h) usage; exit 0 ;;
-    --version) echo "1.3.0-alpha1"; exit 0 ;;
+    --version) echo "1.3.1-alpha1"; exit 0 ;;
 esac
 
 DEVICE="${1:-}"
 [ -n "$DEVICE" ] || { usage; exit 1; }
-[ -e "$DEVICE" ] || { cc_error "Device not found: $DEVICE"; exit 1; }
+cc_storage_require_smartctl || exit $?
+cc_storage_require_device "$DEVICE" || exit $?
 
-if ! command -v smartctl >/dev/null 2>&1; then
-    cc_error "smartctl not found. Install smartmontools."
-    exit 127
-fi
-
-safe_name="$(basename "$DEVICE" | tr '/' '_')"
-stamp="$(date +%Y%m%d-%H%M%S)"
-out_dir="$REPORT_ROOT/${safe_name}-${stamp}"
-mkdir -p "$out_dir"
+safe_name="$(cc_storage_device_basename "$DEVICE")"
+out_dir="$(cc_report_make_dir drives "$safe_name")"
 cc_assets_init
 
-{
-    echo "Captain Cronos Drive Report"
-    echo "Generated: $(date)"
-    echo "Device: $DEVICE"
-    echo "Host ID: ${CC_HOST_ID:-unknown}"
-    echo "Host: $(hostname 2>/dev/null || echo unknown)"
-    echo "Kernel: $(uname -r 2>/dev/null || echo unknown)"
-} > "$out_dir/metadata.txt"
+cc_report_write_metadata "$out_dir/metadata.txt" "Captain Cronos Drive Report" "$DEVICE"
+cc_report_append_kv "$out_dir/metadata.txt" "Device" "$DEVICE"
 
 bash "$PROJECT_ROOT/tools/cc" drive-smart "$DEVICE" > "$out_dir/summary.txt" 2>&1 || true
-sudo smartctl -a "$DEVICE" > "$out_dir/smartctl-a.txt" 2>&1 || smartctl -a "$DEVICE" > "$out_dir/smartctl-a.txt" 2>&1 || true
+cc_storage_smart_text_for_device "$DEVICE" > "$out_dir/smartctl-a.txt" 2>&1 || true
 
 model="$(cc_smart_extract_model "$out_dir/summary.txt")"
 serial="$(cc_smart_extract_serial "$out_dir/summary.txt")"
@@ -82,6 +71,7 @@ asset_file="$(cc_asset_file drives "$serial")"
 state="inventory"
 qualified="unknown"
 created="$(cc_asset_timestamp)"
+host="$(hostname 2>/dev/null || echo unknown)"
 
 if [ -f "$asset_file" ]; then
     current_state="$(cc_yaml_get "$asset_file" state)"
@@ -105,7 +95,7 @@ model: "$model"
 size: "$size"
 current_device: "$DEVICE"
 last_seen: "$(cc_asset_timestamp)"
-host: "$(hostname 2>/dev/null || echo unknown)"
+host: "$host"
 smart: "$smart"
 result: "$result"
 power_on_hours: "$hours"
@@ -114,7 +104,7 @@ last_report: "$out_dir"
 qualified: "$qualified"
 qualified_date: ""
 location:
-  system: "$(hostname 2>/dev/null || echo unknown)"
+  system: "$host"
   bay: "$( [ -f "$asset_file" ] && cc_yaml_get_nested "$asset_file" location bay || true )"
   pool: "$( [ -f "$asset_file" ] && cc_yaml_get_nested "$asset_file" location pool || true )"
 notes: "Asset record created or updated by cc drive-report."
