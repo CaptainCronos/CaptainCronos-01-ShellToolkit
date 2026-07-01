@@ -99,13 +99,12 @@ run_gate() {
     local label="$1"
     shift
 
-    printf '%-30s ' "$label"
     if "$@" >/tmp/cc-framework-verify.out 2>&1; then
-        echo "PASS"
+        cc_status_line "$label" "PASS"
         return 0
     fi
 
-    echo "FAIL"
+    cc_status_line "$label" "FAIL"
     echo
     cat /tmp/cc-framework-verify.out
     echo
@@ -128,11 +127,13 @@ show_verify() {
 
     rm -f /tmp/cc-framework-verify.out
     echo
+    printf '%-16s ' "Overall Status:"
     if [ "$failed" -eq 0 ]; then
-        echo "Overall Status: PASS"
+        cc_pass
     else
-        echo "Overall Status: FAIL"
+        cc_fail
     fi
+    printf '\n'
 
     [ "$failed" -eq 0 ]
 }
