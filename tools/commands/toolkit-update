@@ -30,4 +30,4 @@ case "${1:-}" in
         ;;
 esac
 
-exec install/update.sh "$@"
+exec bash install/update.sh "$@"
