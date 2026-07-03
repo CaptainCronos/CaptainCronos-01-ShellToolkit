@@ -60,6 +60,33 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+verify_all() {
+    cc_banner
+    echo
+    echo "Repository Verification"
+    echo "-----------------------"
+
+    if install/verify.sh >/tmp/cc-verify.out 2>&1; then
+        cc_status_line "Repository verification" "PASS"
+        rm -f /tmp/cc-verify.out
+        echo
+        printf '%-16s ' "Overall Status:"
+        cc_pass
+        printf '\n'
+        return 0
+    fi
+
+    cc_status_line "Repository verification" "FAIL"
+    echo
+    cat /tmp/cc-verify.out
+    rm -f /tmp/cc-verify.out
+    echo
+    printf '%-16s ' "Overall Status:"
+    cc_fail
+    printf '\n'
+    return 1
+}
+
 verify_executable() {
     local total=0 executable=0 missing=0 file
 
@@ -84,6 +111,8 @@ verify_executable() {
 
     if [ "$missing" -gt 0 ]; then
         echo
+        cc_status_line "Executable permissions" "FAIL"
+        echo
         echo "Missing executable bit:"
         find tools/commands -maxdepth 1 -type f ! -executable | sort
 
@@ -92,6 +121,7 @@ verify_executable() {
             cc_log "Applying executable permissions to tools/commands/*"
             chmod 755 tools/commands/*
             cc_log "Executable permissions repaired."
+            cc_status_line "Permission repair" "PASS"
             return 0
         fi
 
@@ -101,12 +131,16 @@ verify_executable() {
     fi
 
     echo
-    echo "Overall: PASS"
+    cc_status_line "Executable permissions" "PASS"
+    echo
+    printf '%-16s ' "Overall Status:"
+    cc_pass
+    printf '\n'
 }
 
 case "$ACTION" in
     all)
-        install/verify.sh
+        verify_all
         ;;
     executable)
         verify_executable
