@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : helpme-refresh
-# Version     : 1.2.0-alpha1
+# Version     : 1.2.1-alpha1
 # Category    : Documentation
 # Requires    : bash python3
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -38,7 +38,7 @@ case "${1:---dry-run}" in
         exit 0
         ;;
     --version)
-        echo "1.2.0-alpha1"
+        echo "1.2.1-alpha1"
         exit 0
         ;;
     --dry-run)
@@ -125,6 +125,33 @@ bad = '        name="${name#cc-}"\n        cc_bin='
 good = '        name="${name#cc-}"\n        [ -n "$name" ] || return 1\n        cc_bin='
 if bad in text and good not in text:
     text = text.replace(bad, good, 1)
+
+old_search = '''        {
+            _cc_help_core
+            _cc_help_repository
+            _cc_help_storage
+            _cc_help_maintenance
+            _cc_help_docs
+            _cc_help_engineering
+        } | awk -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q {print}'
+'''
+new_search = '''        {
+            echo "cc Captain Cronos Command Framework"
+            echo "cc framework Command dispatcher and framework overview"
+            echo "cc framework verify Run framework quality gates"
+            _cc_help_cc_overview
+            _cc_help_core
+            _cc_help_repository
+            _cc_help_storage
+            _cc_help_maintenance
+            _cc_help_docs
+            _cc_help_engineering
+        } | awk -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q {print}'
+'''
+if old_search in text:
+    text = text.replace(old_search, new_search, 1)
+elif '_cc_help_cc_overview' not in text.split('_cc_help_search_static() {', 1)[-1].split('}', 1)[0]:
+    raise SystemExit("Could not update helpme search source")
 
 path.write_text(text)
 PY
