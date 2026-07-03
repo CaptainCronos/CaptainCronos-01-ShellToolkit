@@ -6,20 +6,67 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ---
 
-## v2.0.0-alpha — Planned
+## v1.3.0-beta1 — Blackbeard
 
 ### Purpose
 
-First documented engineering-framework release.
+Framework completion milestone for the Captain Cronos Shell Toolkit.
 
-### Planned
+This release marks the transition from a collection of shell utilities into a structured framework with shared libraries, a command dispatcher, storage workflows, asset tracking, engineering validation, release checks, and a standardized terminal UI.
 
-- Complete documentation refresh.
-- Freeze repository layout.
-- Complete command framework migration.
-- Expand `cc doctor`.
-- Add release checklist.
-- Prepare annotated Git tag.
+### Added
+
+- Storage namespace and storage command workflow.
+- Environment namespace.
+- Asset lifecycle and history framework.
+- Shared YAML helper library.
+- Shared SMART helper library.
+- Shared storage helper library.
+- Shared report helper library.
+- Drive inventory, SMART, burn-in, qualification, and reporting workflows.
+- Report-backed drive qualification output.
+- Asset record updates from drive reporting workflows.
+- `cc selftest` engineering validation suite.
+- `cc framework verify` framework gate.
+- `cc release check` pre-release gate.
+- Shared terminal color helpers.
+- Shared status helpers for colorized `PASS`, `WARN`, and `FAIL` output.
+- Dotted leader formatting for status lines.
+- Library load checks in `cc selftest`.
+
+### Changed
+
+- `drive-report` now uses shared report helpers.
+- `drive-qualify` now uses shared report helpers.
+- Engineering commands now use shared status output:
+  - `cc selftest`
+  - `cc framework verify`
+  - `cc doctor`
+  - `cc audit`
+  - `cc release check`
+  - `cc verify`
+- `VERSION` now reports `1.3.0-beta1`.
+- README and roadmap now describe the 1.3 framework state.
+
+### Fixed
+
+- Restored executable-bit expectations for framework commands.
+- Corrected `cc doctor --full` to invoke `tools/cc` through `bash` without requiring the file itself to be executable.
+- Reduced status-output drift across engineering commands.
+
+### Validation
+
+Recommended validation suite:
+
+```bash
+cc selftest
+cc framework verify
+cc doctor
+cc release check
+cc audit --strict
+cc verify executable
+git status --short
+```
 
 ---
 
