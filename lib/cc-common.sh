@@ -62,8 +62,16 @@ cc_status_word() {
 }
 
 cc_status_line() {
-    local label="$1" status="$2"
-    printf '%-38s ' "$label"
+    local label="$1" status="$2" width="${CC_STATUS_WIDTH:-38}" label_len dots
+    label_len=${#label}
+    if [ "$label_len" -ge "$width" ]; then
+        printf '%s ' "$label"
+    else
+        dots=$((width - label_len))
+        printf '%s' "$label"
+        printf '%*s' "$dots" '' | tr ' ' '.'
+        printf ' '
+    fi
     cc_status_word "$status"
     printf '\n'
 }
