@@ -187,7 +187,6 @@ for path in sorted(cmd_dir.iterdir()):
     if has_header(text, "Category") and has_header(text, "Requires"):
         continue
     out = []
-    inserted = False
     for line in lines:
         out.append(line)
         if line.startswith("# Version") and not has_header(text, "Category"):
@@ -195,7 +194,6 @@ for path in sorted(cmd_dir.iterdir()):
         if line.startswith("# Category") and not has_header(text, "Requires"):
             out.append(f"# Requires    : {requires}")
         if line.startswith("# Version") and has_header(text, "Category") and not has_header(text, "Requires"):
-            # If Category existed above or elsewhere, Requires will be added after Category only.
             pass
     new_text = "\n".join(out) + ("\n" if text.endswith("\n") else "")
     if new_text != text:
@@ -233,9 +231,29 @@ case "$MODE" in
             fi
         done < <(rows)
         printf '%-12s %s\n' "Commands:" "$total"
-        printf '%-12s %s\n' "Clean:" "$clean"
-        printf '%-12s %s\n' "Warnings:" "$warn"
-        printf '%-12s %s\n' "Failures:" "$fail"
+        cc_status_line "Clean commands" "$clean"
+        if [ "$warn" -gt 0 ]; then
+            cc_status_line "Warnings" "WARN"
+            printf '%-38s %s\n' "Warning count" "$warn"
+        else
+            cc_status_line "Warnings" "PASS"
+        fi
+        if [ "$fail" -gt 0 ]; then
+            cc_status_line "Failures" "FAIL"
+            printf '%-38s %s\n' "Failure count" "$fail"
+        else
+            cc_status_line "Failures" "PASS"
+        fi
+        echo
+        printf '%-16s ' "Overall Status:"
+        if [ "$fail" -gt 0 ]; then
+            cc_fail
+        elif [ "$warn" -gt 0 ]; then
+            cc_warning
+        else
+            cc_pass
+        fi
+        printf '\n'
         echo
         if [ "$warn" -gt 0 ] || [ "$fail" -gt 0 ]; then
             echo "Run detail: cc audit commands"
