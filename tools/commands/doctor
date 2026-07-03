@@ -45,12 +45,12 @@ esac
 run_cc() {
     local cmd="$1"
     shift
-    if [ -x "$PROJECT_ROOT/tools/cc" ]; then
+    if [ -r "$PROJECT_ROOT/tools/cc" ]; then
         bash "$PROJECT_ROOT/tools/cc" "$cmd" "$@" || true
     else
         WARNINGS=$((WARNINGS + 1))
         cc_status_line "cc $cmd available" "WARN"
-        cc_warn "tools/cc not executable; skipping cc $cmd"
+        cc_warn "tools/cc not readable; skipping cc $cmd"
     fi
 }
 
