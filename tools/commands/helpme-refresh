@@ -4,11 +4,11 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : helpme-refresh
-# Version     : 1.2.2-alpha1
+# Version     : 1.3.0-alpha1
 # Category    : Documentation
 # Requires    : bash python3
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Refresh installed helpme output for the current command architecture.
+# Purpose     : Replace installed helpme with canonical framework help.
 # ==============================================================================
 
 set -euo pipefail
@@ -20,25 +20,19 @@ source "$PROJECT_ROOT/lib/cc-common.sh"
 APPLY=0
 TARGET="$HOME/.bash_functions"
 
-usage() {
-    cat <<'EOF_HELP'
+case "${1:---dry-run}" in
+    --help|-h)
+        cat <<'EOF_HELP'
 Usage:
   cc helpme-refresh [--apply]
 
-Refreshes the installed helpme function in ~/.bash_functions so it includes
-current Captain Cronos command-framework help topics.
-
+Replaces the installed helpme function with canonical Captain Cronos framework help.
 Default is dry-run.
 EOF_HELP
-}
-
-case "${1:---dry-run}" in
-    --help|-h)
-        usage
         exit 0
         ;;
     --version)
-        echo "1.2.2-alpha1"
+        echo "1.3.0-alpha1"
         exit 0
         ;;
     --dry-run)
@@ -48,18 +42,15 @@ case "${1:---dry-run}" in
         APPLY=1
         ;;
     *)
-        usage
+        echo "Usage: cc helpme-refresh [--apply]"
         exit 1
         ;;
 esac
 
-if [ ! -f "$TARGET" ]; then
-    cc_error "Missing installed functions file: $TARGET"
-    exit 1
-fi
+[ -f "$TARGET" ] || { cc_error "Missing installed functions file: $TARGET"; exit 1; }
 
 if [ "$APPLY" -eq 0 ]; then
-    cc_log "DRY RUN: would add/refresh helpme cc topic in $TARGET"
+    cc_log "DRY RUN: would replace helpme in $TARGET"
     cc_log "After apply, run: source ~/.bash_functions"
     exit 0
 fi
@@ -73,114 +64,143 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
+start = text.find("# @name helpme\n")
+if start < 0:
+    raise SystemExit("Could not find helpme block marker")
 
-cc_overview = r'''
-    _cc_help_cc_overview() {
+block = r'''# @name helpme
+# @group Shell
+# @desc Show Captain Cronos Toolkit help, framework topics, command search, and stats.
+# @usage helpme [cc|framework|search <term>|stats|aliases|functions|version]
+# @example helpme cc
+# @example helpme search framework
+helpme() {
+    local cmd term repo version_file
+
+    _cc_help_version() {
+        repo="${CAPTAIN_CRONOS_REPO:-$HOME/GitHub/CaptainCronos-01-ShellToolkit}"
+        version_file="$repo/VERSION"
+        [ -f "$version_file" ] && . "$version_file"
+        echo "Captain Cronos Shell Toolkit"
+        echo "Version : ${TOOLKIT_VERSION:-unknown}"
+        echo "Codename: ${TOOLKIT_CODENAME:-unknown}"
+        echo
+    }
+
+    _cc_help_row() { printf "%-30s %s\n" "$1" "$2"; }
+
+    _cc_help_framework() {
         _cc_help_version
         echo "Captain Cronos Command Framework"
         echo "================================"
         echo
-        echo "Usage:"
-        echo "  cc <command> [options]"
+        echo "Usage: cc <command> [options]"
         echo
-        echo "Purpose:"
-        echo "  cc is the main Captain Cronos command dispatcher. It loads commands from"
-        echo "  tools/commands/ and provides a single front-end for toolkit operations."
+        _cc_help_row "cc version" "Show toolkit version information."
+        _cc_help_row "cc selftest" "Run the engineering self-test suite."
+        _cc_help_row "cc framework verify" "Run framework quality gates."
+        _cc_help_row "cc doctor" "Run repository, install, and host checks."
+        _cc_help_row "cc update" "Run managed toolkit and system maintenance."
+        _cc_help_row "cc release check" "Run pre-release verification checks."
         echo
-        echo "Common workflows:"
-        printf "%-30s %s\n" "cc version" "Show toolkit version information."
-        printf "%-30s %s\n" "cc selftest" "Run the engineering self-test suite."
-        printf "%-30s %s\n" "cc framework verify" "Run framework quality gates."
-        printf "%-30s %s\n" "cc doctor" "Run repository, installation, and host health checks."
-        printf "%-30s %s\n" "cc update" "Run managed toolkit and system maintenance workflow."
-        printf "%-30s %s\n" "cc release check" "Run pre-release verification checks."
-        echo
-        echo "Command families:"
-        printf "%-30s %s\n" "helpme engineering" "Validation, release, and framework commands."
-        printf "%-30s %s\n" "helpme storage" "Drive, SMART, report, and asset commands."
-        printf "%-30s %s\n" "helpme maintenance" "Update, health, and cleanup commands."
-        printf "%-30s %s\n" "helpme docs" "Documentation commands and files."
-        echo
-        echo "Discovery:"
-        printf "%-30s %s\n" "cc" "Show dispatcher command list."
-        printf "%-30s %s\n" "cc <command> --help" "Show help for one command."
-        printf "%-30s %s\n" "helpme search <term>" "Search aliases, functions, and command families."
+        _cc_help_row "helpme engineering" "Validation, release, and framework commands."
+        _cc_help_row "helpme storage" "Drive, SMART, report, and asset commands."
+        _cc_help_row "helpme maintenance" "Update, health, and cleanup commands."
+        _cc_help_row "helpme docs" "Documentation commands and files."
     }
-'''
 
-search_static = r'''
-    _cc_help_search_static() {
-        {
-            echo "cc Captain Cronos Command Framework"
-            echo "cc framework Command dispatcher and framework overview"
-            echo "cc framework verify Run framework quality gates"
-            _cc_help_cc_overview
-            _cc_help_engineering
-            _cc_help_docs
-        } | awk -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q {print}'
+    _cc_help_engineering() {
+        _cc_help_row "cc audit --strict" "Run strict command consistency checks."
+        _cc_help_row "cc docs lint" "Check documentation and command metadata."
+        _cc_help_row "cc framework verify" "Run framework quality gates."
+        _cc_help_row "cc release check" "Run pre-release verification checks."
+        _cc_help_row "cc selftest" "Run the full engineering self-test suite."
+        _cc_help_row "cc verify" "Verify repository structure and Bash syntax."
     }
-'''
 
-if "_cc_help_cc_overview()" not in text:
-    marker = "    _cc_help_engineering() {"
-    if marker not in text:
-        raise SystemExit("Could not find helpme helper insertion point")
-    text = text.replace(marker, cc_overview + "\n" + marker, 1)
+    _cc_help_storage() {
+        _cc_help_row "cc drives" "Show installed storage devices and mounts."
+        _cc_help_row "cc smart" "Summarize SMART health for installed drives."
+        _cc_help_row "cc drive-report" "Archive SMART report and update drive asset."
+        _cc_help_row "cc asset" "Manage lifecycle asset records."
+    }
 
-if "_cc_help_search_static()" not in text:
-    marker = "    case \"${1:-}\" in"
-    if marker not in text:
-        raise SystemExit("Could not find helpme case start")
-    text = text.replace(marker, search_static + "\n" + marker, 1)
+    _cc_help_maintenance() {
+        _cc_help_row "cc doctor" "Run repository, install, and host checks."
+        _cc_help_row "cc system-update" "Run OS, package, app, and CLI updates."
+        _cc_help_row "cc toolkit-update" "Pull latest toolkit changes and reinstall."
+        _cc_help_row "cc kernel-cleanup" "Review obsolete kernel packages safely."
+        _cc_help_row "cc update" "Run managed maintenance workflow."
+    }
 
-case_marker = '        version|--version)\n'
-case_block = '        cc|command|commands|framework)\n            _cc_help_cc_overview\n            ;;\n'
-if case_block not in text:
-    if case_marker not in text:
-        raise SystemExit("Could not find helpme case insertion point")
-    text = text.replace(case_marker, case_block + case_marker, 1)
+    _cc_help_docs() {
+        _cc_help_row "cc docs" "Generate references, inventories, and lint reports."
+        _cc_help_row "cc registry" "Display command metadata registry."
+        _cc_help_row "cc roadmap" "Show project roadmap."
+        _cc_help_row "README.md" "Project overview."
+        _cc_help_row "ROADMAP.md" "Project roadmap."
+        _cc_help_row "CHANGELOG.md" "Change history."
+    }
 
-bad = '        name="${name#cc-}"\n        cc_bin='
-good = '        name="${name#cc-}"\n        [ -n "$name" ] || return 1\n        cc_bin='
-if bad in text and good not in text:
-    text = text.replace(bad, good, 1)
+    _cc_help_search_all() {
+        echo "cc Captain Cronos Command Framework"
+        echo "cc framework Command dispatcher and framework overview"
+        echo "cc framework verify Run framework quality gates"
+        _cc_help_framework
+        _cc_help_engineering
+        _cc_help_storage
+        _cc_help_maintenance
+        _cc_help_docs
+    }
 
-old_modern_search = '''        {
-            _cc_help_core
-            _cc_help_repository
-            _cc_help_storage
-            _cc_help_maintenance
-            _cc_help_docs
-            _cc_help_engineering
-        } | awk -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q {print}'
-'''
-new_modern_search = '''        {
-            echo "cc Captain Cronos Command Framework"
-            echo "cc framework Command dispatcher and framework overview"
-            echo "cc framework verify Run framework quality gates"
-            _cc_help_cc_overview
-            _cc_help_core
-            _cc_help_repository
-            _cc_help_storage
-            _cc_help_maintenance
-            _cc_help_docs
-            _cc_help_engineering
-        } | awk -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q {print}'
-'''
-if old_modern_search in text:
-    text = text.replace(old_modern_search, new_modern_search, 1)
+    case "${1:-}" in
+        ""|list|all|cc|command|commands|framework) _cc_help_framework ;;
+        version|--version) _cc_help_version ;;
+        engineering|engineer|dev|diagnostics|verify) _cc_help_version; _cc_help_engineering ;;
+        storage|drive|drives|disk|disks|nas) _cc_help_version; _cc_help_storage ;;
+        maintenance|maint|install|installer|update) _cc_help_version; _cc_help_maintenance ;;
+        docs|documentation) _cc_help_version; _cc_help_docs ;;
+        github|git|workflow|gitflow) _cc_gitflow_help ;;
+        aliases) _cc_alias_table | awk -F '\t' '{ printf "%-16s %s\n", $1, $2 }' ;;
+        functions) _cc_function_table | awk -F '\t' '{ printf "%-16s %-12s %s\n", $2, $1, $3 }' ;;
+        search)
+            shift
+            term="$*"
+            [ -n "$term" ] || { echo "Usage: helpme search <term>"; return 1; }
+            echo "Search results for: $term"
+            echo "------------------------"
+            {
+                _cc_alias_table | awk -F '\t' '{ print "alias\t" $1 "\t" $2 }'
+                _cc_function_table | awk -F '\t' '{ print "function\t" $2 "\t" $3 }'
+                _cc_help_search_all | awk 'NF { print "command\t" $1 "\t" substr($0, index($0,$2)) }'
+            } | awk -F '\t' -v q="$term" 'BEGIN{IGNORECASE=1} $0 ~ q { printf "%-12s %-24s %s\n", $1, $2, $3 }'
+            ;;
+        stats)
+            _cc_help_version
+            echo "Toolkit Statistics"
+            echo "=================="
+            printf "Aliases       : %s\n" "$(_cc_alias_names | wc -l)"
+            printf "Functions     : %s\n" "$(_cc_function_names | wc -l)"
+            command -v cc >/dev/null 2>&1 && printf "Commands      : %s\n" "$(cc registry tsv 2>/dev/null | tail -n +2 | wc -l)"
+            printf "Function file : %s\n" "$(_cc_meta_file)"
+            printf "Alias file    : %s\n" "$(_cc_alias_file)"
+            ;;
+        *)
+            cmd="$1"
+            cc "$cmd" --help 2>/dev/null && return 0
+            _cc_command_help "$cmd" 2>/dev/null && return 0
+            _cc_alias_help "$cmd" 2>/dev/null && return 0
+            echo "No help entry for: $cmd"
+            echo "Try: helpme search $cmd"
+            return 1
+            ;;
+    esac
+}'''
 
-old_legacy_search = '''                _cc_help_engineering | awk 'NF { print "engineering\t" $1 "\t" substr($0, index($0,$2)) }'
-'''
-new_legacy_search = '''                _cc_help_engineering | awk 'NF { print "engineering\t" $1 "\t" substr($0, index($0,$2)) }'
-                _cc_help_search_static | awk 'NF { print "command\t" $1 "\t" substr($0, index($0,$2)) }'
-'''
-if old_legacy_search in text and new_legacy_search not in text:
-    text = text.replace(old_legacy_search, new_legacy_search, 1)
-
+text = text[:start].rstrip() + "\n\n" + block + "\n"
 path.write_text(text)
 PY
 
-cc_log "Refreshed helpme cc topic in $TARGET"
+cc_log "Replaced helpme in $TARGET"
 cc_log "Backup: $BACKUP"
 cc_log "Reload with: source ~/.bash_functions"
