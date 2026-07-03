@@ -59,25 +59,54 @@ release_plan() {
     echo "9. Push commit and tag."
 }
 
+run_release_gate() {
+    local label="$1"
+    shift
+
+    if "$@" >/tmp/cc-release-check.out 2>&1; then
+        cc_status_line "$label" "PASS"
+        return 0
+    fi
+
+    cc_status_line "$label" "FAIL"
+    cat /tmp/cc-release-check.out
+    return 1
+}
+
 release_check() {
+    local failed=0
+
     cc_banner
     echo
     echo "Pre-release checks"
     echo "------------------"
+
     bash "$PROJECT_ROOT/tools/cc" version
     echo
-    bash "$PROJECT_ROOT/tools/cc" verify
-    echo
-    bash "$PROJECT_ROOT/tools/cc" doctor
-    echo
-    bash "$PROJECT_ROOT/tools/cc" docs lint
-    echo
+
+    run_release_gate "Repository verify" bash "$PROJECT_ROOT/tools/cc" verify || failed=$((failed + 1))
+    run_release_gate "Doctor" bash "$PROJECT_ROOT/tools/cc" doctor || failed=$((failed + 1))
+    run_release_gate "Documentation lint" bash "$PROJECT_ROOT/tools/cc" docs lint || failed=$((failed + 1))
+
     if [ -n "$(git status --short)" ]; then
-        cc_warn "Working tree is not clean."
+        cc_status_line "Working tree clean" "FAIL"
         git status --short
-        exit 1
+        failed=$((failed + 1))
+    else
+        cc_status_line "Working tree clean" "PASS"
     fi
-    cc_log "Working tree clean."
+
+    rm -f /tmp/cc-release-check.out
+    echo
+    printf '%-16s ' "Overall Status:"
+    if [ "$failed" -eq 0 ]; then
+        cc_pass
+    else
+        cc_fail
+    fi
+    printf '\n'
+
+    [ "$failed" -eq 0 ]
 }
 
 case "$ACTION" in
