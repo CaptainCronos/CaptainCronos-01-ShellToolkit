@@ -1,10 +1,10 @@
 # Captain Cronos Shell Toolkit
 
-**Current milestone:** `v1.0.0-alpha1` — **Blackbeard**
+**Current milestone:** `v1.3.0-beta1` — **Blackbeard**
 
-Captain Cronos Shell Toolkit is the reference implementation of the Captain Cronos engineering framework. It provides a standardized Linux shell environment, reusable Bash functions, installer tooling, baseline capture, release defaults, and a growing command framework built around the `cc` command.
+Captain Cronos Shell Toolkit is the reference implementation of the Captain Cronos engineering framework. It provides a standardized Linux shell environment, reusable Bash libraries, installer tooling, baseline capture, release defaults, storage workflows, asset tracking, reporting, and a growing command framework built around the `cc` command.
 
-The project began as a personal Bash configuration and has evolved into a documented, versioned, installable toolkit intended to be reusable across Linux workstations, rescue environments, servers, and future Captain Cronos projects.
+The project began as a personal Bash configuration and has evolved into a documented, versioned, installable toolkit intended to be reusable across Linux workstations, rescue environments, servers, NAS systems, and future Captain Cronos projects.
 
 ---
 
@@ -15,6 +15,7 @@ The project began as a personal Bash configuration and has evolved into a docume
 - Separate operating-system baselines from Captain Cronos defaults.
 - Maintain rollback paths through timestamped backups.
 - Standardize script headers, versioning, repository layout, and release process.
+- Provide shared framework libraries for commands, reports, storage, YAML, assets, and terminal UI.
 - Build a foundation that future Captain Cronos repositories can reuse.
 
 ---
@@ -46,10 +47,10 @@ Verify:
 
 ```bash
 cc version
-cc repo
+cc selftest
+cc framework verify
 cc doctor
-helpme engineering
-lstree --depth 2 .
+cc release check
 ```
 
 ---
@@ -62,13 +63,18 @@ The long-term command front-end is:
 cc <command> [options]
 ```
 
-Initial commands include:
+Core and engineering commands include:
 
 ```bash
 cc version
 cc repo
 cc doctor
 cc verify
+cc selftest
+cc framework verify
+cc audit --strict
+cc release check
+cc docs lint
 cc install
 cc update
 cc baseline
@@ -76,7 +82,48 @@ cc defaults
 cc help
 ```
 
-The command framework is being migrated toward `tools/commands/`, where each command is a standalone script discovered by the `cc` dispatcher.
+Storage and asset commands include:
+
+```bash
+cc storage
+cc drives
+cc smart
+cc drive-report
+cc drive-qualify
+cc drive-burnin
+cc asset
+```
+
+Commands live under `tools/commands/`, where each command is a standalone script discovered by the `cc` dispatcher.
+
+---
+
+## Framework Status
+
+`v1.3.0-beta1` marks the 1.3 framework milestone.
+
+Completed framework areas:
+
+- Shared command dispatcher and `tools/commands/` architecture.
+- Shared libraries under `lib/`.
+- Engineering validation through `cc selftest`, `cc framework verify`, `cc audit`, `cc verify`, `cc doctor`, and `cc release check`.
+- Storage namespace and drive workflows.
+- Environment namespace.
+- Asset lifecycle and history framework.
+- Shared reporting helpers.
+- Shared YAML helpers.
+- Terminal UI helpers for colorized `PASS`, `WARN`, and `FAIL` status output.
+- Dotted leader formatting for status lines.
+
+Recommended validation workflow:
+
+```bash
+cc selftest
+cc framework verify
+cc doctor
+cc release check
+git status --short
+```
 
 ---
 
@@ -106,6 +153,36 @@ CaptainCronos-01-ShellToolkit/
 │   └── commands/
 └── archive/
 ```
+
+---
+
+## Shared Libraries
+
+Shared framework code lives under `lib/`.
+
+Current framework libraries include:
+
+```text
+lib/cc-common.sh
+lib/cc-config.sh
+lib/cc-yaml.sh
+lib/cc-smart.sh
+lib/cc-storage.sh
+lib/cc-assets.sh
+lib/cc-report.sh
+```
+
+Commands should use shared helpers instead of duplicating behavior. In particular, command output should use:
+
+```bash
+cc_banner
+cc_status_line
+cc_log
+cc_warn
+cc_error
+```
+
+Direct `echo "PASS"`, `echo "FAIL"`, and ad hoc status formatting should be avoided in new framework commands.
 
 ---
 
