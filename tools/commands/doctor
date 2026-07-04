@@ -13,16 +13,16 @@
 
 set -euo pipefail
 
+ORIGINAL_PWD="${PWD:-$(pwd)}"
 TOOLKIT_ROOT="${TOOLKIT_ROOT:-${PROJECT_ROOT:-}}"
 if [ -z "$TOOLKIT_ROOT" ]; then
     TOOLKIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 fi
-CURRENT_REPO="${CURRENT_REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-PROJECT_ROOT="$TOOLKIT_ROOT"
-export TOOLKIT_ROOT CURRENT_REPO PROJECT_ROOT
 
 cd "$TOOLKIT_ROOT"
+source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
+cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 FULL=0
 WARNINGS=0
@@ -52,8 +52,8 @@ esac
 run_cc() {
     local cmd="$1"
     shift
-    if [ -r "$PROJECT_ROOT/tools/cc" ]; then
-        bash "$PROJECT_ROOT/tools/cc" "$cmd" "$@" || true
+    if [ -r "$TOOLKIT_ROOT/tools/cc" ]; then
+        bash "$TOOLKIT_ROOT/tools/cc" "$cmd" "$@" || true
     else
         WARNINGS=$((WARNINGS + 1))
         cc_status_line "cc $cmd available" "WARN"
@@ -76,13 +76,13 @@ else
 fi
 
 cc_log "Checking Git status..."
-if [ -n "$(git status --short)" ]; then
+if cc_repo_clean "$TOOLKIT_ROOT"; then
+    cc_status_line "Working tree clean" "PASS"
+else
     WARNINGS=$((WARNINGS + 1))
     cc_status_line "Working tree clean" "WARN"
     cc_warn "Working tree has uncommitted changes:"
-    git status --short
-else
-    cc_status_line "Working tree clean" "PASS"
+    cc_repo_status_short "$TOOLKIT_ROOT" || true
 fi
 
 cc_log "Checking script syntax..."

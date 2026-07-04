@@ -30,11 +30,12 @@ tools/cc
 
 Its job is to:
 
-1. Locate the repository.
-2. Load shared functions.
-3. Discover command modules.
-4. Dispatch the requested command.
-5. Provide generated help output.
+1. Discover the active Shell Toolkit checkout as `TOOLKIT_ROOT`.
+2. Load `lib/cc-context.sh`, `lib/cc-common.sh`, and `lib/cc-deps.sh`.
+3. Initialize `TOOLKIT_ROOT`, `CURRENT_REPO`, and the compatibility alias `PROJECT_ROOT`.
+4. Discover command modules.
+5. Dispatch the requested command.
+6. Provide generated help output.
 
 The dispatcher should remain small. It should not contain the full implementation of each command.
 
@@ -98,10 +99,11 @@ Each command should support where practical:
 Commands should use shared functions from:
 
 ```text
+lib/cc-context.sh
 lib/cc-common.sh
 ```
 
-Commands should not duplicate common logging, version, or repository-detection logic when shared helpers are available.
+Commands should not duplicate common logging, version, dependency, or repository-detection logic when shared helpers are available. New command code should use `TOOLKIT_ROOT` for toolkit files and `CURRENT_REPO` for caller repository behavior. `PROJECT_ROOT` is retained only as a backwards-compatible alias for older commands and maps to `TOOLKIT_ROOT`.
 
 ---
 

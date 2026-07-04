@@ -16,27 +16,28 @@ set -euo pipefail
 DEFAULT_TOOLKIT_ROOT="$HOME/GitHub/CaptainCronos-01-ShellToolkit"
 ORIGINAL_PWD="${PWD:-$(pwd)}"
 
-canonical_dir() {
+cc_launcher_canonical_dir() {
     local path="$1"
     [ -d "$path" ] || return 1
     (cd "$path" && pwd -P)
 }
 
-is_toolkit_root() {
+cc_launcher_is_toolkit_root() {
     local root="$1"
     [ -n "$root" ] &&
+        [ -f "$root/lib/cc-context.sh" ] &&
         [ -f "$root/lib/cc-common.sh" ] &&
         [ -d "$root/tools/commands" ] &&
         [ -f "$root/tools/cc" ]
 }
 
-resolve_toolkit_root() {
+cc_launcher_resolve_toolkit_root() {
     local raw candidate script_dir
 
     for raw in "${CAPTAIN_CRONOS_TOOLKIT_ROOT:-}" "${CAPTAIN_CRONOS_REPO:-}"; do
         [ -n "$raw" ] || continue
-        candidate="$(canonical_dir "$raw" 2>/dev/null || true)"
-        if is_toolkit_root "$candidate"; then
+        candidate="$(cc_launcher_canonical_dir "$raw" 2>/dev/null || true)"
+        if cc_launcher_is_toolkit_root "$candidate"; then
             echo "$candidate"
             return 0
         fi
@@ -46,11 +47,11 @@ resolve_toolkit_root() {
         return 1
     done
 
-    script_dir="$(canonical_dir "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null || true)"
+    script_dir="$(cc_launcher_canonical_dir "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null || true)"
     for raw in "$script_dir/.." "$script_dir" "$DEFAULT_TOOLKIT_ROOT"; do
         [ -n "$raw" ] || continue
-        candidate="$(canonical_dir "$raw" 2>/dev/null || true)"
-        if is_toolkit_root "$candidate"; then
+        candidate="$(cc_launcher_canonical_dir "$raw" 2>/dev/null || true)"
+        if cc_launcher_is_toolkit_root "$candidate"; then
             echo "$candidate"
             return 0
         fi
@@ -61,24 +62,13 @@ resolve_toolkit_root() {
     return 1
 }
 
-resolve_current_repo() {
-    local root
-    root="$(git -C "$ORIGINAL_PWD" rev-parse --show-toplevel 2>/dev/null || true)"
-    if [ -n "$root" ]; then
-        canonical_dir "$root"
-    else
-        canonical_dir "$ORIGINAL_PWD"
-    fi
-}
-
-TOOLKIT_ROOT="$(resolve_toolkit_root)" || exit 1
-CURRENT_REPO="$(resolve_current_repo)"
-PROJECT_ROOT="$TOOLKIT_ROOT"
-export TOOLKIT_ROOT CURRENT_REPO PROJECT_ROOT
+TOOLKIT_ROOT="$(cc_launcher_resolve_toolkit_root)" || exit 1
 
 cd "$TOOLKIT_ROOT"
+source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
 source "$TOOLKIT_ROOT/lib/cc-deps.sh"
+cc_context_init "$TOOLKIT_ROOT" "$ORIGINAL_PWD"
 
 COMMAND_DIR="$TOOLKIT_ROOT/tools/commands"
 

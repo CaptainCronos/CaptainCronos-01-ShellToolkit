@@ -9,36 +9,17 @@
 # Purpose     : Shared library for Captain Cronos scripts.
 # ==============================================================================
 
-cc_toolkit_root() {
-    if [ -n "${TOOLKIT_ROOT:-}" ]; then
-        echo "$TOOLKIT_ROOT"
-        return 0
-    fi
-
-    if [ -n "${PROJECT_ROOT:-}" ]; then
-        echo "$PROJECT_ROOT"
-        return 0
-    fi
-
-    git rev-parse --show-toplevel 2>/dev/null || pwd
-}
-
-cc_current_repo() {
-    if [ -n "${CURRENT_REPO:-}" ]; then
-        echo "$CURRENT_REPO"
-        return 0
-    fi
-
-    git rev-parse --show-toplevel 2>/dev/null || pwd
-}
-
-cc_repo_root() {
-    cc_current_repo
-}
+if [ -z "${CC_CONTEXT_LOADED:-}" ]; then
+    _cc_common_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    # shellcheck disable=SC1091
+    source "$_cc_common_lib_dir/cc-context.sh"
+    cc_context_init "${TOOLKIT_ROOT:-${PROJECT_ROOT:-}}" "${CURRENT_REPO:-${PWD:-$(pwd)}}"
+    unset _cc_common_lib_dir
+fi
 
 cc_load_version() {
     local root
-    root="$(cc_toolkit_root)"
+    root="$(cc_toolkit_root 2>/dev/null || pwd)"
     if [ -f "$root/VERSION" ]; then
         # shellcheck disable=SC1091
         source "$root/VERSION"

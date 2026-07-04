@@ -11,17 +11,17 @@
 
 set -euo pipefail
 
+ORIGINAL_PWD="${PWD:-$(pwd)}"
 TOOLKIT_ROOT="${TOOLKIT_ROOT:-${PROJECT_ROOT:-}}"
 if [ -z "$TOOLKIT_ROOT" ]; then
     TOOLKIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 fi
-CURRENT_REPO="${CURRENT_REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-PROJECT_ROOT="$TOOLKIT_ROOT"
-export TOOLKIT_ROOT CURRENT_REPO PROJECT_ROOT
 
 cd "$TOOLKIT_ROOT"
 
+source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
+cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 case "${1:-}" in
     --help|-h)
@@ -40,10 +40,11 @@ for d in bash install lib baseline/ubuntu-26.04 defaults/v1 docs; do
     cc_require_dir "$d"
 done
 
-for f in VERSION manifest.yml lib/cc-common.sh bash/bashrc bash/bash_aliases bash/bash_functions install/install.sh; do
+for f in VERSION manifest.yml lib/cc-context.sh lib/cc-common.sh bash/bashrc bash/bash_aliases bash/bash_functions install/install.sh; do
     cc_require_file "$f"
 done
 
+bash -n lib/cc-context.sh
 bash -n lib/cc-common.sh
 bash -n bash/bashrc
 bash -n bash/bash_aliases
