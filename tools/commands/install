@@ -4,28 +4,234 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : install
-# Version     : reads VERSION
+# Version     : 2.3.0-alpha1
 # Category    : Core
-# Requires    : bash
+# Requires    : bash install cmp
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Install the Shell Toolkit locally.
+# Purpose     : Install the active toolkit launcher into ~/bin.
 # ==============================================================================
 
 set -euo pipefail
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cd "$PROJECT_ROOT"
-source "$PROJECT_ROOT/lib/cc-common.sh"
+TOOLKIT_ROOT="${TOOLKIT_ROOT:-${PROJECT_ROOT:-}}"
+if [ -z "$TOOLKIT_ROOT" ]; then
+    TOOLKIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+fi
+CURRENT_REPO="${CURRENT_REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT_ROOT="$TOOLKIT_ROOT"
+export TOOLKIT_ROOT CURRENT_REPO PROJECT_ROOT
 
-case "${1:-}" in
-    --help|-h)
-        install/install.sh --help
-        exit 0
-        ;;
-    --version)
-        install/install.sh --version
-        exit 0
-        ;;
-esac
+cd "$TOOLKIT_ROOT"
+source "$TOOLKIT_ROOT/lib/cc-common.sh"
 
-exec install/install.sh "$@"
+COMMAND_VERSION="2.3.0-alpha1"
+DRY_RUN=0
+FORCE=0
+FAILURES=0
+WARNINGS=0
+USER_BIN="$HOME/bin"
+SOURCE_LAUNCHER="$TOOLKIT_ROOT/tools/cc"
+TARGET_LAUNCHER="$USER_BIN/cc"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc install [--dry-run] [--force]
+
+Installs or updates the active Shell Toolkit launcher at:
+  ~/bin/cc
+
+Options:
+  --dry-run    Show what would be installed without changing files.
+  --force      Reinstall even when ~/bin/cc already matches the source.
+  --help, -h   Show this help.
+  --version    Show command and toolkit version.
+
+Notes:
+  This command installs only the cc launcher. The full shell-file installer
+  remains available as install/install.sh.
+EOF_HELP
+}
+
+record_pass() {
+    cc_status_line "$1" "PASS"
+}
+
+record_warn() {
+    WARNINGS=$((WARNINGS + 1))
+    cc_status_line "$1" "WARN"
+    [ "${2:-}" ] && cc_warn "$2"
+}
+
+record_fail() {
+    FAILURES=$((FAILURES + 1))
+    cc_status_line "$1" "FAIL"
+    [ "${2:-}" ] && cc_error "$2"
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        --force)
+            FORCE=1
+            shift
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "install $COMMAND_VERSION"
+            cc_version
+            exit 0
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+verify_source_launcher() {
+    if [ -f "$SOURCE_LAUNCHER" ]; then
+        record_pass "Source launcher present"
+    else
+        record_fail "Source launcher present" "Missing source launcher: $SOURCE_LAUNCHER"
+        return 1
+    fi
+
+    if bash -n "$SOURCE_LAUNCHER"; then
+        record_pass "Source launcher syntax"
+    else
+        record_fail "Source launcher syntax" "Source launcher failed Bash syntax check."
+        return 1
+    fi
+}
+
+ensure_user_bin() {
+    if [ -d "$USER_BIN" ]; then
+        record_pass "User bin directory"
+        return 0
+    fi
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        record_pass "User bin directory"
+        cc_log "DRY RUN: would create $USER_BIN"
+        return 0
+    fi
+
+    if mkdir -p "$USER_BIN"; then
+        record_pass "User bin directory"
+    else
+        record_fail "User bin directory" "Could not create $USER_BIN"
+        return 1
+    fi
+}
+
+install_launcher() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        record_pass "Launcher install"
+        cc_log "DRY RUN: would install $SOURCE_LAUNCHER -> $TARGET_LAUNCHER mode 0755"
+        return 0
+    fi
+
+    if [ "$FORCE" -eq 0 ] && [ -f "$TARGET_LAUNCHER" ] && cmp -s "$SOURCE_LAUNCHER" "$TARGET_LAUNCHER"; then
+        record_pass "Launcher install"
+        cc_log "Installed launcher already current: $TARGET_LAUNCHER"
+        return 0
+    fi
+
+    if install -m 0755 "$SOURCE_LAUNCHER" "$TARGET_LAUNCHER"; then
+        record_pass "Launcher install"
+        cc_log "Installed launcher: $TARGET_LAUNCHER"
+    else
+        record_fail "Launcher install" "Could not install $TARGET_LAUNCHER"
+        return 1
+    fi
+}
+
+verify_installed_launcher() {
+    local resolved
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        if [ -x "$TARGET_LAUNCHER" ]; then
+            record_pass "Installed launcher executable"
+        else
+            record_warn "Installed launcher executable" "Dry run only; $TARGET_LAUNCHER is not currently executable."
+        fi
+    elif [ -x "$TARGET_LAUNCHER" ]; then
+        record_pass "Installed launcher executable"
+    else
+        record_fail "Installed launcher executable" "Installed launcher is not executable: $TARGET_LAUNCHER"
+        return 1
+    fi
+
+    hash -r 2>/dev/null || true
+    resolved="$(command -v cc 2>/dev/null || true)"
+    if [ "$resolved" = "$TARGET_LAUNCHER" ]; then
+        record_pass "Installed launcher resolves"
+    else
+        record_warn "Installed launcher resolves" "command -v cc returned '${resolved:-not found}', expected $TARGET_LAUNCHER"
+    fi
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        return 0
+    fi
+
+    if CAPTAIN_CRONOS_TOOLKIT_ROOT="$TOOLKIT_ROOT" "$TARGET_LAUNCHER" version >/dev/null 2>&1; then
+        record_pass "Installed launcher runs"
+    else
+        record_fail "Installed launcher runs" "$TARGET_LAUNCHER version failed."
+        return 1
+    fi
+}
+
+print_report() {
+    echo
+    echo "Install Report"
+    echo "=============="
+    printf '%-18s %s\n' "Toolkit root:" "$TOOLKIT_ROOT"
+    printf '%-18s %s\n' "Current repo:" "$CURRENT_REPO"
+    printf '%-18s %s\n' "Source:" "$SOURCE_LAUNCHER"
+    printf '%-18s %s\n' "Target:" "$TARGET_LAUNCHER"
+    printf '%-18s %s\n' "Dry run:" "$([ "$DRY_RUN" -eq 1 ] && echo yes || echo no)"
+    printf '%-18s %s\n' "Force:" "$([ "$FORCE" -eq 1 ] && echo yes || echo no)"
+}
+
+print_overall_status() {
+    echo
+    printf '%-16s ' "Overall Status:"
+    if [ "$FAILURES" -gt 0 ]; then
+        cc_fail
+    elif [ "$WARNINGS" -gt 0 ]; then
+        cc_warning
+    else
+        cc_pass
+    fi
+    printf '\n'
+}
+
+cc_banner
+
+echo "Launcher Install"
+echo "================"
+echo
+
+verify_source_launcher || true
+ensure_user_bin || true
+
+if [ "$FAILURES" -eq 0 ]; then
+    install_launcher || true
+fi
+
+if [ "$FAILURES" -eq 0 ]; then
+    verify_installed_launcher || true
+fi
+
+print_report
+print_overall_status
+
+[ "$FAILURES" -eq 0 ]
