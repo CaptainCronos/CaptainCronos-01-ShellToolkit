@@ -13,28 +13,74 @@
 
 set -euo pipefail
 
-DEFAULT_REPO="$HOME/GitHub/CaptainCronos-01-ShellToolkit"
-PROJECT_ROOT="${CAPTAIN_CRONOS_REPO:-}"
+DEFAULT_TOOLKIT_ROOT="$HOME/GitHub/CaptainCronos-01-ShellToolkit"
+ORIGINAL_PWD="${PWD:-$(pwd)}"
 
-if [ -z "$PROJECT_ROOT" ]; then
-    PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-fi
+canonical_dir() {
+    local path="$1"
+    [ -d "$path" ] || return 1
+    (cd "$path" && pwd -P)
+}
 
-if [ -z "$PROJECT_ROOT" ] || [ ! -d "$PROJECT_ROOT" ]; then
-    PROJECT_ROOT="$DEFAULT_REPO"
-fi
+is_toolkit_root() {
+    local root="$1"
+    [ -n "$root" ] &&
+        [ -f "$root/lib/cc-common.sh" ] &&
+        [ -d "$root/tools/commands" ] &&
+        [ -f "$root/tools/cc" ]
+}
 
-if [ ! -d "$PROJECT_ROOT" ]; then
-    echo "[CC ERROR] Repository not found: $PROJECT_ROOT" >&2
-    echo "Set CAPTAIN_CRONOS_REPO or clone to: $DEFAULT_REPO" >&2
-    exit 1
-fi
+resolve_toolkit_root() {
+    local raw candidate script_dir
 
-cd "$PROJECT_ROOT"
-source "$PROJECT_ROOT/lib/cc-common.sh"
-source "$PROJECT_ROOT/lib/cc-deps.sh"
+    for raw in "${CAPTAIN_CRONOS_TOOLKIT_ROOT:-}" "${CAPTAIN_CRONOS_REPO:-}"; do
+        [ -n "$raw" ] || continue
+        candidate="$(canonical_dir "$raw" 2>/dev/null || true)"
+        if is_toolkit_root "$candidate"; then
+            echo "$candidate"
+            return 0
+        fi
 
-COMMAND_DIR="$PROJECT_ROOT/tools/commands"
+        echo "[CC ERROR] Invalid toolkit root: $raw" >&2
+        echo "Expected a Shell Toolkit checkout containing lib/cc-common.sh and tools/commands." >&2
+        return 1
+    done
+
+    script_dir="$(canonical_dir "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null || true)"
+    for raw in "$script_dir/.." "$script_dir" "$DEFAULT_TOOLKIT_ROOT"; do
+        [ -n "$raw" ] || continue
+        candidate="$(canonical_dir "$raw" 2>/dev/null || true)"
+        if is_toolkit_root "$candidate"; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+
+    echo "[CC ERROR] Shell Toolkit repository not found." >&2
+    echo "Set CAPTAIN_CRONOS_TOOLKIT_ROOT or clone to: $DEFAULT_TOOLKIT_ROOT" >&2
+    return 1
+}
+
+resolve_current_repo() {
+    local root
+    root="$(git -C "$ORIGINAL_PWD" rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$root" ]; then
+        canonical_dir "$root"
+    else
+        canonical_dir "$ORIGINAL_PWD"
+    fi
+}
+
+TOOLKIT_ROOT="$(resolve_toolkit_root)" || exit 1
+CURRENT_REPO="$(resolve_current_repo)"
+PROJECT_ROOT="$TOOLKIT_ROOT"
+export TOOLKIT_ROOT CURRENT_REPO PROJECT_ROOT
+
+cd "$TOOLKIT_ROOT"
+source "$TOOLKIT_ROOT/lib/cc-common.sh"
+source "$TOOLKIT_ROOT/lib/cc-deps.sh"
+
+COMMAND_DIR="$TOOLKIT_ROOT/tools/commands"
 
 show_help() {
     echo "Captain Cronos Shell Toolkit"
@@ -60,7 +106,8 @@ show_help() {
     echo "  cc install --dry-run"
     echo "  cc update"
     echo
-    echo "Repository: $PROJECT_ROOT"
+    echo "Toolkit root: $TOOLKIT_ROOT"
+    echo "Current repo:  $CURRENT_REPO"
 }
 
 script_field() {

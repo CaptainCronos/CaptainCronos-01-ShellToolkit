@@ -9,13 +9,36 @@
 # Purpose     : Shared library for Captain Cronos scripts.
 # ==============================================================================
 
-cc_repo_root() {
+cc_toolkit_root() {
+    if [ -n "${TOOLKIT_ROOT:-}" ]; then
+        echo "$TOOLKIT_ROOT"
+        return 0
+    fi
+
+    if [ -n "${PROJECT_ROOT:-}" ]; then
+        echo "$PROJECT_ROOT"
+        return 0
+    fi
+
     git rev-parse --show-toplevel 2>/dev/null || pwd
+}
+
+cc_current_repo() {
+    if [ -n "${CURRENT_REPO:-}" ]; then
+        echo "$CURRENT_REPO"
+        return 0
+    fi
+
+    git rev-parse --show-toplevel 2>/dev/null || pwd
+}
+
+cc_repo_root() {
+    cc_current_repo
 }
 
 cc_load_version() {
     local root
-    root="$(cc_repo_root)"
+    root="$(cc_toolkit_root)"
     if [ -f "$root/VERSION" ]; then
         # shellcheck disable=SC1091
         source "$root/VERSION"

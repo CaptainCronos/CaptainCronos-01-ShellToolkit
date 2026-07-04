@@ -11,10 +11,17 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cd "$PROJECT_ROOT"
+TOOLKIT_ROOT="${TOOLKIT_ROOT:-${PROJECT_ROOT:-}}"
+if [ -z "$TOOLKIT_ROOT" ]; then
+    TOOLKIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+fi
+CURRENT_REPO="${CURRENT_REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT_ROOT="$TOOLKIT_ROOT"
+export TOOLKIT_ROOT CURRENT_REPO PROJECT_ROOT
 
-source "$PROJECT_ROOT/lib/cc-common.sh"
+cd "$TOOLKIT_ROOT"
+
+source "$TOOLKIT_ROOT/lib/cc-common.sh"
 
 case "${1:-}" in
     --help|-h)
