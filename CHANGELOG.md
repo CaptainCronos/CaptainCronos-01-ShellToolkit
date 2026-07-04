@@ -39,6 +39,8 @@ This release marks the transition from a collection of shell utilities into a st
 
 - `drive-report` now uses shared report helpers.
 - `drive-qualify` now uses shared report helpers.
+- `cc repo` and `cc status` now report the caller repository from `CURRENT_REPO` instead of the toolkit root.
+- `cc repos push` now skips dirty repositories, and `cc repos publish` now only pushes clean `main` branches with `git push origin main`.
 - Engineering commands now use shared status output:
   - `cc selftest`
   - `cc framework verify`

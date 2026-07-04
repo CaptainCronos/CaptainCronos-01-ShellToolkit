@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : repos
-# Version     : 1.2.1-alpha1
+# Version     : 1.2.2-alpha1
 # Category    : Repository
 # Requires    : bash git awk find du
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -36,7 +36,7 @@ Options:
   --root PATH      Repository root. Default: ~/GitHub
   --out FILE       Output file for inventory. Supports .md and .csv
   --bundle-dir DIR Bundle output directory. Default: ~/.captaincronos/repo-bundles
-  --message TEXT   Commit message for commit and publish actions.
+  --message TEXT   Commit message for commit actions.
   --apply          Apply mutating actions. Default is dry-run.
 
 Actions:
@@ -49,8 +49,8 @@ Actions:
   sync       Fetch then pull --ff-only for clean repositories. Dry-run by default.
   backup     Create git bundle backups for clean repositories. Dry-run by default.
   commit     Commit dirty repositories with --message. Dry-run by default.
-  push       Push repositories ahead of origin. Dry-run by default.
-  publish    Commit dirty repositories, then push repositories ahead of origin. Dry-run by default.
+  push       Push clean repositories ahead of origin. Dry-run by default.
+  publish    Push clean main branches with git push origin main. Dry-run by default.
   verify     Run cc verify for toolkit repositories that contain tools/cc.
   doctor     Run cc doctor for toolkit repositories that contain tools/cc.
 
@@ -64,7 +64,7 @@ Examples:
   cc repos backup --apply
   cc repos commit --message "work in progress"
   cc repos push --apply
-  cc repos publish --message "work in progress" --apply
+  cc repos publish --apply
 EOF_HELP
 }
 
@@ -75,7 +75,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "1.2.1-alpha1"
+            echo "1.2.2-alpha1"
             exit 0
             ;;
         --root)
@@ -123,7 +123,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$ACTION" in
-    commit|publish)
+    commit)
         if [ -z "$MESSAGE" ]; then
             cc_error "cc repos $ACTION requires --message."
             echo
@@ -470,7 +470,6 @@ PUSH_REF=""
 PUSH_AHEAD=0
 PUSH_BEHIND=0
 PUSH_READY=0
-PUSH_CAN_COMMIT_THEN_PUSH=0
 PUSH_STATUS="PASS"
 PUSH_DETAIL=""
 
@@ -482,7 +481,6 @@ repo_analyze_push() {
     PUSH_AHEAD=0
     PUSH_BEHIND=0
     PUSH_READY=0
-    PUSH_CAN_COMMIT_THEN_PUSH=0
     PUSH_STATUS="PASS"
     PUSH_DETAIL=""
 
@@ -517,25 +515,18 @@ repo_analyze_push() {
     PUSH_BEHIND="$(echo "$counts" | awk '{print $2}')"
 
     if [ "$PUSH_BEHIND" -gt 0 ] 2>/dev/null; then
-        if [ "$PUSH_AHEAD" -gt 0 ] 2>/dev/null; then
-            PUSH_STATUS="WARN"
-            PUSH_DETAIL="ahead:$PUSH_AHEAD behind:$PUSH_BEHIND relative to $PUSH_REF; skipped"
-        else
-            PUSH_STATUS="WARN"
-            PUSH_DETAIL="behind:$PUSH_BEHIND relative to $PUSH_REF; skipped"
-        fi
+        PUSH_STATUS="WARN"
+        PUSH_DETAIL="ahead:$PUSH_AHEAD behind:$PUSH_BEHIND relative to $PUSH_REF; skipped"
         return 0
     fi
-
-    PUSH_CAN_COMMIT_THEN_PUSH=1
 
     if [ "$PUSH_AHEAD" -gt 0 ] 2>/dev/null; then
         PUSH_READY=1
         PUSH_STATUS="PASS"
-        PUSH_DETAIL="ahead:$PUSH_AHEAD relative to $PUSH_REF"
+        PUSH_DETAIL="ahead:$PUSH_AHEAD behind:$PUSH_BEHIND relative to $PUSH_REF"
     else
         PUSH_STATUS="PASS"
-        PUSH_DETAIL="not ahead of $PUSH_REF; skipped"
+        PUSH_DETAIL="ahead:$PUSH_AHEAD behind:$PUSH_BEHIND relative to $PUSH_REF; skipped"
     fi
 }
 
@@ -571,7 +562,13 @@ repo_commit() {
 }
 
 repo_push() {
-    local repo="$1"
+    local repo="$1" state
+
+    state="$(repo_state "$repo")"
+    if [ "$state" != "clean" ]; then
+        repo_action_result "$repo" "WARN" "dirty; skipped; $(repo_ahead_behind "$repo")"
+        return 0
+    fi
 
     repo_analyze_push "$repo"
     if [ "$PUSH_READY" -ne 1 ]; then
@@ -594,49 +591,32 @@ repo_publish() {
     local repo="$1" state branch
 
     state="$(repo_state "$repo")"
-    if [ "$state" = "clean" ]; then
-        repo_push "$repo"
+    if [ "$state" != "clean" ]; then
+        repo_action_result "$repo" "WARN" "dirty; skipped; publish requires a clean working tree"
         return 0
     fi
 
     branch="$(repo_branch "$repo")"
-    if [ "$branch" = "detached" ]; then
-        repo_action_result "$repo" "WARN" "detached HEAD; skipped"
+    if [ "$branch" != "main" ]; then
+        repo_action_result "$repo" "WARN" "branch:$branch; skipped; publish requires main"
         return 0
     fi
 
-    if repo_has_unmerged_paths "$repo"; then
-        repo_action_result "$repo" "FAIL" "unmerged paths; resolve conflicts before publish"
+    if [ "$(repo_origin "$repo")" = "none" ]; then
+        repo_action_result "$repo" "WARN" "no origin remote; skipped"
         return 0
     fi
 
-    repo_analyze_push "$repo"
-    if [ "$PUSH_CAN_COMMIT_THEN_PUSH" -ne 1 ]; then
-        repo_action_result "$repo" "$PUSH_STATUS" "dirty; $PUSH_DETAIL"
+    if [ "$APPLY" -eq 1 ]; then
+        if git -C "$repo" push origin main; then
+            repo_action_result "$repo" "PASS" "ran git push origin main"
+        else
+            repo_action_result "$repo" "FAIL" "git push origin main failed"
+        fi
         return 0
     fi
 
-    if [ "$APPLY" -ne 1 ]; then
-        repo_action_result "$repo" "PASS" "dry-run: would commit dirty tree and push to origin/$PUSH_BRANCH"
-        return 0
-    fi
-
-    if ! git -C "$repo" add -A || ! git -C "$repo" commit -m "$MESSAGE"; then
-        repo_action_result "$repo" "FAIL" "commit failed; push skipped"
-        return 0
-    fi
-
-    repo_analyze_push "$repo"
-    if [ "$PUSH_READY" -ne 1 ]; then
-        repo_action_result "$repo" "FAIL" "committed, but push preflight failed: $PUSH_DETAIL"
-        return 0
-    fi
-
-    if git -C "$repo" push origin "$PUSH_BRANCH"; then
-        repo_action_result "$repo" "PASS" "committed and pushed to origin/$PUSH_BRANCH"
-    else
-        repo_action_result "$repo" "FAIL" "committed, but push to origin/$PUSH_BRANCH failed"
-    fi
+    repo_action_result "$repo" "PASS" "dry-run: would run git push origin main"
 }
 
 print_header

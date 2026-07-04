@@ -62,6 +62,7 @@ tools/commands/verify
 tools/commands/baseline
 tools/commands/defaults
 tools/commands/repo
+tools/commands/repos
 ```
 
 ---
@@ -104,6 +105,8 @@ lib/cc-common.sh
 ```
 
 Commands should not duplicate common logging, version, dependency, or repository-detection logic when shared helpers are available. New command code should use `TOOLKIT_ROOT` for toolkit files and `CURRENT_REPO` for caller repository behavior. `PROJECT_ROOT` is retained only as a backwards-compatible alias for older commands and maps to `TOOLKIT_ROOT`.
+
+Batch repository commands should remain conservative. Mutating `cc repos` actions are dry-run by default and require `--apply` before writing to repositories or remotes. `cc repos push` skips dirty repositories, skips repositories without `origin`, reports ahead/behind state, and never force pushes. `cc repos publish` is the strict main-branch release path: after confirming a clean working tree, branch `main`, and an `origin` remote, it runs `git push origin main`.
 
 ---
 

@@ -157,6 +157,7 @@ Completed areas:
 - Storage namespace.
 - Environment namespace.
 - Asset lifecycle and history framework.
+- Repository status, inventory, push, and publish workflows.
 - Shared report helpers.
 - Shared YAML helpers.
 - Shared SMART and storage helpers.

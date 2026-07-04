@@ -30,6 +30,8 @@ tools/commands/
 
 Each command should be a standalone script with a standard header.
 
+Mutating batch repository workflows under `cc repos` should be dry-run by default and require `--apply`. Push workflows must not force push. The guarded publish workflow is limited to clean repositories on branch `main` and runs `git push origin main`.
+
 ---
 
 ## Command Discovery

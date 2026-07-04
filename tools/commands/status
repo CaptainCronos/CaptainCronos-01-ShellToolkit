@@ -13,9 +13,16 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cd "$PROJECT_ROOT"
-source "$PROJECT_ROOT/lib/cc-common.sh"
+ORIGINAL_PWD="${PWD:-$(pwd)}"
+TOOLKIT_ROOT="${TOOLKIT_ROOT:-${PROJECT_ROOT:-}}"
+if [ -z "$TOOLKIT_ROOT" ]; then
+    TOOLKIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+fi
+
+cd "$TOOLKIT_ROOT"
+source "$TOOLKIT_ROOT/lib/cc-context.sh"
+source "$TOOLKIT_ROOT/lib/cc-common.sh"
+cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 case "${1:-}" in
     --help|-h)
@@ -31,18 +38,19 @@ case "${1:-}" in
 esac
 
 cc_banner
-printf '%-14s %s\n' "Repository:" "$PROJECT_ROOT"
-printf '%-14s %s\n' "Branch:" "$(git branch --show-current 2>/dev/null || echo unknown)"
-printf '%-14s %s\n' "Origin:" "$(git remote get-url origin 2>/dev/null || echo none)"
+REPO_ROOT="$(cc_current_repo)"
+printf '%-14s %s\n' "Repository:" "$REPO_ROOT"
+printf '%-14s %s\n' "Branch:" "$(cc_repo_branch "$REPO_ROOT" 2>/dev/null || echo unknown)"
+printf '%-14s %s\n' "Origin:" "$(cc_repo_remote "$REPO_ROOT" origin 2>/dev/null || echo none)"
 echo
 echo "Recent commits"
 echo "--------------"
-git log --oneline -5 2>/dev/null || true
+git -C "$REPO_ROOT" log --oneline -5 2>/dev/null || true
 echo
 echo "Working tree"
 echo "------------"
-if [ -n "$(git status --short)" ]; then
-    git status --short
+if [ -n "$(git -C "$REPO_ROOT" status --short)" ]; then
+    git -C "$REPO_ROOT" status --short
 else
     echo "clean"
 fi

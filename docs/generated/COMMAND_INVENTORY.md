@@ -36,7 +36,7 @@ Generated: Sat Jul  4 15:09:02 EDT 2026
 | cc registry | 1.0.1-alpha1 | Display command metadata registry information. |
 | cc release | 1.0.0-alpha1 | Plan and run the toolkit release workflow. |
 | cc repo | reads VERSION | Show repository path and Git remote information. |
-| cc repos | 1.2.1-alpha1 | Inventory and manage local Git repositories. |
+| cc repos | 1.2.2-alpha1 | Inventory and manage local Git repositories. |
 | cc roadmap | 1.0.0-alpha1 | Show the project roadmap from docs/ROADMAP.md. |
 | cc selftest | 1.0.0-alpha1 | Run the full toolkit engineering self-test suite. |
 | cc smart | reads VERSION | Summarize SMART health for installed storage devices. |

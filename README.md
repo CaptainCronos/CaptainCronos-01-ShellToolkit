@@ -83,6 +83,16 @@ cc defaults
 cc help
 ```
 
+Repository management commands include:
+
+```bash
+cc repos status
+cc repos push --apply
+cc repos publish --apply
+```
+
+`cc repos push` skips dirty repositories and repositories without an `origin` remote, reports ahead/behind state, and pushes only branches that are ahead of their origin branch. `cc repos publish --apply` is stricter: it skips dirty repositories, skips non-`main` branches, and runs `git push origin main` for each remaining repository.
+
 Storage and asset commands include:
 
 ```bash
@@ -111,6 +121,7 @@ Completed framework areas:
 - Storage namespace and drive workflows.
 - Environment namespace.
 - Asset lifecycle and history framework.
+- Repository inventory and publishing workflows.
 - Shared reporting helpers.
 - Shared YAML helpers.
 - Terminal UI helpers for colorized `PASS`, `WARN`, and `FAIL` status output.

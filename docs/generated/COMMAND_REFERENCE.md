@@ -483,7 +483,7 @@ Options:
   --root PATH      Repository root. Default: ~/GitHub
   --out FILE       Output file for inventory. Supports .md and .csv
   --bundle-dir DIR Bundle output directory. Default: ~/.captaincronos/repo-bundles
-  --message TEXT   Commit message for commit and publish actions.
+  --message TEXT   Commit message for commit actions.
   --apply          Apply mutating actions. Default is dry-run.
 
 Actions:
@@ -496,8 +496,8 @@ Actions:
   sync       Fetch then pull --ff-only for clean repositories. Dry-run by default.
   backup     Create git bundle backups for clean repositories. Dry-run by default.
   commit     Commit dirty repositories with --message. Dry-run by default.
-  push       Push repositories ahead of origin. Dry-run by default.
-  publish    Commit dirty repositories, then push repositories ahead of origin. Dry-run by default.
+  push       Push clean repositories ahead of origin. Dry-run by default.
+  publish    Push clean main branches with git push origin main. Dry-run by default.
   verify     Run cc verify for toolkit repositories that contain tools/cc.
   doctor     Run cc doctor for toolkit repositories that contain tools/cc.
 
@@ -511,7 +511,7 @@ Examples:
   cc repos backup --apply
   cc repos commit --message "work in progress"
   cc repos push --apply
-  cc repos publish --message "work in progress" --apply
+  cc repos publish --apply
 ~~~
 
 ## cc roadmap
