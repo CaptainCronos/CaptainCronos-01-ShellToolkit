@@ -29,6 +29,7 @@ This release marks the transition from a collection of shell utilities into a st
 - `cc selftest` engineering validation suite.
 - `cc framework verify` framework gate.
 - `cc release check` pre-release gate.
+- Batch `cc repos commit`, `cc repos push`, and `cc repos publish` workflows.
 - Shared terminal color helpers.
 - Shared status helpers for colorized `PASS`, `WARN`, and `FAIL` output.
 - Dotted leader formatting for status lines.

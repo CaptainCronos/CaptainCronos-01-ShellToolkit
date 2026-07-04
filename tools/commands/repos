@@ -22,16 +22,21 @@ ACTION="status"
 APPLY=0
 OUT=""
 BUNDLE_DIR="${CAPTAIN_CRONOS_REPO_BUNDLE_DIR:-$HOME/.captaincronos/repo-bundles}"
+MESSAGE=""
+ACTION_PASSES=0
+ACTION_WARNINGS=0
+ACTION_FAILURES=0
 
 usage() {
     cat <<'EOF_HELP'
 Usage:
-  cc repos [list|status|health|inventory|fetch|pull|sync|backup|verify|doctor] [options]
+  cc repos [list|status|health|inventory|fetch|pull|sync|backup|commit|push|publish|verify|doctor] [options]
 
 Options:
   --root PATH      Repository root. Default: ~/GitHub
   --out FILE       Output file for inventory. Supports .md and .csv
   --bundle-dir DIR Bundle output directory. Default: ~/.captaincronos/repo-bundles
+  --message TEXT   Commit message for commit and publish actions.
   --apply          Apply mutating actions. Default is dry-run.
 
 Actions:
@@ -43,6 +48,9 @@ Actions:
   pull       Pull --ff-only for clean repositories. Dry-run by default.
   sync       Fetch then pull --ff-only for clean repositories. Dry-run by default.
   backup     Create git bundle backups for clean repositories. Dry-run by default.
+  commit     Commit dirty repositories with --message. Dry-run by default.
+  push       Push repositories ahead of origin. Dry-run by default.
+  publish    Commit dirty repositories, then push repositories ahead of origin. Dry-run by default.
   verify     Run cc verify for toolkit repositories that contain tools/cc.
   doctor     Run cc doctor for toolkit repositories that contain tools/cc.
 
@@ -54,6 +62,9 @@ Examples:
   cc repos fetch --apply
   cc repos sync --apply
   cc repos backup --apply
+  cc repos commit --message "work in progress"
+  cc repos push --apply
+  cc repos publish --message "work in progress" --apply
 EOF_HELP
 }
 
@@ -85,11 +96,22 @@ while [ "$#" -gt 0 ]; do
             [ -n "$BUNDLE_DIR" ] || { usage; exit 1; }
             shift
             ;;
+        --message)
+            shift
+            MESSAGE="${1:-}"
+            [ -n "$MESSAGE" ] || { usage; exit 1; }
+            shift
+            ;;
+        --message=*)
+            MESSAGE="${1#--message=}"
+            [ -n "$MESSAGE" ] || { usage; exit 1; }
+            shift
+            ;;
         --apply)
             APPLY=1
             shift
             ;;
-        list|status|health|inventory|pull|fetch|sync|backup|verify|doctor)
+        list|status|health|inventory|pull|fetch|sync|backup|commit|push|publish|verify|doctor)
             ACTION="$1"
             shift
             ;;
@@ -99,6 +121,17 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+case "$ACTION" in
+    commit|publish)
+        if [ -z "$MESSAGE" ]; then
+            cc_error "cc repos $ACTION requires --message."
+            echo
+            usage
+            exit 2
+        fi
+        ;;
+esac
 
 find_repos() {
     find "$ROOT" -maxdepth 3 -type d -name .git 2>/dev/null | sed 's#/.git$##' | sort
@@ -120,6 +153,10 @@ repo_state() {
     else
         echo clean
     fi
+}
+
+repo_has_unmerged_paths() {
+    git -C "$1" diff --name-only --diff-filter=U 2>/dev/null | grep -q .
 }
 
 repo_upstream() {
@@ -392,6 +429,216 @@ repo_backup() {
     fi
 }
 
+repo_action_result() {
+    local repo="$1" status="$2" detail="$3"
+
+    case "$status" in
+        PASS) ACTION_PASSES=$((ACTION_PASSES + 1)) ;;
+        WARN) ACTION_WARNINGS=$((ACTION_WARNINGS + 1)) ;;
+        FAIL) ACTION_FAILURES=$((ACTION_FAILURES + 1)) ;;
+    esac
+
+    printf '%-34s ' "$(basename "$repo")"
+    cc_status_word "$status"
+    printf ' %s\n' "$detail"
+}
+
+repo_action_header() {
+    printf '%-34s %-6s %s\n' "Repository" "Result" "Detail"
+    printf '%-34s %-6s %s\n' "----------" "------" "------"
+}
+
+repo_action_summary() {
+    echo
+    echo "Action Summary"
+    echo "--------------"
+    printf '%-14s %s\n' "PASS:" "$ACTION_PASSES"
+    printf '%-14s %s\n' "WARN:" "$ACTION_WARNINGS"
+    printf '%-14s %s\n' "FAIL:" "$ACTION_FAILURES"
+}
+
+repo_origin_branch_ref() {
+    local repo="$1" branch
+    branch="$(repo_branch "$repo")"
+    [ "$branch" != "detached" ] || return 1
+    git -C "$repo" show-ref --verify --quiet "refs/remotes/origin/$branch" || return 1
+    echo "origin/$branch"
+}
+
+PUSH_BRANCH=""
+PUSH_REF=""
+PUSH_AHEAD=0
+PUSH_BEHIND=0
+PUSH_READY=0
+PUSH_CAN_COMMIT_THEN_PUSH=0
+PUSH_STATUS="PASS"
+PUSH_DETAIL=""
+
+repo_analyze_push() {
+    local repo="$1" origin counts
+
+    PUSH_BRANCH="$(repo_branch "$repo")"
+    PUSH_REF=""
+    PUSH_AHEAD=0
+    PUSH_BEHIND=0
+    PUSH_READY=0
+    PUSH_CAN_COMMIT_THEN_PUSH=0
+    PUSH_STATUS="PASS"
+    PUSH_DETAIL=""
+
+    if [ "$PUSH_BRANCH" = "detached" ]; then
+        PUSH_STATUS="WARN"
+        PUSH_DETAIL="detached HEAD; skipped"
+        return 0
+    fi
+
+    origin="$(repo_origin "$repo")"
+    if [ "$origin" = "none" ]; then
+        PUSH_STATUS="WARN"
+        PUSH_DETAIL="no origin remote; skipped"
+        return 0
+    fi
+
+    PUSH_REF="$(repo_origin_branch_ref "$repo" 2>/dev/null || true)"
+    if [ -z "$PUSH_REF" ]; then
+        PUSH_STATUS="WARN"
+        PUSH_DETAIL="origin/$PUSH_BRANCH not found; skipped"
+        return 0
+    fi
+
+    counts="$(git -C "$repo" rev-list --left-right --count HEAD..."$PUSH_REF" 2>/dev/null || true)"
+    if [ -z "$counts" ]; then
+        PUSH_STATUS="FAIL"
+        PUSH_DETAIL="could not compare HEAD with $PUSH_REF"
+        return 0
+    fi
+
+    PUSH_AHEAD="$(echo "$counts" | awk '{print $1}')"
+    PUSH_BEHIND="$(echo "$counts" | awk '{print $2}')"
+
+    if [ "$PUSH_BEHIND" -gt 0 ] 2>/dev/null; then
+        if [ "$PUSH_AHEAD" -gt 0 ] 2>/dev/null; then
+            PUSH_STATUS="WARN"
+            PUSH_DETAIL="ahead:$PUSH_AHEAD behind:$PUSH_BEHIND relative to $PUSH_REF; skipped"
+        else
+            PUSH_STATUS="WARN"
+            PUSH_DETAIL="behind:$PUSH_BEHIND relative to $PUSH_REF; skipped"
+        fi
+        return 0
+    fi
+
+    PUSH_CAN_COMMIT_THEN_PUSH=1
+
+    if [ "$PUSH_AHEAD" -gt 0 ] 2>/dev/null; then
+        PUSH_READY=1
+        PUSH_STATUS="PASS"
+        PUSH_DETAIL="ahead:$PUSH_AHEAD relative to $PUSH_REF"
+    else
+        PUSH_STATUS="PASS"
+        PUSH_DETAIL="not ahead of $PUSH_REF; skipped"
+    fi
+}
+
+repo_commit() {
+    local repo="$1" state branch
+
+    state="$(repo_state "$repo")"
+    if [ "$state" = "clean" ]; then
+        repo_action_result "$repo" "PASS" "clean; skipped"
+        return 0
+    fi
+
+    branch="$(repo_branch "$repo")"
+    if [ "$branch" = "detached" ]; then
+        repo_action_result "$repo" "WARN" "detached HEAD; skipped"
+        return 0
+    fi
+
+    if repo_has_unmerged_paths "$repo"; then
+        repo_action_result "$repo" "FAIL" "unmerged paths; resolve conflicts before commit"
+        return 0
+    fi
+
+    if [ "$APPLY" -eq 1 ]; then
+        if git -C "$repo" add -A && git -C "$repo" commit -m "$MESSAGE"; then
+            repo_action_result "$repo" "PASS" "committed dirty working tree"
+        else
+            repo_action_result "$repo" "FAIL" "commit failed"
+        fi
+    else
+        repo_action_result "$repo" "PASS" "dry-run: would stage all changes and commit with supplied message"
+    fi
+}
+
+repo_push() {
+    local repo="$1"
+
+    repo_analyze_push "$repo"
+    if [ "$PUSH_READY" -ne 1 ]; then
+        repo_action_result "$repo" "$PUSH_STATUS" "$PUSH_DETAIL"
+        return 0
+    fi
+
+    if [ "$APPLY" -eq 1 ]; then
+        if git -C "$repo" push origin "$PUSH_BRANCH"; then
+            repo_action_result "$repo" "PASS" "pushed $PUSH_AHEAD commit(s) to origin/$PUSH_BRANCH"
+        else
+            repo_action_result "$repo" "FAIL" "push to origin/$PUSH_BRANCH failed"
+        fi
+    else
+        repo_action_result "$repo" "PASS" "dry-run: would push $PUSH_AHEAD commit(s) to origin/$PUSH_BRANCH"
+    fi
+}
+
+repo_publish() {
+    local repo="$1" state branch
+
+    state="$(repo_state "$repo")"
+    if [ "$state" = "clean" ]; then
+        repo_push "$repo"
+        return 0
+    fi
+
+    branch="$(repo_branch "$repo")"
+    if [ "$branch" = "detached" ]; then
+        repo_action_result "$repo" "WARN" "detached HEAD; skipped"
+        return 0
+    fi
+
+    if repo_has_unmerged_paths "$repo"; then
+        repo_action_result "$repo" "FAIL" "unmerged paths; resolve conflicts before publish"
+        return 0
+    fi
+
+    repo_analyze_push "$repo"
+    if [ "$PUSH_CAN_COMMIT_THEN_PUSH" -ne 1 ]; then
+        repo_action_result "$repo" "$PUSH_STATUS" "dirty; $PUSH_DETAIL"
+        return 0
+    fi
+
+    if [ "$APPLY" -ne 1 ]; then
+        repo_action_result "$repo" "PASS" "dry-run: would commit dirty tree and push to origin/$PUSH_BRANCH"
+        return 0
+    fi
+
+    if ! git -C "$repo" add -A || ! git -C "$repo" commit -m "$MESSAGE"; then
+        repo_action_result "$repo" "FAIL" "commit failed; push skipped"
+        return 0
+    fi
+
+    repo_analyze_push "$repo"
+    if [ "$PUSH_READY" -ne 1 ]; then
+        repo_action_result "$repo" "FAIL" "committed, but push preflight failed: $PUSH_DETAIL"
+        return 0
+    fi
+
+    if git -C "$repo" push origin "$PUSH_BRANCH"; then
+        repo_action_result "$repo" "PASS" "committed and pushed to origin/$PUSH_BRANCH"
+    else
+        repo_action_result "$repo" "FAIL" "committed, but push to origin/$PUSH_BRANCH failed"
+    fi
+}
+
 print_header
 
 if [ ! -d "$ROOT" ]; then
@@ -457,6 +704,33 @@ case "$ACTION" in
             echo "[$(basename "$repo")] $repo"
             repo_backup "$repo"
         done < <(find_repos)
+        ;;
+    commit)
+        repo_action_header
+        while read -r repo; do
+            [ -n "$repo" ] || continue
+            repo_commit "$repo"
+        done < <(find_repos)
+        repo_action_summary
+        [ "$ACTION_FAILURES" -eq 0 ]
+        ;;
+    push)
+        repo_action_header
+        while read -r repo; do
+            [ -n "$repo" ] || continue
+            repo_push "$repo"
+        done < <(find_repos)
+        repo_action_summary
+        [ "$ACTION_FAILURES" -eq 0 ]
+        ;;
+    publish)
+        repo_action_header
+        while read -r repo; do
+            [ -n "$repo" ] || continue
+            repo_publish "$repo"
+        done < <(find_repos)
+        repo_action_summary
+        [ "$ACTION_FAILURES" -eq 0 ]
         ;;
     verify|doctor)
         while read -r repo; do
