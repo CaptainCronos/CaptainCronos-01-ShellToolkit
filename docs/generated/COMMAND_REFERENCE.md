@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Tue Jun 30 06:34:29 PM EDT 2026
+Generated: Sat Jul  4 15:09:02 EDT 2026
 
 ## cc about
 
@@ -21,7 +21,12 @@ Usage:
   cc asset path [TYPE]
   cc asset search TYPE QUERY
   cc asset inventory TYPE
+  cc asset create TYPE NAME [key=value ...]
   cc asset set TYPE NAME key=value [key=value ...]
+  cc asset state TYPE NAME STATE [NOTE]
+  cc asset history TYPE NAME
+  cc asset retire TYPE NAME [NOTE]
+  cc asset export [TYPE]
 
 Types:
   drives
@@ -30,12 +35,8 @@ Types:
   licenses
   purchases
 
-Examples:
-  cc asset init
-  cc asset list drives
-  cc asset search drives TEAM
-  cc asset inventory drives
-  cc asset set drives SERIAL.yaml location.bay=A1 location.pool=tank qualified=yes
+Lifecycle states:
+  new inventory testing qualified production watch failed retired
 ~~~
 
 ## cc audit
@@ -128,6 +129,31 @@ Usage:
 Shows dependency status for toolkit commands and dependency groups.
 ~~~
 
+## cc dev-update
+
+~~~text
+Usage:
+  cc dev-update [all|npm|pipx|pip|cargo|go|gem] [--dry-run|--apply]
+  cc dev-update [all|npm|pipx|pip|cargo|go|gem] --status-only
+  cc update dev [--dry-run|--apply]
+  cc update npm [--dry-run|--apply]
+
+Default:
+  cc dev-update runs in --dry-run mode.
+
+Behavior:
+  - Detects npm, pipx, pip, cargo, go, and gem.
+  - Reports installed/not installed status.
+  - Reports whether mutating updates are enabled.
+  - Reports the dry-run command for each manager.
+  - Runs mutating updates only with --apply.
+
+Notes:
+  Developer package managers are not updated by cc system-update.
+  npm global packages are never updated unless --apply is supplied.
+  pip, cargo, go, and gem are report-only until a safer per-ecosystem policy exists.
+~~~
+
 ## cc docs
 
 ~~~text
@@ -192,15 +218,15 @@ Usage:
   cc drive-qualify /dev/sdX
 
 Actions:
-  start     Capture pre-test report, start short SMART test, and optionally start long test.
+  start     Capture pre-test report, start short SMART self-test, and optionally start long self-test.
   status    Show SMART self-test status.
   complete  Capture final report and mark asset qualified when SMART result is GOOD.
 
 Options:
-  --long    Start a SMART long test after the initial report instead of only a short test.
+  --long    Start a SMART long self-test after the initial report instead of only a short self-test.
 
 Notes:
-  This is non-destructive. It does not run badblocks or write/read burn-in.
+  This is non-destructive. It does not run write/read burn-in.
 ~~~
 
 ## cc drive-report
@@ -210,19 +236,8 @@ Usage:
   cc drive-report /dev/sdX
   cc drive-report /dev/nvme0n1
 
-Creates an archived drive report under:
-  ~/.captaincronos/reports/drives/
-
-Also creates/updates a drive asset record under:
-  ~/.captaincronos/assets/drives/
-~~~
-
-## cc drives
-
-~~~text
-Usage: cc drives
-
-Shows physical block devices, filesystems, labels, UUIDs, usage, and mount points.
+Creates an archived drive report under the host report directory.
+Also creates/updates a drive asset record and appends asset history.
 ~~~
 
 ## cc drive-smart
@@ -248,11 +263,19 @@ Actions:
   status   Show SMART self-test status and recent self-test log.
   short    Start SMART short self-test.
   long     Start SMART long self-test.
-  abort    Abort active SMART self-test.
+  abort    Abort handling remains in the command wrapper for compatibility.
 
 Notes:
-  Starting or aborting tests may require sudo.
+  Starting tests may require sudo.
   This command does not run destructive write/read burn-in tests.
+~~~
+
+## cc drives
+
+~~~text
+Usage: cc drives
+
+Shows physical block devices, filesystems, labels, UUIDs, usage, and mount points.
 ~~~
 
 ## cc env
@@ -279,6 +302,18 @@ Fix/apply behavior:
   - preserves first occurrence order when showing the cleaned PATH
 ~~~
 
+## cc framework
+
+~~~text
+Usage:
+  cc framework [status|checklist|verify]
+
+Actions:
+  status     Show framework milestone progress.
+  checklist  Print the 1.3 framework completion checklist.
+  verify     Run the 1.3 framework quality gates.
+~~~
+
 ## cc gitflow
 
 ~~~text
@@ -298,9 +333,7 @@ Examples:
 Usage:
   cc helpme-refresh [--apply]
 
-Refreshes the installed helpme function in ~/.bash_functions so it lists the
-current Captain Cronos command families.
-
+Replaces the installed helpme function with canonical Captain Cronos framework help.
 Default is dry-run.
 ~~~
 
@@ -334,33 +367,21 @@ Default is dry-run.
 ## cc install
 
 ~~~text
-Captain Cronos Shell Toolkit Installer
-======================================
-
 Usage:
-  install/install.sh [options]
+  cc install [--dry-run] [--force]
+
+Installs or updates the active Shell Toolkit launcher at:
+  ~/bin/cc
 
 Options:
-  --dry-run          Show what would be done without copying files.
-  --no-backup        Do not create timestamped backups before installing.
-  --no-baseline      Do not create baseline files if baseline appears empty.
-  --no-deps          Skip dependency gate. Use only for recovery/testing.
-  --no-bashrc        Install aliases/functions only; do not replace ~/.bashrc.
-  --no-commands      Do not install command front-end into ~/bin.
-  --help, -h         Show this help.
-  --version          Show installer and toolkit version.
+  --dry-run    Show what would be installed without changing files.
+  --force      Reinstall even when ~/bin/cc already matches the source.
+  --help, -h   Show this help.
+  --version    Show command and toolkit version.
 
-What it does:
-  1. Loads VERSION from the repository.
-  2. Verifies required dependencies.
-  3. Verifies required repository files.
-  4. Verifies Bash syntax.
-  5. Optionally captures baseline OS shell files.
-  6. Backs up current ~/.bashrc, ~/.bash_aliases, and ~/.bash_functions.
-  7. Installs bash/bashrc, bash/bash_aliases, and bash/bash_functions.
-  8. Installs the cc command front-end into ~/bin.
-  9. Verifies installed files.
- 10. Prints a final install report.
+Notes:
+  This command installs only the cc launcher. The full shell-file installer
+  remains available as install/install.sh.
 ~~~
 
 ## cc kernel-cleanup
@@ -511,6 +532,7 @@ Usage:
 Runs the toolkit engineering self-test suite.
 
 Checks:
+  - shared library syntax and load checks
   - strict command audit
   - documentation lint
   - release check
@@ -589,9 +611,10 @@ Examples:
 ~~~text
 Usage: cc system-update [--dry-run]
 
-Runs the managed system update workflow: apt/nala/aptitude, snap, flatpak, Python venv, Firefox, Thunderbird, and GRUB CLI Safe Boot refresh.
+Runs the managed system update workflow: apt/nala/aptitude, snap, flatpak, Firefox, Thunderbird, and GRUB CLI Safe Boot refresh.
 
 Notes:
+  Developer package managers are detected and reported, but not updated by system-update.
   This command does not purge old kernels. Review kernel cleanup separately after this workflow is stable.
 ~~~
 
@@ -608,6 +631,8 @@ Pulls latest toolkit changes and runs the toolkit update workflow.
 ~~~text
 Usage:
   cc update [--dry-run|--apply] [--toolkit-only|--system-only|--health-only]
+  cc update dev [all|npm|pipx|pip|cargo|go|gem] [--dry-run|--apply]
+  cc update npm [--dry-run|--apply]
 
 Default:
   cc update runs in --dry-run mode.
@@ -616,14 +641,17 @@ Workflow:
   1. toolkit-update       Pull latest toolkit changes and reinstall command files.
   2. system-update        Run managed OS/app update workflow.
   3. kernel-cleanup       Review obsolete kernels. Applies only with --apply.
-  4. verify               Verify repository structure and Bash syntax.
-  5. doctor               Run toolkit health checks.
-  6. drives / smart       Show storage inventory and SMART summary.
-  7. status               Show repository status.
+  4. dev-update           Optional developer maintenance when explicitly enabled.
+  5. verify               Verify repository structure and Bash syntax.
+  6. doctor               Run toolkit health checks.
+  7. drives / smart       Show storage inventory and SMART summary.
+  8. status               Show repository status.
 
 Notes:
   Use cc toolkit-update for the old direct toolkit pull/reinstall behavior.
   Use cc system-update for package/app updates only.
+  Use cc update dev --dry-run before applying developer package updates.
+  Set DEV_UPDATES=yes in cc config to include developer updates in cc update --apply.
   Use cc kernel-cleanup separately before trusting automated cleanup.
 ~~~
 
@@ -645,7 +673,7 @@ Options:
 ## cc version
 
 ~~~text
-Toolkit : 1.3.0-alpha1
+Toolkit : 1.3.0-beta1
 Codename: Blackbeard
 Standard: 0.1.0
 Baseline: ubuntu-26.04

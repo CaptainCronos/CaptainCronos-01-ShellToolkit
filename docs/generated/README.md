@@ -1,6 +1,6 @@
 # Generated Documentation Index
 
-Generated: Tue Jun 30 06:34:29 PM EDT 2026
+Generated: Sat Jul  4 15:09:04 EDT 2026
 
 - COMMAND_INVENTORY.md
 - COMMAND_REFERENCE.md

@@ -141,6 +141,7 @@ meta = {
     "baseline": ("Engineering", "bash"),
     "config": ("Core", "bash"),
     "defaults": ("Engineering", "bash"),
+    "dev-update": ("Maintenance", "bash"),
     "docs": ("Documentation", "bash git find awk"),
     "doctor": ("Diagnostics", "bash git awk df smartctl"),
     "drive-burnin": ("Storage", "bash smartctl date mkdir"),

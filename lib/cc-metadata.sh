@@ -43,7 +43,7 @@ cc_infer_category() {
         repo|repos|gitflow|status) echo "Repository" ;;
         verify|doctor) echo "Diagnostics" ;;
         drives|smart|kernel-cleanup) echo "Storage" ;;
-        system-update|update|monthly-health|monthly-health-timer) echo "Maintenance" ;;
+        dev-update|system-update|update|monthly-health|monthly-health-timer) echo "Maintenance" ;;
         *) echo "General" ;;
     esac
 }

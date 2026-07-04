@@ -77,6 +77,7 @@ cc release check
 cc docs lint
 cc install
 cc update
+cc update dev --dry-run
 cc baseline
 cc defaults
 cc help

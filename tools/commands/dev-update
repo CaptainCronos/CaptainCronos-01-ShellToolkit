@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : dev-update
+# Version     : 1.0.0-alpha1
+# Category    : Maintenance
+# Requires    : bash
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Report and explicitly update developer package managers.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
+
+VERSION="1.0.0-alpha1"
+MODE="dry-run"
+TARGET="all"
+APPLY=0
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc dev-update [all|npm|pipx|pip|cargo|go|gem] [--dry-run|--apply]
+  cc dev-update [all|npm|pipx|pip|cargo|go|gem] --status-only
+  cc update dev [--dry-run|--apply]
+  cc update npm [--dry-run|--apply]
+
+Default:
+  cc dev-update runs in --dry-run mode.
+
+Behavior:
+  - Detects npm, pipx, pip, cargo, go, and gem.
+  - Reports installed/not installed status.
+  - Reports whether mutating updates are enabled.
+  - Reports the dry-run command for each manager.
+  - Runs mutating updates only with --apply.
+
+Notes:
+  Developer package managers are not updated by cc system-update.
+  npm global packages are never updated unless --apply is supplied.
+  pip, cargo, go, and gem are report-only until a safer per-ecosystem policy exists.
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "$VERSION"
+            exit 0
+            ;;
+        --dry-run)
+            MODE="dry-run"
+            APPLY=0
+            shift
+            ;;
+        --apply)
+            MODE="apply"
+            APPLY=1
+            shift
+            ;;
+        --status-only)
+            MODE="status-only"
+            APPLY=0
+            shift
+            ;;
+        all|npm|pipx|pip|cargo|go|gem)
+            TARGET="$1"
+            shift
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+cc_banner
+printf '%-16s %s\n' "Target:" "$TARGET"
+printf '%-16s %s\n' "Mode:" "$MODE"
+echo
+
+cc_dev_update_report "$TARGET" "$APPLY"
+
+echo
+case "$MODE" in
+    apply)
+        cc_dev_update_apply "$TARGET"
+        ;;
+    dry-run)
+        echo "Dry-run only. No developer packages were changed."
+        echo "To apply supported developer updates, run: cc update dev --apply"
+        ;;
+    status-only)
+        echo "Status only. Developer updates are disabled in this workflow."
+        ;;
+esac

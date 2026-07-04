@@ -128,6 +128,7 @@ helpme() {
     _cc_help_maintenance() {
         _cc_help_row "cc doctor" "Run repository, install, and host checks."
         _cc_help_row "cc system-update" "Run OS, package, app, and CLI updates."
+        _cc_help_row "cc update dev --dry-run" "Review developer package managers safely."
         _cc_help_row "cc toolkit-update" "Pull latest toolkit changes and reinstall."
         _cc_help_row "cc kernel-cleanup" "Review obsolete kernel packages safely."
         _cc_help_row "cc update" "Run managed maintenance workflow."

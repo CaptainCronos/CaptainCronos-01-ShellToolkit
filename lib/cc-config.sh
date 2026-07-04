@@ -31,6 +31,7 @@ REPORT_DIR="$HOME/.captaincronos/reports"
 DOCS_DIR="docs/generated"
 AUTO_DOCS="no"
 AUTO_PUSH="no"
+DEV_UPDATES="no"
 EDITOR="nano"
 EOF_CONFIG
     fi
@@ -41,7 +42,8 @@ cc_config_get() {
     local cfg value
     cfg="$(cc_config_file)"
     if [ -f "$cfg" ]; then
-        value="$(grep -E "^${key}=" "$cfg" 2>/dev/null | tail -n 1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
+        value="$(grep -E "^${key}=" "$cfg" 2>/dev/null || true)"
+        value="$(printf '%s\n' "$value" | tail -n 1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
         if [ -n "$value" ]; then
             eval "printf '%s\n' \"$value\""
             return 0

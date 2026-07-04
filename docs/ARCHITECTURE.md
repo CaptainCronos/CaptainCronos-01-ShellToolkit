@@ -44,6 +44,17 @@ User configuration is stored under:
 
 Use `cc config` to view or modify it.
 
+### Update Architecture
+Maintenance updates are split into three surfaces:
+
+- System package managers: apt/nala/aptitude and related OS maintenance.
+- Desktop/app package managers: snap, flatpak, and direct desktop app refreshes already managed by `cc system-update`.
+- Developer ecosystem package managers: npm, pipx, pip, cargo, go, and gem.
+
+`cc system-update` owns system and desktop/app updates. It detects and reports developer ecosystem package managers, but does not update them. This protects project toolchains, global CLIs, language-specific package state, and user development environments from broad workstation maintenance runs.
+
+`cc dev-update` owns developer ecosystem reporting and explicit mutation. It defaults to dry-run/reporting. Mutating developer updates require `--apply`; only package managers with a conservative global update path are applied. Normal `cc update --apply` includes developer updates only when `DEV_UPDATES=yes` is set in toolkit config.
+
 ### Reports
 Historical reports are stored under:
 

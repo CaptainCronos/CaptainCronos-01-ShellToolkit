@@ -8,7 +8,7 @@
 # Category    : Maintenance
 # Requires    : bash git
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Run managed toolkit and system maintenance workflow.
+# Purpose     : Run managed toolkit, system, and optional developer maintenance.
 # ==============================================================================
 
 set -euo pipefail
@@ -16,17 +16,23 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-config.sh"
+source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
 
 MODE="dry-run"
 RUN_TOOLKIT=1
 RUN_SYSTEM=1
 RUN_KERNEL=1
 RUN_HEALTH=1
+RUN_DEV=0
+DEV_TARGET="all"
 
 usage() {
     cat <<'EOF_HELP'
 Usage:
   cc update [--dry-run|--apply] [--toolkit-only|--system-only|--health-only]
+  cc update dev [all|npm|pipx|pip|cargo|go|gem] [--dry-run|--apply]
+  cc update npm [--dry-run|--apply]
 
 Default:
   cc update runs in --dry-run mode.
@@ -35,17 +41,36 @@ Workflow:
   1. toolkit-update       Pull latest toolkit changes and reinstall command files.
   2. system-update        Run managed OS/app update workflow.
   3. kernel-cleanup       Review obsolete kernels. Applies only with --apply.
-  4. verify               Verify repository structure and Bash syntax.
-  5. doctor               Run toolkit health checks.
-  6. drives / smart       Show storage inventory and SMART summary.
-  7. status               Show repository status.
+  4. dev-update           Optional developer maintenance when explicitly enabled.
+  5. verify               Verify repository structure and Bash syntax.
+  6. doctor               Run toolkit health checks.
+  7. drives / smart       Show storage inventory and SMART summary.
+  8. status               Show repository status.
 
 Notes:
   Use cc toolkit-update for the old direct toolkit pull/reinstall behavior.
   Use cc system-update for package/app updates only.
+  Use cc update dev --dry-run before applying developer package updates.
+  Set DEV_UPDATES=yes in cc config to include developer updates in cc update --apply.
   Use cc kernel-cleanup separately before trusting automated cleanup.
 EOF_HELP
 }
+
+case "${1:-}" in
+    dev|developer|developers)
+        RUN_TOOLKIT=0; RUN_SYSTEM=0; RUN_KERNEL=0; RUN_HEALTH=0; RUN_DEV=1
+        shift
+        if cc_dev_update_selector_valid "${1:-all}"; then
+            DEV_TARGET="${1:-all}"
+            [ "$#" -eq 0 ] || shift
+        fi
+        ;;
+    npm|pipx|pip|cargo|go|gem)
+        RUN_TOOLKIT=0; RUN_SYSTEM=0; RUN_KERNEL=0; RUN_HEALTH=0; RUN_DEV=1
+        DEV_TARGET="$1"
+        shift
+        ;;
+esac
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -66,15 +91,15 @@ while [ "$#" -gt 0 ]; do
             shift
             ;;
         --toolkit-only)
-            RUN_TOOLKIT=1; RUN_SYSTEM=0; RUN_KERNEL=0; RUN_HEALTH=0
+            RUN_TOOLKIT=1; RUN_SYSTEM=0; RUN_KERNEL=0; RUN_HEALTH=0; RUN_DEV=0
             shift
             ;;
         --system-only)
-            RUN_TOOLKIT=0; RUN_SYSTEM=1; RUN_KERNEL=1; RUN_HEALTH=0
+            RUN_TOOLKIT=0; RUN_SYSTEM=1; RUN_KERNEL=1; RUN_HEALTH=0; RUN_DEV=0
             shift
             ;;
         --health-only)
-            RUN_TOOLKIT=0; RUN_SYSTEM=0; RUN_KERNEL=0; RUN_HEALTH=1
+            RUN_TOOLKIT=0; RUN_SYSTEM=0; RUN_KERNEL=0; RUN_HEALTH=1; RUN_DEV=0
             shift
             ;;
         *)
@@ -92,6 +117,14 @@ run_cc() {
     echo "cc $name $*"
     echo "============================================================"
     bash "$PROJECT_ROOT/tools/cc" "$name" "$@"
+}
+
+run_dev_update() {
+    if [ "$MODE" = "apply" ]; then
+        run_cc dev-update "$DEV_TARGET" --apply
+    else
+        run_cc dev-update "$DEV_TARGET" --dry-run
+    fi
 }
 
 cc_banner
@@ -118,6 +151,14 @@ if [ "$RUN_KERNEL" -eq 1 ]; then
         run_cc kernel-cleanup --apply
     else
         run_cc kernel-cleanup --dry-run
+    fi
+fi
+
+if [ "$RUN_DEV" -eq 1 ]; then
+    run_dev_update
+elif [ "$RUN_TOOLKIT" -eq 1 ] && [ "$RUN_SYSTEM" -eq 1 ] && [ "$RUN_KERNEL" -eq 1 ]; then
+    if cc_dev_update_truthy "$(cc_config_get DEV_UPDATES no)"; then
+        run_dev_update
     fi
 fi
 

@@ -8,7 +8,7 @@
 # Category    : Maintenance
 # Requires    : bash apt flatpak snap
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Run OS, package, app, and CLI Safe Boot update workflow.
+# Purpose     : Run OS, desktop app, and CLI Safe Boot update workflow.
 # ==============================================================================
 
 set -uo pipefail
@@ -16,6 +16,7 @@ set -uo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
 
 VERSION="1.0.0-alpha1"
 LOG="${LOG:-$HOME/upgrade.log}"
@@ -24,9 +25,10 @@ DRY_RUN=0
 usage() {
     echo "Usage: cc system-update [--dry-run]"
     echo
-    echo "Runs the managed system update workflow: apt/nala/aptitude, snap, flatpak, Python venv, Firefox, Thunderbird, and GRUB CLI Safe Boot refresh."
+    echo "Runs the managed system update workflow: apt/nala/aptitude, snap, flatpak, Firefox, Thunderbird, and GRUB CLI Safe Boot refresh."
     echo
     echo "Notes:"
+    echo "  Developer package managers are detected and reported, but not updated by system-update."
     echo "  This command does not purge old kernels. Review kernel cleanup separately after this workflow is stable."
 }
 
@@ -211,10 +213,16 @@ GRUBEOF
 cc_banner
 say "Starting system update (${VERSION})..."
 
+say
+say "System Package Managers"
+say "-----------------------"
 pkg_update || exit 1
 pkg_upgrade || true
 update_cli_safe_boot || true
 
+say
+say "Desktop/App Package Managers"
+say "----------------------------"
 if have snap; then
     run_log sudo snap refresh || true
 fi
@@ -222,19 +230,6 @@ fi
 if have flatpak; then
     run_log flatpak update -y || true
     run_log flatpak uninstall --unused -y || true
-fi
-
-if [ -f "$HOME/myenv/bin/activate" ]; then
-    if [ "$DRY_RUN" -eq 1 ]; then
-        say "DRY RUN: would update Python packages in $HOME/myenv"
-    else
-        . "$HOME/myenv/bin/activate"
-        python -m pip list --outdated --format=json 2>>"$LOG" | python -c 'import sys,json; s=sys.stdin.read().strip();
-try: data=json.loads(s) if s else []
-except json.JSONDecodeError: data=[]
-print("\n".join(p["name"] for p in data if "name" in p))' | xargs -r python -m pip install -U || true
-        deactivate
-    fi
 fi
 
 need curl || exit 1
@@ -247,6 +242,14 @@ cd "$TMP_DIR" || exit 1
 
 run_daily_update "$STATE_DIR/firefox.stamp" install_app_from_tar "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US" "firefox.tar.xz" "firefox" "/opt/firefox" || true
 run_daily_update "$STATE_DIR/thunderbird.stamp" install_app_from_tar "https://download.mozilla.org/?product=thunderbird-latest&os=linux64&lang=en-US" "thunderbird.tar.xz" "thunderbird" "/opt/thunderbird" || true
+
+say
+if [ -f "$HOME/myenv/bin/activate" ]; then
+    say "Developer Python environment detected: $HOME/myenv"
+    say "INFO: system-update does not update Python virtualenv packages automatically."
+fi
+cc_dev_update_report all 0 | tee -a "$LOG"
+say "INFO: developer package updates require: cc update dev --apply"
 
 say "System update complete (${VERSION})."
 cd "$HOME" || true

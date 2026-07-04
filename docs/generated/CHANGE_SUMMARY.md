@@ -1,46 +1,46 @@
 # Recent Change Summary
 
-Generated: Tue Jun 30 06:34:29 PM EDT 2026
+Generated: Sat Jul  4 15:09:04 EDT 2026
 
 ~~~text
-8601d58 (HEAD -> main, origin/main, origin/HEAD) Add framework standard documentation
-55e9254 Add executable permission verification
-05542f9 Make env command executable
-7aaab69 Add environment namespace and PATH hygiene checks
-30e36c5 Add storage namespace command
-0b7219c Add storage namespace command
-eb10f9e Mark new framework commands executable
-e3d2b85 Add live USB workbench preparation command
-51df5b0 Enhance host init with platform profiles
-4235c3e Add capability inspection command
-1cc74ff Add platform status command
-8736da6 Add platform detection library
-a792232 Run dependency checks at install start
-701239b Add dependency status command
-293a521 Enforce command dependencies from metadata
-bda78db Add dependency check helper library
-262f90b Add host init command
-34660a6 Add host environment identity library
-92b9daf Add engineering selftest command
-0bf0bbf Regenerate documentation after command standardization
-858c5cc Standardize command metadata and executable permissions
-8a7b4ae Standardize command metadata and executable permissions
-5ccec52 Add audit fixer for executable bits and metadata headers
-c154fd8 Refine audit consistency checks
-74c140d Add command consistency audit
-12737a5 Refresh helpme by command family
-0163951 Add metadata header to roadmap command
-04825cb Add roadmap command
-7b4195c Add about command
-fc2ee31 Add plugin developer guide
-aaeecd4 Add architecture guide
-2cac7f2 Add administrator guide
-0b72bdb Add project roadmap
-c0e3351 Add drive acceptance workflow placeholder
-6930d41 Add asset search set and inventory actions
-6309ff0 Implement non-destructive drive qualification workflow
-a52b940 Create drive asset records from drive reports
-4c66f47 Add asset inventory command
-837e1d3 Add asset inventory helper library
-e147393 Add drive report generation command
+571191d (HEAD -> feat/update-dev-package-status, origin/main, origin/HEAD, main) feat(repos): add batch commit, push, and publish actions
+694e958 refactor(context): introduce centralized context library
+5ad0a61 feat(install): deploy user launcher from toolkit root
+cb41e58 fix(context): separate toolkit root from current repo
+ba7ef11 Replace installed helpme with compact canonical version
+54cb260 Handle legacy helpme search refresh
+ffe2589 Include cc overview in helpme search
+c2d2713 Add cc topic to helpme refresh
+858c414 Honor dry-run in toolkit update workflow
+a71a770 Run toolkit update script through bash
+eb00c36 Add v1.3.0-beta1 changelog entry
+1de9a3e Update roadmap for v1.3.0-beta1
+c0f4149 Document v1.3.0-beta1 framework completion
+68616d9 Bump version to v1.3.0-beta1
+57cfd3d (tag: v1.3.0-beta1) Add dotted leaders to status lines
+48ddc6f Use status color helpers in verify
+59f5a02 Use status color helpers in release checks
+49f9416 Use status color helpers in audit summary
+3d71a8b Allow doctor to run tools cc through bash
+9834acd Use status color helpers in doctor
+e175f81 Use status color helpers in framework verify
+d653e1b Use status color helpers in selftest
+a07c48c Add terminal status color helpers
+dba479e Add asset library metadata helpers
+bf6a39f Add SMART library metadata helpers
+86c68dd Add storage library metadata helpers
+53d5e0c Add report library metadata helpers
+94be091 Add shared library checks to selftest
+e1e8c70 Use shared report helpers for drive qualification
+7328edc Restore executable bit on framework command
+11915c4 Add framework verify gate
+64068c9 Use report helpers in drive-report
+f24c7f8 Add shared report helper library
+c4bea39 Refactor drive-burnin to storage helpers
+d1a0e22 Refactor drive-qualify to storage helpers
+c4d0268 Refactor drive-test status and start actions to storage library
+1804cc0 Add storage SMART self-test helpers
+1c7bb27 Refactor drive inventory to storage library
+3913407 Add storage inventory helpers
+2bbf537 Add shared storage helper library
 ~~~
