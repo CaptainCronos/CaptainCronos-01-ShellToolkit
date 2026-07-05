@@ -110,6 +110,34 @@ Adding a command should not require editing the dispatcher unless command discov
 
 ---
 
+## Prompt Engine
+
+Prompt rendering infrastructure is internal and lives in:
+
+```text
+lib/cc-prompt-engine.sh
+templates/prompts/
+```
+
+The engine uses the context layer to resolve `TOOLKIT_ROOT`, then discovers
+template files from `templates/prompts/*.prompt`. Each template carries
+machine-readable metadata headers and line-oriented sections for question
+definitions and rendered prompt text.
+
+The engine owns:
+
+- template discovery and metadata catalog output
+- interactive question definitions
+- `{{variable}}` substitution
+- prompt rendering
+- output formatting hooks
+- clipboard capability metadata for future commands
+
+The public `cc prompt` namespace is intentionally not implemented yet. Future
+commands should be thin wrappers over this library.
+
+---
+
 ## Future Plugin Model
 
 Future plugin directories may add their own command modules:

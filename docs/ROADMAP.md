@@ -16,6 +16,7 @@
 - NAS health framework
 
 ## Version 1.4.x
+- Prompt command namespace backed by internal prompt templates
 - TrueNAS integration
 - ZFS management
 - Backup verification

@@ -1,0 +1,42 @@
+# ==============================================================================
+# Captain Cronos Shell Toolkit Prompt Template
+# ------------------------------------------------------------------------------
+# Template    : framework
+# Version     : 1.0.0-alpha1
+# Category    : Prompt
+# Output      : markdown
+# Clipboard   : planned
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Render a framework evolution prompt.
+# ==============================================================================
+
+[questions]
+framework_area|text|yes|Framework area||Command framework, installer, metadata, storage, reports, or another core area.
+current_state|textarea|yes|Current state||Existing behavior and files involved.
+target_state|textarea|yes|Target state||Desired framework capability or rule.
+interfaces|textarea|yes|Interfaces||Shared functions, commands, metadata, or files that must remain stable.
+validation|textarea|yes|Validation||Commands or checks that must pass.
+
+[template]
+# Framework Prompt
+
+Framework area:
+{{framework_area}}
+
+Current state:
+{{current_state}}
+
+Target state:
+{{target_state}}
+
+Interfaces and compatibility:
+{{interfaces}}
+
+Architecture guidance:
+- Keep shared behavior in reusable libraries.
+- Preserve command discovery and metadata conventions.
+- Avoid changing the dispatcher unless discovery behavior itself changes.
+- Document any new framework rule before relying on it broadly.
+
+Validation:
+{{validation}}

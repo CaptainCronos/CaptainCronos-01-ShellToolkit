@@ -1,0 +1,42 @@
+# ==============================================================================
+# Captain Cronos Shell Toolkit Prompt Template
+# ------------------------------------------------------------------------------
+# Template    : docs
+# Version     : 1.0.0-alpha1
+# Category    : Prompt
+# Output      : markdown
+# Clipboard   : planned
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Render a documentation update prompt.
+# ==============================================================================
+
+[questions]
+document_scope|text|yes|Documentation scope||Document, section, command, or workflow being updated.
+audience|text|yes|Audience||User, administrator, developer, or release maintainer.
+source_context|textarea|yes|Source context||Implementation or behavior the docs must reflect.
+required_updates|textarea|yes|Required updates||Specific files or topics to change.
+validation|textarea|yes|Validation||Documentation lint or review checks.
+
+[template]
+# Documentation Prompt
+
+Scope:
+{{document_scope}}
+
+Audience:
+{{audience}}
+
+Source context:
+{{source_context}}
+
+Required updates:
+{{required_updates}}
+
+Documentation guidance:
+- Keep docs concise, practical, and aligned with implementation.
+- Prefer generated references where command metadata is the source of truth.
+- Update changelog or roadmap when behavior, architecture, or direction changes.
+- Avoid duplicating command usage in multiple places unless necessary.
+
+Validation:
+{{validation}}

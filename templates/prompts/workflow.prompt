@@ -1,0 +1,42 @@
+# ==============================================================================
+# Captain Cronos Shell Toolkit Prompt Template
+# ------------------------------------------------------------------------------
+# Template    : workflow
+# Version     : 1.0.0-alpha1
+# Category    : Prompt
+# Output      : markdown
+# Clipboard   : planned
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Render an operational workflow prompt.
+# ==============================================================================
+
+[questions]
+workflow_name|text|yes|Workflow name||Short workflow name.
+trigger|textarea|yes|Trigger||When and why the workflow runs.
+steps|textarea|yes|Steps||Expected sequence of actions.
+safety_rules|textarea|yes|Safety rules||Dry-run, confirmation, rollback, or mutation constraints.
+validation|textarea|yes|Validation||Commands or checks that must pass.
+
+[template]
+# Workflow Prompt
+
+Workflow:
+{{workflow_name}}
+
+Trigger:
+{{trigger}}
+
+Steps:
+{{steps}}
+
+Safety rules:
+{{safety_rules}}
+
+Implementation guidance:
+- Keep destructive or remote-mutating behavior guarded by explicit apply flags.
+- Use existing shared logging, status, context, and dependency helpers.
+- Preserve rollback paths when user files or operational state can change.
+- Make dry-run behavior clear and verifiable.
+
+Validation:
+{{validation}}

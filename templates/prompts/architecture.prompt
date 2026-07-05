@@ -1,0 +1,42 @@
+# ==============================================================================
+# Captain Cronos Shell Toolkit Prompt Template
+# ------------------------------------------------------------------------------
+# Template    : architecture
+# Version     : 1.0.0-alpha1
+# Category    : Prompt
+# Output      : markdown
+# Clipboard   : planned
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Render an architecture design prompt.
+# ==============================================================================
+
+[questions]
+architecture_topic|text|yes|Architecture topic||Capability, subsystem, or integration being designed.
+current_constraints|textarea|yes|Current constraints||Existing standards, paths, or compatibility rules.
+design_goal|textarea|yes|Design goal||What the architecture needs to enable.
+integration_points|textarea|yes|Integration points||Libraries, commands, metadata, docs, or templates involved.
+validation|textarea|yes|Validation||Review and verification expectations.
+
+[template]
+# Architecture Prompt
+
+Topic:
+{{architecture_topic}}
+
+Current constraints:
+{{current_constraints}}
+
+Design goal:
+{{design_goal}}
+
+Integration points:
+{{integration_points}}
+
+Architecture guidance:
+- Fit new behavior into existing top-level directories unless the roadmap approves a layout change.
+- Keep shared mechanisms reusable and metadata-driven.
+- Separate internal infrastructure from public command surfaces.
+- Describe migration and validation expectations before implementation.
+
+Validation:
+{{validation}}

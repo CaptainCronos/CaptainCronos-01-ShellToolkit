@@ -1,0 +1,42 @@
+# ==============================================================================
+# Captain Cronos Shell Toolkit Prompt Template
+# ------------------------------------------------------------------------------
+# Template    : feature
+# Version     : 1.0.0-alpha1
+# Category    : Prompt
+# Output      : markdown
+# Clipboard   : planned
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Render a feature implementation prompt.
+# ==============================================================================
+
+[questions]
+feature_name|text|yes|Feature name||Short name for the feature.
+repository_context|textarea|yes|Repository context||Relevant project, module, or command area.
+objective|textarea|yes|Objective||What should be implemented.
+constraints|textarea|no|Constraints||Important limits, compatibility rules, or standards.
+validation|textarea|yes|Validation||Commands or checks that must pass.
+
+[template]
+# Feature Implementation Prompt
+
+Repository context:
+{{repository_context}}
+
+Feature:
+{{feature_name}}
+
+Objective:
+{{objective}}
+
+Constraints:
+{{constraints}}
+
+Implementation guidance:
+- Reuse existing project patterns before adding new abstractions.
+- Keep the implementation scoped to the requested feature.
+- Update relevant documentation when behavior or architecture changes.
+- Do not expose new user-facing commands unless the objective explicitly asks for them.
+
+Validation:
+{{validation}}

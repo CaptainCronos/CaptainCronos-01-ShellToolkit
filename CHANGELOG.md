@@ -6,6 +6,16 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ---
 
+## Unreleased
+
+### Added
+
+- Internal Prompt Engine foundation for future `cc prompt` commands.
+- Metadata-discovered prompt templates for feature, framework, bugfix, docs, workflow, and architecture prompts.
+- Prompt Engine validation in `install/verify.sh` and `cc selftest`.
+
+---
+
 ## v1.3.0-beta1 — Blackbeard
 
 ### Purpose

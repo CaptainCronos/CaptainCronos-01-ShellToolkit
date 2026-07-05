@@ -185,6 +185,10 @@ cc verify executable
 
 Status: **Maintenance / Future**
 
+Completed in active development:
+
+- Internal Prompt Engine foundation for future `cc prompt` workflows.
+
 Remaining polish candidates:
 
 - Shared section helpers.
@@ -209,6 +213,7 @@ Begin adding larger user-facing infrastructure modules on top of the completed 1
 
 Candidate areas:
 
+- Prompt command namespace backed by the internal Prompt Engine.
 - TrueNAS administration.
 - ZFS pool management.
 - NAS backup verification.

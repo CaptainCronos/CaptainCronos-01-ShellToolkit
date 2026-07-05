@@ -34,6 +34,7 @@ Important libraries:
 - `cc-config.sh` — toolkit configuration helpers
 - `cc-metadata.sh` — command metadata and registry helpers
 - `cc-assets.sh` — local asset database helpers
+- `cc-prompt-engine.sh` — internal prompt template discovery, rendering, and formatting helpers
 
 ### Configuration
 User configuration is stored under:
@@ -86,6 +87,21 @@ Current reserved plugin areas include:
 - repository
 - maintenance
 - bitcoin
+
+### Prompt Engine
+The internal prompt engine lives in:
+
+```text
+lib/cc-prompt-engine.sh
+templates/prompts/
+```
+
+It discovers prompt templates from metadata headers, reads interactive question
+definitions, substitutes `{{variables}}`, renders prompt bodies, and applies
+output formatting hooks. It does not add a user-facing `cc prompt` command yet.
+Future commands such as `cc prompt feature`, `cc prompt bugfix`, and
+`cc prompt architecture` should call the shared engine instead of duplicating
+template parsing or rendering logic.
 
 ### Documentation
 Generated documentation is stored under:

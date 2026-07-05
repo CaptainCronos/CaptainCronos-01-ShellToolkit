@@ -1,0 +1,42 @@
+# ==============================================================================
+# Captain Cronos Shell Toolkit Prompt Template
+# ------------------------------------------------------------------------------
+# Template    : bugfix
+# Version     : 1.0.0-alpha1
+# Category    : Prompt
+# Output      : markdown
+# Clipboard   : planned
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Render a bugfix investigation prompt.
+# ==============================================================================
+
+[questions]
+bug_summary|text|yes|Bug summary||Short description of the defect.
+observed_behavior|textarea|yes|Observed behavior||What currently happens.
+expected_behavior|textarea|yes|Expected behavior||What should happen instead.
+suspected_area|textarea|no|Suspected area||Relevant files, commands, or recent changes.
+validation|textarea|yes|Validation||Regression checks that must pass.
+
+[template]
+# Bugfix Prompt
+
+Bug:
+{{bug_summary}}
+
+Observed behavior:
+{{observed_behavior}}
+
+Expected behavior:
+{{expected_behavior}}
+
+Suspected area:
+{{suspected_area}}
+
+Investigation guidance:
+- Reproduce or reason from the smallest failing path first.
+- Identify the root cause before editing.
+- Keep the fix focused and avoid unrelated cleanup.
+- Add or update validation that would catch the regression.
+
+Validation:
+{{validation}}
