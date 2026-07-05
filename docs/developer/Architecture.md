@@ -131,10 +131,12 @@ The engine owns:
 - `{{variable}}` substitution
 - prompt rendering
 - output formatting hooks
-- clipboard capability metadata for future commands
+- clipboard capability helpers for command-layer copy support
 
-The public `cc prompt` namespace is intentionally not implemented yet. Future
-commands should be thin wrappers over this library.
+The public `cc prompt` namespace starts with `cc prompt feature`, implemented as
+a thin interactive wrapper over `templates/prompts/feature.prompt`. Future
+commands should follow that model and reuse this library instead of parsing or
+rendering templates themselves.
 
 ---
 

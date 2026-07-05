@@ -1,15 +1,15 @@
 # Prompt Engine
 
-The Prompt Engine is internal infrastructure for future `cc prompt` commands.
-It does not expose a user-facing command yet.
+The Prompt Engine is shared infrastructure for `cc prompt` commands. The first
+public wrapper is `cc prompt feature`.
 
 ## Goals
 
 - Keep prompt templates reusable and metadata-driven.
-- Keep future `cc prompt feature`, `cc prompt bugfix`, `cc prompt docs`, and related commands thin.
+- Keep `cc prompt feature`, future `cc prompt bugfix`, `cc prompt docs`, and related commands thin.
 - Store static prompt definitions under the existing `templates/` tree.
 - Use the context layer for repository paths instead of hard-coded checkout locations.
-- Reserve clipboard behavior for a future command layer without implementing copy support now.
+- Keep clipboard behavior capability-based so commands can copy when a supported host tool exists.
 
 ## Files
 
@@ -60,8 +60,9 @@ Supported output formats:
 - `raw`
 - `terminal`
 
-`Clipboard: planned` is metadata only. The engine does not copy to the system
-clipboard.
+`Clipboard: planned` is template metadata. Public commands may call the engine's
+clipboard helpers to copy rendered output when a supported host clipboard tool
+exists.
 
 ## Library API
 
@@ -74,10 +75,18 @@ Important functions:
 - `cc_prompt_render ID name=value ...` renders a prompt after validating required variables.
 - `cc_prompt_render_formatted ID FORMAT name=value ...` renders and formats output.
 - `cc_prompt_validate_templates` validates all discovered templates.
+- `cc_prompt_clipboard_available` checks for supported clipboard tools.
+- `cc_prompt_copy_to_clipboard` copies stdin to the detected clipboard tool.
 
-Future command modules should collect answers from `cc_prompt_question_rows`,
-pass them to `cc_prompt_render`, and leave template loading and substitution to
-the shared engine.
+Command modules should collect answers from `cc_prompt_question_rows`, pass them
+to `cc_prompt_render`, and leave template loading and substitution to the shared
+engine.
+
+## Public Command
+
+`cc prompt feature` reads the `feature` template question rows from the engine,
+prompts for the values one at a time, previews the rendered prompt, and then
+renders the final prompt through `cc_prompt_render`.
 
 ## Validation
 

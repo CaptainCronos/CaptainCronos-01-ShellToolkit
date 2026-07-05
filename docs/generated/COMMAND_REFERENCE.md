@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Sat Jul  4 15:09:02 EDT 2026
+Generated: Sun Jul  5 04:40:39 EDT 2026
 
 ## cc about
 
@@ -443,6 +443,27 @@ Actions:
 This command only inspects plugin directories. It does not enable, disable, or execute plugins yet.
 ~~~
 
+## cc prompt
+
+~~~text
+Usage:
+  cc prompt feature
+
+Interactive Prompt Framework commands:
+  feature   Collect feature details and render templates/prompts/feature.prompt.
+
+Navigation:
+  previous  Go back one question.
+  next      Keep the current answer and continue.
+  edit      Clear and re-enter the current answer.
+  cancel    Exit without rendering.
+
+After preview:
+  [Y]es     Generate, copy when supported, and print the rendered prompt.
+  [E]dit    Edit a collected answer and preview again.
+  [C]ancel  Exit without generating.
+~~~
+
 ## cc registry
 
 ~~~text
@@ -533,6 +554,7 @@ Runs the toolkit engineering self-test suite.
 
 Checks:
   - shared library syntax and load checks
+  - prompt engine template validation
   - strict command audit
   - documentation lint
   - release check

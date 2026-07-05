@@ -29,6 +29,6 @@ Prompt body with {{variables}}.
 Supported question types are `text`, `textarea`, `select`, and `confirm`.
 The required flag is `yes` or `no`.
 
-The prompt engine is internal infrastructure only. Future `cc prompt ...`
-commands should render these templates through the shared engine rather than
-parsing template files themselves.
+Prompt commands render these templates through the shared engine rather than
+parsing template files themselves. The first public wrapper is
+`cc prompt feature`, backed by `templates/prompts/feature.prompt`.

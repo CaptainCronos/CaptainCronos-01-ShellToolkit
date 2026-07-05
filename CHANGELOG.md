@@ -10,6 +10,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Public `cc prompt feature` command backed by `templates/prompts/feature.prompt`.
+- Interactive prompt collection with previous, next, edit, cancel, preview, and generate flow.
+- Prompt clipboard copy helpers for supported host clipboard tools.
 - Internal Prompt Engine foundation for future `cc prompt` commands.
 - Metadata-discovered prompt templates for feature, framework, bugfix, docs, workflow, and architecture prompts.
 - Prompt Engine validation in `install/verify.sh` and `cc selftest`.

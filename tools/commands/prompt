@@ -1,0 +1,398 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : prompt
+# Version     : 1.0.0-alpha1
+# Category    : Prompt
+# Requires    : bash awk find sort
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Render interactive Prompt Framework templates.
+# ==============================================================================
+
+set -euo pipefail
+
+ORIGINAL_PWD="${PWD:-$(pwd)}"
+TOOLKIT_ROOT="${TOOLKIT_ROOT:-${PROJECT_ROOT:-}}"
+if [ -z "$TOOLKIT_ROOT" ]; then
+    TOOLKIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+fi
+
+cd "$TOOLKIT_ROOT"
+source "$TOOLKIT_ROOT/lib/cc-context.sh"
+source "$TOOLKIT_ROOT/lib/cc-common.sh"
+source "$TOOLKIT_ROOT/lib/cc-prompt-engine.sh"
+cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
+
+COMMAND_VERSION="1.0.0-alpha1"
+TEMPLATE_ID="feature"
+
+declare -a QUESTION_NAMES=()
+declare -a QUESTION_TYPES=()
+declare -a QUESTION_REQUIRED=()
+declare -a QUESTION_PROMPTS=()
+declare -a QUESTION_DEFAULTS=()
+declare -a QUESTION_HELP=()
+declare -a ANSWERS=()
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc prompt feature
+
+Interactive Prompt Framework commands:
+  feature   Collect feature details and render templates/prompts/feature.prompt.
+
+Navigation:
+  previous  Go back one question.
+  next      Keep the current answer and continue.
+  edit      Clear and re-enter the current answer.
+  cancel    Exit without rendering.
+
+After preview:
+  [Y]es     Generate, copy when supported, and print the rendered prompt.
+  [E]dit    Edit a collected answer and preview again.
+  [C]ancel  Exit without generating.
+EOF_HELP
+}
+
+lower_word() {
+    printf '%s' "${1,,}"
+}
+
+required_label() {
+    case "$1" in
+        yes) echo "required" ;;
+        *) echo "optional" ;;
+    esac
+}
+
+row_field() {
+    local row="$1" field="$2"
+    printf '%s\n' "$row" | awk -F '\t' -v field="$field" '{print $field}'
+}
+
+load_questions() {
+    local row name type required prompt default help
+
+    cc_prompt_template_path "$TEMPLATE_ID" >/dev/null
+
+    while IFS= read -r row; do
+        name="$(row_field "$row" 1)"
+        type="$(row_field "$row" 2)"
+        required="$(row_field "$row" 3)"
+        prompt="$(row_field "$row" 4)"
+        default="$(row_field "$row" 5)"
+        help="$(row_field "$row" 6)"
+
+        [ -n "$name" ] || continue
+        QUESTION_NAMES+=("$name")
+        QUESTION_TYPES+=("$type")
+        QUESTION_REQUIRED+=("$required")
+        QUESTION_PROMPTS+=("$prompt")
+        QUESTION_DEFAULTS+=("$default")
+        QUESTION_HELP+=("$help")
+        ANSWERS+=("$default")
+    done < <(cc_prompt_question_rows "$TEMPLATE_ID")
+
+    if [ "${#QUESTION_NAMES[@]}" -eq 0 ]; then
+        cc_error "No questions defined for prompt template: $TEMPLATE_ID"
+        return 1
+    fi
+}
+
+answer_valid() {
+    local index="$1" value="${ANSWERS[$index]-}"
+
+    if [ "${QUESTION_REQUIRED[$index]}" = "yes" ] && [ -z "$value" ]; then
+        return 1
+    fi
+
+    return 0
+}
+
+print_question() {
+    local index="$1" total="${#QUESTION_NAMES[@]}"
+
+    echo >&2
+    printf 'Question %s of %s\n' "$((index + 1))" "$total" >&2
+    printf '%s\n' "----------------" >&2
+    printf '%s (%s)\n' "${QUESTION_PROMPTS[$index]}" "$(required_label "${QUESTION_REQUIRED[$index]}")" >&2
+    if [ -n "${QUESTION_HELP[$index]}" ]; then
+        printf '%s\n' "${QUESTION_HELP[$index]}" >&2
+    fi
+    if [ -n "${ANSWERS[$index]-}" ]; then
+        printf 'Current: %s\n' "${ANSWERS[$index]}" >&2
+    elif [ -n "${QUESTION_DEFAULTS[$index]}" ]; then
+        printf 'Default: %s\n' "${QUESTION_DEFAULTS[$index]}" >&2
+    fi
+    printf 'Command or answer [previous/next/edit/cancel]: ' >&2
+}
+
+read_answer() {
+    local index="$1" input command
+
+    print_question "$index"
+    if ! IFS= read -r input; then
+        echo >&2
+        cc_warn "Input ended before prompt generation."
+        return 130
+    fi
+
+    command="$(lower_word "$input")"
+    case "$command" in
+        previous|prev|back)
+            echo "__COMMAND__:previous"
+            return 0
+            ;;
+        next|"")
+            echo "__COMMAND__:next"
+            return 0
+            ;;
+        edit)
+            echo "__COMMAND__:edit"
+            return 0
+            ;;
+        cancel|quit|exit)
+            echo "__COMMAND__:cancel"
+            return 0
+            ;;
+    esac
+
+    echo "$input"
+}
+
+run_question_flow() {
+    local index="${1:-0}" result command
+
+    while [ "$index" -lt "${#QUESTION_NAMES[@]}" ]; do
+        result="$(read_answer "$index")" || return $?
+
+        if [[ "$result" == __COMMAND__:* ]]; then
+            command="${result#__COMMAND__:}"
+            case "$command" in
+                previous)
+                    if [ "$index" -gt 0 ]; then
+                        index=$((index - 1))
+                    else
+                        cc_warn "Already at the first question."
+                    fi
+                    ;;
+                next)
+                    if answer_valid "$index"; then
+                        index=$((index + 1))
+                    else
+                        cc_warn "A value is required for ${QUESTION_PROMPTS[$index]}."
+                    fi
+                    ;;
+                edit)
+                    ANSWERS[$index]=""
+                    ;;
+                cancel)
+                    return 130
+                    ;;
+            esac
+            continue
+        fi
+
+        ANSWERS[$index]="$result"
+        if answer_valid "$index"; then
+            index=$((index + 1))
+        else
+            cc_warn "A value is required for ${QUESTION_PROMPTS[$index]}."
+        fi
+    done
+}
+
+edit_single_answer() {
+    local index="$1" result command
+
+    while true; do
+        result="$(read_answer "$index")" || return $?
+
+        if [[ "$result" == __COMMAND__:* ]]; then
+            command="${result#__COMMAND__:}"
+            case "$command" in
+                previous|next)
+                    if answer_valid "$index"; then
+                        return 0
+                    fi
+                    cc_warn "A value is required for ${QUESTION_PROMPTS[$index]}."
+                    ;;
+                edit)
+                    ANSWERS[$index]=""
+                    ;;
+                cancel)
+                    return 130
+                    ;;
+            esac
+            continue
+        fi
+
+        ANSWERS[$index]="$result"
+        if answer_valid "$index"; then
+            return 0
+        fi
+        cc_warn "A value is required for ${QUESTION_PROMPTS[$index]}."
+    done
+}
+
+assignments() {
+    local index
+
+    for index in "${!QUESTION_NAMES[@]}"; do
+        printf '%s=%s\n' "${QUESTION_NAMES[$index]}" "${ANSWERS[$index]-}"
+    done
+}
+
+render_prompt() {
+    local rendered
+    local -a vars=()
+
+    while IFS= read -r rendered; do
+        vars+=("$rendered")
+    done < <(assignments)
+
+    cc_prompt_render "$TEMPLATE_ID" "${vars[@]}"
+}
+
+print_preview() {
+    local rendered="$1"
+
+    echo
+    echo "Prompt Preview"
+    echo "=============="
+    echo
+    printf '%s\n' "$rendered"
+}
+
+choose_edit_question() {
+    local input index total="${#QUESTION_NAMES[@]}"
+
+    echo >&2
+    echo "Edit Answer" >&2
+    echo "===========" >&2
+    for index in "${!QUESTION_NAMES[@]}"; do
+        printf '%s. %s\n' "$((index + 1))" "${QUESTION_PROMPTS[$index]}" >&2
+    done
+    printf 'Field number, variable name, or cancel: ' >&2
+
+    if ! IFS= read -r input; then
+        echo >&2
+        return 130
+    fi
+
+    case "$(lower_word "$input")" in
+        cancel|quit|exit|"") return 130 ;;
+    esac
+
+    if [[ "$input" =~ ^[0-9]+$ ]] && [ "$input" -ge 1 ] && [ "$input" -le "$total" ]; then
+        echo "$((input - 1))"
+        return 0
+    fi
+
+    for index in "${!QUESTION_NAMES[@]}"; do
+        if [ "$input" = "${QUESTION_NAMES[$index]}" ]; then
+            echo "$index"
+            return 0
+        fi
+    done
+
+    cc_warn "Unknown field: $input"
+    return 1
+}
+
+generate_choice() {
+    local input
+
+    echo >&2
+    echo "Generate?" >&2
+    echo "[Y]es" >&2
+    echo "[E]dit" >&2
+    echo "[C]ancel" >&2
+    printf 'Selection: ' >&2
+
+    if ! IFS= read -r input; then
+        echo >&2
+        return 130
+    fi
+
+    case "$(lower_word "$input")" in
+        y|yes|"") echo "yes" ;;
+        e|edit) echo "edit" ;;
+        c|cancel|quit|exit) echo "cancel" ;;
+        *)
+            cc_warn "Choose Yes, Edit, or Cancel."
+            generate_choice
+            ;;
+    esac
+}
+
+copy_rendered_prompt() {
+    local rendered="$1"
+
+    if cc_prompt_clipboard_available; then
+        if printf '%s\n' "$rendered" | cc_prompt_copy_to_clipboard; then
+            cc_log "Rendered prompt copied to clipboard."
+        else
+            cc_warn "Clipboard command failed; rendered prompt was not copied."
+        fi
+    else
+        cc_warn "Clipboard support not detected; rendered prompt was not copied."
+    fi
+}
+
+feature_prompt() {
+    local rendered choice edit_index
+
+    load_questions
+    run_question_flow 0 || return $?
+
+    while true; do
+        rendered="$(render_prompt)"
+        print_preview "$rendered"
+        choice="$(generate_choice)" || return $?
+
+        case "$choice" in
+            yes)
+                rendered="$(render_prompt)"
+                copy_rendered_prompt "$rendered" >&2
+                echo
+                printf '%s\n' "$rendered"
+                return 0
+                ;;
+            edit)
+                edit_index="$(choose_edit_question)" || return $?
+                edit_single_answer "$edit_index" || return $?
+                ;;
+            cancel)
+                return 130
+                ;;
+        esac
+    done
+}
+
+case "${1:-}" in
+    --help|-h|"")
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "prompt $COMMAND_VERSION"
+        cc_version
+        exit 0
+        ;;
+    feature)
+        shift
+        if [ "$#" -gt 0 ]; then
+            usage
+            exit 1
+        fi
+        feature_prompt
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

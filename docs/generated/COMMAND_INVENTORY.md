@@ -1,6 +1,6 @@
 # Captain Cronos Command Inventory
 
-Generated: Sat Jul  4 15:09:02 EDT 2026
+Generated: Sun Jul  5 04:40:39 EDT 2026
 
 | Command | Version | Purpose |
 |---|---|---|
@@ -33,6 +33,7 @@ Generated: Sat Jul  4 15:09:02 EDT 2026
 | cc monthly-health-timer | reads VERSION | Retire or inspect the standalone monthly health user timer. |
 | cc platform | 1.0.0-alpha1 | Show detected operating platform and host capabilities. |
 | cc plugin | 1.0.0-alpha1 | Inspect local toolkit plugin directories. |
+| cc prompt | 1.0.0-alpha1 | Render interactive Prompt Framework templates. |
 | cc registry | 1.0.1-alpha1 | Display command metadata registry information. |
 | cc release | 1.0.0-alpha1 | Plan and run the toolkit release workflow. |
 | cc repo | reads VERSION | Show repository path and Git remote information. |

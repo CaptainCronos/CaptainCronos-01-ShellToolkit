@@ -493,9 +493,49 @@ cc_prompt_validate_templates() {
 }
 
 cc_prompt_clipboard_available() {
-    return 1
+    command -v wl-copy >/dev/null 2>&1 ||
+    command -v xclip >/dev/null 2>&1 ||
+    command -v xsel >/dev/null 2>&1 ||
+    command -v pbcopy >/dev/null 2>&1 ||
+    command -v clip.exe >/dev/null 2>&1
+}
+
+cc_prompt_clipboard_command() {
+    if command -v wl-copy >/dev/null 2>&1; then
+        echo "wl-copy"
+    elif command -v xclip >/dev/null 2>&1; then
+        echo "xclip -selection clipboard"
+    elif command -v xsel >/dev/null 2>&1; then
+        echo "xsel --clipboard --input"
+    elif command -v pbcopy >/dev/null 2>&1; then
+        echo "pbcopy"
+    elif command -v clip.exe >/dev/null 2>&1; then
+        echo "clip.exe"
+    else
+        return 1
+    fi
+}
+
+cc_prompt_copy_to_clipboard() {
+    if command -v wl-copy >/dev/null 2>&1; then
+        wl-copy
+    elif command -v xclip >/dev/null 2>&1; then
+        xclip -selection clipboard
+    elif command -v xsel >/dev/null 2>&1; then
+        xsel --clipboard --input
+    elif command -v pbcopy >/dev/null 2>&1; then
+        pbcopy
+    elif command -v clip.exe >/dev/null 2>&1; then
+        clip.exe
+    else
+        return 1
+    fi
 }
 
 cc_prompt_clipboard_design_note() {
-    echo "Clipboard support is reserved for future cc prompt commands and is not implemented by this internal engine."
+    if cc_prompt_clipboard_available; then
+        printf 'Clipboard support available through: %s\n' "$(cc_prompt_clipboard_command)"
+    else
+        echo "Clipboard support is unavailable on this host."
+    fi
 }

@@ -98,10 +98,11 @@ templates/prompts/
 
 It discovers prompt templates from metadata headers, reads interactive question
 definitions, substitutes `{{variables}}`, renders prompt bodies, and applies
-output formatting hooks. It does not add a user-facing `cc prompt` command yet.
-Future commands such as `cc prompt feature`, `cc prompt bugfix`, and
-`cc prompt architecture` should call the shared engine instead of duplicating
-template parsing or rendering logic.
+output formatting hooks. The first public command, `cc prompt feature`, is a
+thin interactive wrapper over `templates/prompts/feature.prompt`.
+Future commands such as `cc prompt bugfix` and `cc prompt architecture` should
+call the shared engine instead of duplicating template parsing or rendering
+logic.
 
 ### Documentation
 Generated documentation is stored under:
