@@ -2,8 +2,12 @@
 # Captain Cronos Shell Toolkit Prompt Template
 # ------------------------------------------------------------------------------
 # Template    : workflow
+# Title       : Workflow
+# Description : Render an operational workflow prompt.
+# Order       : 40
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Tags        : workflow, operations, process
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit

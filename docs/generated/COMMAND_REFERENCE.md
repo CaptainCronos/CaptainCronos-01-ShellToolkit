@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Sun Jul  5 04:40:39 EDT 2026
+Generated: Mon Jul  6 03:07:43 EDT 2026
 
 ## cc about
 
@@ -447,10 +447,13 @@ This command only inspects plugin directories. It does not enable, disable, or e
 
 ~~~text
 Usage:
-  cc prompt feature
+  cc prompt
+  cc prompt TEMPLATE
 
-Interactive Prompt Framework commands:
-  feature   Collect feature details and render templates/prompts/feature.prompt.
+Dynamic Prompt Engine:
+  Discovers templates from templates/prompts/.
+  Run without TEMPLATE to choose from the interactive template menu.
+  TEMPLATE may be a template id or template title.
 
 Navigation:
   previous  Go back one question.

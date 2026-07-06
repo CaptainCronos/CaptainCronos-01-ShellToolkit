@@ -136,6 +136,62 @@ cc_prompt_template_field() {
     cc_prompt_metadata_field "$file" "$field"
 }
 
+cc_prompt_required_metadata_fields() {
+    printf '%s\n' Title Description Category Tags
+}
+
+cc_prompt_template_title() {
+    cc_prompt_template_field "$1" "Title"
+}
+
+cc_prompt_template_description() {
+    cc_prompt_template_field "$1" "Description"
+}
+
+cc_prompt_template_tags() {
+    cc_prompt_template_field "$1" "Tags"
+}
+
+cc_prompt_template_menu_order() {
+    local id="$1" order
+    order="$(cc_prompt_template_field "$id" "Order")" || return $?
+    if [[ "$order" =~ ^[0-9]+$ ]]; then
+        echo "$order"
+    else
+        echo "9999"
+    fi
+}
+
+cc_prompt_template_menu_row() {
+    local id="$1" title description category tags
+
+    title="$(cc_prompt_template_title "$id")" || return $?
+    description="$(cc_prompt_template_description "$id")" || return $?
+    category="$(cc_prompt_template_field "$id" "Category")" || return $?
+    tags="$(cc_prompt_template_tags "$id")" || return $?
+
+    printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$title" "$description" "$category" "$tags"
+}
+
+cc_prompt_template_menu_catalog() {
+    local id order
+    {
+        while IFS= read -r id; do
+            [ -n "$id" ] || continue
+            order="$(cc_prompt_template_menu_order "$id")" || return $?
+            printf '%06d\t' "$order"
+            cc_prompt_template_menu_row "$id"
+        done < <(cc_prompt_template_ids)
+    } | sort -t $'\t' -k1,1n -k3,3 | awk -F '\t' '
+        {
+            for (i = 2; i <= NF; i++) {
+                printf "%s%s", (i > 2 ? FS : ""), $i
+            }
+            printf "\n"
+        }
+    '
+}
+
 cc_prompt_template_default_format() {
     local id="$1" format
     format="$(cc_prompt_template_field "$id" "Output")"
@@ -438,6 +494,22 @@ cc_prompt_questions_validate() {
     [ "$issues" -eq 0 ]
 }
 
+cc_prompt_required_metadata_validate() {
+    local id="$1" file field value issues=0
+
+    file="$(cc_prompt_template_path "$id")" || return $?
+    while IFS= read -r field; do
+        [ -n "$field" ] || continue
+        value="$(cc_prompt_metadata_field "$file" "$field")"
+        if [ -z "$value" ]; then
+            _cc_prompt_error "Missing required metadata in $id: $field"
+            issues=$((issues + 1))
+        fi
+    done < <(cc_prompt_required_metadata_fields)
+
+    [ "$issues" -eq 0 ]
+}
+
 cc_prompt_template_validate() {
     local id="$1" file template_id format variable body issues=0
 
@@ -449,6 +521,8 @@ cc_prompt_template_validate() {
         _cc_prompt_error "Invalid template id in $file: $template_id"
         issues=$((issues + 1))
     fi
+
+    cc_prompt_required_metadata_validate "$id" || issues=$((issues + 1))
 
     if ! cc_prompt_output_format_supported "$format"; then
         _cc_prompt_error "Invalid output format in $id: $format"

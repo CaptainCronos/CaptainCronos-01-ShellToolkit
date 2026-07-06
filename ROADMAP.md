@@ -188,7 +188,8 @@ Status: **Maintenance / Future**
 Completed in active development:
 
 - Internal Prompt Engine foundation for future `cc prompt` workflows.
-- First public Prompt Framework command: `cc prompt feature`.
+- Dynamic `cc prompt` menu backed by metadata-discovered prompt templates.
+- Prompt template metadata validation for menu title, description, category, and tags.
 
 Remaining polish candidates:
 
@@ -214,7 +215,7 @@ Begin adding larger user-facing infrastructure modules on top of the completed 1
 
 Candidate areas:
 
-- Additional prompt commands backed by the internal Prompt Engine.
+- Additional prompt templates backed by the dynamic Prompt Engine.
 - TrueNAS administration.
 - ZFS pool management.
 - NAS backup verification.

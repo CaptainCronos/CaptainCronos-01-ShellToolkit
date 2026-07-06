@@ -2,8 +2,12 @@
 # Captain Cronos Shell Toolkit Prompt Template
 # ------------------------------------------------------------------------------
 # Template    : architecture
+# Title       : Architecture Review
+# Description : Render an architecture design prompt.
+# Order       : 60
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Tags        : architecture, design, review
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit

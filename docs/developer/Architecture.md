@@ -127,16 +127,17 @@ definitions and rendered prompt text.
 The engine owns:
 
 - template discovery and metadata catalog output
+- prompt menu metadata validation
 - interactive question definitions
 - `{{variable}}` substitution
 - prompt rendering
 - output formatting hooks
 - clipboard capability helpers for command-layer copy support
 
-The public `cc prompt` namespace starts with `cc prompt feature`, implemented as
-a thin interactive wrapper over `templates/prompts/feature.prompt`. Future
-commands should follow that model and reuse this library instead of parsing or
-rendering templates themselves.
+The public `cc prompt` command opens a dynamic menu from discovered template
+metadata, then reuses this library for questions, rendering, and clipboard
+support. Adding a new `templates/prompts/*.prompt` file should not require
+shell code changes.
 
 ---
 

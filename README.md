@@ -93,6 +93,17 @@ cc repos publish --apply
 
 `cc repos push` skips dirty repositories and repositories without an `origin` remote, reports ahead/behind state, and pushes only branches that are ahead of their origin branch. `cc repos publish --apply` is stricter: it skips dirty repositories, skips non-`main` branches, and runs `git push origin main` for each remaining repository.
 
+Prompt commands include:
+
+```bash
+cc prompt
+```
+
+`cc prompt` opens the Prompt Engine menu, discovers `templates/prompts/*.prompt`
+templates dynamically, reads template metadata, collects answers interactively,
+previews the rendered prompt, copies it to the clipboard when a supported
+clipboard tool is available, and prints the generated prompt to stdout.
+
 Storage and asset commands include:
 
 ```bash
@@ -182,6 +193,7 @@ lib/cc-smart.sh
 lib/cc-storage.sh
 lib/cc-assets.sh
 lib/cc-report.sh
+lib/cc-prompt-engine.sh
 ```
 
 Commands should use shared helpers instead of duplicating behavior. In particular, command output should use:

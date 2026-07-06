@@ -2,8 +2,12 @@
 # Captain Cronos Shell Toolkit Prompt Template
 # ------------------------------------------------------------------------------
 # Template    : feature
+# Title       : Feature
+# Description : Render a feature implementation prompt.
+# Order       : 10
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Tags        : feature, implementation, planning
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit

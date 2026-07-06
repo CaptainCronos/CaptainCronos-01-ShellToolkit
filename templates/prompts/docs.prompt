@@ -2,8 +2,12 @@
 # Captain Cronos Shell Toolkit Prompt Template
 # ------------------------------------------------------------------------------
 # Template    : docs
+# Title       : Documentation
+# Description : Render a documentation update prompt.
+# Order       : 30
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Tags        : documentation, docs, writing
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit

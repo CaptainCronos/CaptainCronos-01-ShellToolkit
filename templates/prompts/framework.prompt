@@ -2,8 +2,12 @@
 # Captain Cronos Shell Toolkit Prompt Template
 # ------------------------------------------------------------------------------
 # Template    : framework
+# Title       : Framework
+# Description : Render a framework evolution prompt.
+# Order       : 50
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Tags        : framework, standards, infrastructure
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit
