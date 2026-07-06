@@ -36,6 +36,62 @@ bf() {
     done
 }
 
+# @name kedit
+# @group Editors
+# @desc Open Nano in a new Kitty terminal window.
+# @usage kedit <file> [file...]
+# @example kedit ~/.bashrc
+kedit() {
+    if [ "$#" -eq 0 ]; then
+        echo "Usage: kedit <file> [file...]"
+        return 1
+    fi
+
+    if ! command -v kitty >/dev/null 2>&1; then
+        echo "ERROR: kitty is not installed or not in PATH."
+        return 1
+    fi
+
+    kitty --detach nano "$@"
+}
+
+# @name suedit
+# @group Editors
+# @desc Edit a file as root in a new Kitty terminal window.
+# @usage suedit <file>
+# @example suedit /etc/fstab
+suedit() {
+    if [ "$#" -eq 0 ]; then
+        echo "Usage: suedit <file>"
+        return 1
+    fi
+
+    if ! command -v kitty >/dev/null 2>&1; then
+        echo "ERROR: kitty is not installed or not in PATH."
+        return 1
+    fi
+
+    kitty --detach bash -lc 'sudo nano "$@"' bash "$@"
+}
+
+# =============================
+# TERMINAL HELPERS
+# =============================
+
+# @name sukitty
+# @group Terminal
+# @desc Open a new Kitty terminal running an interactive root login shell.
+# @usage sukitty
+# @example sukitty
+sukitty() {
+    if ! command -v kitty >/dev/null 2>&1; then
+        echo "ERROR: kitty is not installed or not in PATH."
+        return 1
+    fi
+
+    kitty --detach bash -lc 'sudo -i'
+}
+
 # =============================
 # SYSTEM INFO
 # =============================
