@@ -7,7 +7,11 @@
 # Order       : 50
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Author      : Captain Cronos Project
 # Tags        : framework, standards, infrastructure
+# Validation  : question-rules
+# Default     : question defaults
+# Examples    : framework_area, current_state, target_state
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -15,11 +19,11 @@
 # ==============================================================================
 
 [questions]
-framework_area|text|yes|Framework area||Command framework, installer, metadata, storage, reports, or another core area.
-current_state|textarea|yes|Current state||Existing behavior and files involved.
-target_state|textarea|yes|Target state||Desired framework capability or rule.
-interfaces|textarea|yes|Interfaces||Shared functions, commands, metadata, or files that must remain stable.
-validation|textarea|yes|Validation||Commands or checks that must pass.
+framework_area|text|yes|Framework area||Command framework, installer, metadata, storage, reports, or another core area.||Prompt Engine
+current_state|textarea|yes|Current state||Existing behavior and files involved.||Question collection lives in a command wrapper.
+target_state|textarea|yes|Target state||Desired framework capability or rule.||Session state and validation live in the shared engine.
+interfaces|textarea|yes|Interfaces||Shared functions, commands, metadata, or files that must remain stable.||cc_prompt_render remains compatible.
+validation|textarea|yes|Validation||Commands or checks that must pass.||cc selftest
 
 [template]
 # Framework Prompt

@@ -129,6 +129,8 @@ The engine owns:
 - template discovery and metadata catalog output
 - prompt menu metadata validation
 - interactive question definitions
+- reusable session state for the selected template, current question, answers, and cancellation
+- shared answer validation for required/optional fields, regexes, choices, ranges, paths, and custom hooks
 - `{{variable}}` substitution
 - prompt rendering
 - output formatting hooks
@@ -136,8 +138,9 @@ The engine owns:
 
 The public `cc prompt` command opens a dynamic menu from discovered template
 metadata, then reuses this library for questions, rendering, and clipboard
-support. Adding a new `templates/prompts/*.prompt` file should not require
-shell code changes.
+support. It presents numbered menus, breadcrumbs, progress, contextual help,
+and graceful Ctrl+C handling. Adding a new `templates/prompts/*.prompt` file
+should not require shell code changes.
 
 ---
 

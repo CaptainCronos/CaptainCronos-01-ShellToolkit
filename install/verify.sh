@@ -51,6 +51,7 @@ bash -n bash/bashrc
 bash -n bash/bash_aliases
 bash -n bash/bash_functions
 bash -n install/install.sh
+bash -n tools/commands/prompt
 
 source "$TOOLKIT_ROOT/lib/cc-prompt-engine.sh"
 cc_prompt_validate_templates

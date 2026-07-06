@@ -100,9 +100,10 @@ cc prompt
 ```
 
 `cc prompt` opens the Prompt Engine menu, discovers `templates/prompts/*.prompt`
-templates dynamically, reads template metadata, collects answers interactively,
-previews the rendered prompt, copies it to the clipboard when a supported
-clipboard tool is available, and prints the generated prompt to stdout.
+templates dynamically, reads template metadata, tracks session state while users
+navigate with Previous/Back/Next/Cancel, validates answers, previews the
+rendered prompt, copies it to the clipboard when a supported clipboard tool is
+available, and prints the generated prompt to stdout.
 
 Storage and asset commands include:
 

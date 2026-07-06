@@ -97,11 +97,12 @@ templates/prompts/
 ```
 
 It discovers prompt templates from metadata headers, reads interactive question
-definitions, substitutes `{{variables}}`, renders prompt bodies, and applies
-output formatting hooks. The public `cc prompt` command builds its menu from
-discovered template metadata and then calls the shared engine for questions,
-rendering, and clipboard support. Adding a new `*.prompt` file makes that
-template available without command-shell changes.
+definitions, tracks reusable session state, validates answers, substitutes
+`{{variables}}`, renders prompt bodies, and applies output formatting hooks.
+The public `cc prompt` command builds its menu from discovered template metadata
+and then calls the shared engine for session navigation, validation, rendering,
+and clipboard support. Adding a new `*.prompt` file makes that template
+available without command-shell changes.
 
 ### Documentation
 Generated documentation is stored under:

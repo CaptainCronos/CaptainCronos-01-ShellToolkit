@@ -7,7 +7,11 @@
 # Order       : 60
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Author      : Captain Cronos Project
 # Tags        : architecture, design, review
+# Validation  : question-rules
+# Default     : question defaults
+# Examples    : architecture_topic, design_goal, integration_points
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -15,11 +19,11 @@
 # ==============================================================================
 
 [questions]
-architecture_topic|text|yes|Architecture topic||Capability, subsystem, or integration being designed.
-current_constraints|textarea|yes|Current constraints||Existing standards, paths, or compatibility rules.
-design_goal|textarea|yes|Design goal||What the architecture needs to enable.
-integration_points|textarea|yes|Integration points||Libraries, commands, metadata, docs, or templates involved.
-validation|textarea|yes|Validation||Review and verification expectations.
+architecture_topic|text|yes|Architecture topic||Capability, subsystem, or integration being designed.||Prompt Engine session lifecycle
+current_constraints|textarea|yes|Current constraints||Existing standards, paths, or compatibility rules.||No new namespace should be added.
+design_goal|textarea|yes|Design goal||What the architecture needs to enable.||Reusable interactive prompt flow for future commands.
+integration_points|textarea|yes|Integration points||Libraries, commands, metadata, docs, or templates involved.||lib/cc-prompt-engine.sh and tools/commands/prompt
+validation|textarea|yes|Validation||Review and verification expectations.||cc selftest
 
 [template]
 # Architecture Prompt

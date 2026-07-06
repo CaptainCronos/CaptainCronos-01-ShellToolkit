@@ -7,7 +7,11 @@
 # Order       : 30
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Author      : Captain Cronos Project
 # Tags        : documentation, docs, writing
+# Validation  : question-rules
+# Default     : question defaults
+# Examples    : document_scope, audience, required_updates
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -15,11 +19,11 @@
 # ==============================================================================
 
 [questions]
-document_scope|text|yes|Documentation scope||Document, section, command, or workflow being updated.
-audience|text|yes|Audience||User, administrator, developer, or release maintainer.
-source_context|textarea|yes|Source context||Implementation or behavior the docs must reflect.
-required_updates|textarea|yes|Required updates||Specific files or topics to change.
-validation|textarea|yes|Validation||Documentation lint or review checks.
+document_scope|text|yes|Documentation scope||Document, section, command, or workflow being updated.||Prompt Engine authoring guide
+audience|text|yes|Audience||User, administrator, developer, or release maintainer.|enum=User,administrator,developer,release maintainer|developer
+source_context|textarea|yes|Source context||Implementation or behavior the docs must reflect.||Session state moved into the prompt engine.
+required_updates|textarea|yes|Required updates||Specific files or topics to change.||Metadata reference and validation examples.
+validation|textarea|yes|Validation||Documentation lint or review checks.||cc docs lint
 
 [template]
 # Documentation Prompt

@@ -7,7 +7,11 @@
 # Order       : 20
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Author      : Captain Cronos Project
 # Tags        : bugfix, defect, regression
+# Validation  : question-rules
+# Default     : question defaults
+# Examples    : bug_summary, observed_behavior, expected_behavior
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -15,11 +19,11 @@
 # ==============================================================================
 
 [questions]
-bug_summary|text|yes|Bug summary||Short description of the defect.
-observed_behavior|textarea|yes|Observed behavior||What currently happens.
-expected_behavior|textarea|yes|Expected behavior||What should happen instead.
-suspected_area|textarea|no|Suspected area||Relevant files, commands, or recent changes.
-validation|textarea|yes|Validation||Regression checks that must pass.
+bug_summary|text|yes|Bug summary||Short description of the defect.||Prompt validation rejects valid answers.
+observed_behavior|textarea|yes|Observed behavior||What currently happens.||A required answer is not preserved after Back.
+expected_behavior|textarea|yes|Expected behavior||What should happen instead.||Navigation preserves existing answers.
+suspected_area|textarea|no|Suspected area||Relevant files, commands, or recent changes.||tools/commands/prompt
+validation|textarea|yes|Validation||Regression checks that must pass.||cc verify
 
 [template]
 # Bugfix Prompt

@@ -1,28 +1,33 @@
 # Prompt Engine
 
-The Prompt Engine is shared infrastructure for `cc prompt`. The public command
-opens a dynamic menu from discovered prompt templates.
+The Prompt Engine is shared infrastructure for `cc prompt` and future
+interactive command flows. The public command discovers templates and handles
+terminal input, while `lib/cc-prompt-engine.sh` owns template discovery,
+metadata parsing, session state, answer validation, rendering, and output hooks.
 
-## Goals
-
-- Keep prompt templates reusable and metadata-driven.
-- Keep `cc prompt` thin and driven by discovered template metadata.
-- Store static prompt definitions under the existing `templates/` tree.
-- Use the context layer for repository paths instead of hard-coded checkout locations.
-- Keep clipboard behavior capability-based so commands can copy when a supported host tool exists.
-- Add new prompt workflows by adding a `*.prompt` file, not shell command code.
-
-## Files
+## Architecture
 
 ```text
+tools/commands/prompt
+  |
+  v
 lib/cc-prompt-engine.sh
+  |-- template discovery
+  |-- metadata catalog
+  |-- question definitions
+  |-- session state
+  |-- validation rules
+  |-- render hooks
+  |-- clipboard helpers
+  v
 templates/prompts/*.prompt
 ```
 
-The library resolves the active toolkit checkout through `lib/cc-context.sh` and
-discovers templates from `templates/prompts/`.
+The engine resolves the active toolkit checkout through `lib/cc-context.sh` and
+discovers templates from `templates/prompts/`. Adding a prompt workflow should
+normally require only a new `*.prompt` file.
 
-## Template Format
+## Template Authoring Guide
 
 Prompt templates are line-oriented files with metadata headers and sections:
 
@@ -33,86 +38,146 @@ Prompt templates are line-oriented files with metadata headers and sections:
 # Order       : 10
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Author      : Captain Cronos Project
 # Tags        : feature, implementation, planning
+# Validation  : question-rules
+# Default     : question defaults
+# Examples    : feature_name, repository_context, objective
 # Output      : markdown
 # Clipboard   : planned
-# Purpose     : Render a feature implementation prompt.
 
 [questions]
-feature_name|text|yes|Feature name||Short name for the feature.
+name|type|required|prompt|default|help|validation|examples
+
+[validation]
+name|rule|argument|message
 
 [template]
 # Feature
-{{feature_name}}
+{{name}}
 ```
 
-Question rows use:
+Question rows support `text`, `textarea`, `select`, and `confirm`. The required
+field is `yes` or `no`. The `validation` and `examples` columns are optional,
+so existing six-column rows remain valid.
+
+## Metadata Reference
+
+Required metadata:
+
+- `Title`: human-readable menu label.
+- `Description`: short menu/help description.
+- `Version`: template contract version.
+- `Category`: menu grouping.
+- `Author`: template owner.
+- `Tags`: comma-separated search and menu tags.
+
+Optional metadata:
+
+- `Template` or `Id`: stable template id; defaults to the filename stem.
+- `Order`: numeric menu sort order.
+- `Validation`: template-level validation mode or note.
+- `Default`: template-level default policy or note.
+- `Examples`: template-level example summary.
+- `Output` or `Format`: default output format.
+- `Clipboard`: clipboard behavior note.
+- `Purpose`: internal inventory description.
+
+Metadata keys are matched case-insensitively.
+
+## Session Lifecycle
+
+Interactive flows start a session with:
+
+```bash
+cc_prompt_session_start TEMPLATE_ID
+```
+
+The session tracks the current template, current question index, cancellation
+state, question definitions, defaults, validation specs, examples, and entered
+answers. Answers are stored in session arrays and are preserved while moving
+with `cc_prompt_session_next`, `cc_prompt_session_previous`, or
+`cc_prompt_session_back`. `cc_prompt_session_cancel` marks the flow cancelled.
+
+Rendering a completed session uses:
+
+```bash
+cc_prompt_session_render
+cc_prompt_session_render_formatted markdown
+```
+
+The public `cc prompt` command wraps this lifecycle with numbered menus,
+breadcrumbs, progress indicators, contextual help, and graceful Ctrl+C handling.
+
+## Validation Framework
+
+Required and optional checks come from the question row. Additional checks may
+be declared inline in the `validation` column with semicolon-separated rules:
 
 ```text
-name|type|required|prompt|default|help
+name|text|yes|Name|||regex=^[A-Za-z0-9 ._-]+$|Prompt Engine
+audience|select|yes|Audience|||enum=user,developer,admin|developer
+retries|text|no|Retries|3||range=0..10|3
+path|text|yes|Config path|||path=file|./config.yml
 ```
 
-Supported question types:
+The `[validation]` section can attach a message to a rule:
 
-- `text`
-- `textarea`
-- `select`
-- `confirm`
+```text
+[validation]
+name|regex|^[A-Za-z0-9 ._-]+$|Use letters, numbers, spaces, dots, dashes, or underscores.
+mode|enum|plan,apply,dry-run|Choose plan, apply, or dry-run.
+count|range|1..25|Choose a number from 1 through 25.
+config|path|file|Provide an existing file path.
+hook|validator|my_validator|Custom validator rejected the answer.
+```
 
-Required menu metadata:
+Supported validation rules:
 
-- `Title`
-- `Description`
-- `Category`
-- `Tags`
+- `required` and `optional`
+- `regex`
+- `enum` or `choices`
+- `range`, `numeric`, or `number`
+- `path`, `exists`, `file`, or `dir`
+- `validator` or `custom`
 
-`cc prompt` reads these fields for every discovered template. Template
-validation fails when any required menu metadata is missing.
+Custom validators are shell functions available at validation time. The hook is
+called as:
 
-`Order` is optional numeric metadata. Templates with lower order values appear
-earlier in the menu; templates without an order are still discovered and sorted
-after ordered templates.
+```bash
+validator_function TEMPLATE_ID QUESTION_NAME ANSWER
+```
 
-Supported output formats:
+It must return zero for a valid answer and nonzero for an invalid answer.
 
-- `markdown`
-- `raw`
-- `terminal`
+## Rendering Hooks
 
-`Clipboard: planned` is template metadata. Public commands may call the engine's
-clipboard helpers to copy rendered output when a supported host clipboard tool
-exists.
+`cc_prompt_format_output FORMAT TEMPLATE_ID` routes rendered content through a
+named output hook. Supported formats are:
 
-## Library API
+- `markdown`: pass-through Markdown output.
+- `raw`: pass-through raw output.
+- `terminal`: terminal header plus rendered content.
+- `clipboard`: copy rendered content to a supported clipboard tool.
+- `json`: JSON-shaped output reserved for future automation.
 
-Important functions:
-
-- `cc_prompt_template_ids` lists discovered template IDs.
-- `cc_prompt_template_metadata ID` prints template metadata as TSV.
-- `cc_prompt_template_menu_catalog` prints menu metadata as TSV.
-- `cc_prompt_question_rows ID` prints interactive question definitions as TSV.
-- `cc_prompt_template_variables ID` lists `{{variables}}` required by the template body.
-- `cc_prompt_render ID name=value ...` renders a prompt after validating required variables.
-- `cc_prompt_render_formatted ID FORMAT name=value ...` renders and formats output.
-- `cc_prompt_validate_templates` validates all discovered templates.
-- `cc_prompt_clipboard_available` checks for supported clipboard tools.
-- `cc_prompt_copy_to_clipboard` copies stdin to the detected clipboard tool.
-
-Command modules should collect answers from `cc_prompt_question_rows`, pass them
-to `cc_prompt_render`, and leave template loading and substitution to the shared
-engine.
+Clipboard helpers remain capability-based and detect `wl-copy`, `xclip`,
+`xsel`, `pbcopy`, or `clip.exe`.
 
 ## Public Command
 
-`cc prompt` discovers templates from `templates/prompts/*.prompt`, reads required
-menu metadata, and presents a numbered interactive menu. Users may select a
-template by number or by template title/id, or quit before selecting.
+`cc prompt` discovers templates, shows a numbered menu, and accepts selection by
+number, id, or exact title. `cc prompt TEMPLATE` skips the menu and starts the
+selected template directly.
 
-After selection, the command reads question rows through
-`cc_prompt_question_rows`, prompts for values one at a time, previews the
-rendered prompt, and then renders the final prompt through `cc_prompt_render`.
-`cc prompt TEMPLATE` is also supported for direct dynamic selection by template
-id or title; it does not use a dedicated template-specific shell path.
+During question entry, users may enter:
+
+- `previous` or `back`
+- `next`
+- `help`
+- `cancel`
+
+After preview, the numbered actions are Generate, Edit, and Cancel.
 
 ## Validation
 

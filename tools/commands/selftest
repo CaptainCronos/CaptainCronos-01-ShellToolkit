@@ -115,13 +115,26 @@ check_library() {
 }
 
 check_prompt_engine() {
-    local rendered
+    local rendered formatted
 
     # shellcheck disable=SC1091
     source "$PROJECT_ROOT/lib/cc-prompt-engine.sh"
 
     cc_prompt_engine_loaded || return 1
     cc_prompt_validate_templates || return 1
+    cc_prompt_validate_answer feature feature_name "Prompt Engine Smoke" || return 1
+    if cc_prompt_validate_answer feature feature_name "@invalid" >/dev/null 2>&1; then
+        return 1
+    fi
+
+    cc_prompt_session_start feature || return 1
+    [ "$(cc_prompt_session_question_count)" -eq 5 ] || return 1
+    cc_prompt_session_answer_set 0 "Prompt Engine Smoke" || return 1
+    cc_prompt_session_validate_answer 0 || return 1
+    cc_prompt_session_next || return 1
+    cc_prompt_session_back || return 1
+    [ "$(cc_prompt_session_current_question)" -eq 0 ] || return 1
+    [ "$(cc_prompt_session_answer_get 0)" = "Prompt Engine Smoke" ] || return 1
 
     rendered="$(
         cc_prompt_render feature \
@@ -133,7 +146,17 @@ check_prompt_engine() {
     )"
 
     printf '%s\n' "$rendered" | grep -q "Feature Implementation Prompt" || return 1
-    printf '%s\n' "$rendered" | grep -q "Prompt Engine Smoke"
+    printf '%s\n' "$rendered" | grep -q "Prompt Engine Smoke" || return 1
+
+    formatted="$(
+        cc_prompt_render_formatted feature json \
+            "feature_name=Prompt Engine Smoke" \
+            "repository_context=Captain Cronos Shell Toolkit" \
+            "objective=Render a metadata-discovered prompt template." \
+            "constraints=Internal engine only." \
+            "validation=cc selftest"
+    )"
+    printf '%s\n' "$formatted" | grep -q '"template":"feature"'
 }
 
 if [ "$JSON" -eq 0 ]; then

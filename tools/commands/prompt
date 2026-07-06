@@ -33,13 +33,14 @@ declare -a TEMPLATE_TITLES=()
 declare -a TEMPLATE_DESCRIPTIONS=()
 declare -a TEMPLATE_CATEGORIES=()
 declare -a TEMPLATE_TAGS=()
-declare -a QUESTION_NAMES=()
-declare -a QUESTION_TYPES=()
-declare -a QUESTION_REQUIRED=()
-declare -a QUESTION_PROMPTS=()
-declare -a QUESTION_DEFAULTS=()
-declare -a QUESTION_HELP=()
-declare -a ANSWERS=()
+
+handle_interrupt() {
+    echo >&2
+    cc_warn "Prompt session cancelled."
+    exit 130
+}
+
+trap handle_interrupt INT
 
 usage() {
     cat <<'EOF_HELP'
@@ -53,15 +54,16 @@ Dynamic Prompt Engine:
   TEMPLATE may be a template id or template title.
 
 Navigation:
-  previous  Go back one question.
+  previous  Move to the previous question.
+  back      Move to the previous question.
   next      Keep the current answer and continue.
-  edit      Clear and re-enter the current answer.
+  help      Show help for the current menu or question.
   cancel    Exit without rendering.
 
 After preview:
-  [Y]es     Generate, copy when supported, and print the rendered prompt.
-  [E]dit    Edit a collected answer and preview again.
-  [C]ancel  Exit without generating.
+  1 Generate  Copy when supported and print the rendered prompt.
+  2 Edit      Edit a collected answer and preview again.
+  3 Cancel    Exit without generating.
 EOF_HELP
 }
 
@@ -108,14 +110,32 @@ print_template_menu() {
     echo >&2
     echo "Captain Cronos Prompt Engine" >&2
     echo "============================" >&2
+    echo "Breadcrumbs: Prompt Engine > Templates" >&2
     echo >&2
     echo "Available Templates" >&2
     echo >&2
     for index in "${!TEMPLATE_IDS[@]}"; do
-        printf '%s) %s\n' "$((index + 1))" "${TEMPLATE_TITLES[$index]}" >&2
+        printf '%2s. %s\n' "$((index + 1))" "${TEMPLATE_TITLES[$index]}" >&2
     done
     echo >&2
-    printf 'Selection: ' >&2
+    printf 'Selection [number/id/title/help/cancel]: ' >&2
+}
+
+print_template_menu_help() {
+    local index
+
+    echo >&2
+    echo "Template Help" >&2
+    echo "=============" >&2
+    for index in "${!TEMPLATE_IDS[@]}"; do
+        printf '%2s. %s\n' "$((index + 1))" "${TEMPLATE_TITLES[$index]}" >&2
+        printf '    ID: %s\n' "${TEMPLATE_IDS[$index]}" >&2
+        printf '    Category: %s\n' "${TEMPLATE_CATEGORIES[$index]}" >&2
+        printf '    Tags: %s\n' "${TEMPLATE_TAGS[$index]}" >&2
+        printf '    %s\n' "${TEMPLATE_DESCRIPTIONS[$index]}" >&2
+    done
+    echo >&2
+    echo "Choose by number, template id, or exact title. Use cancel to exit." >&2
 }
 
 template_index_for_selection() {
@@ -154,6 +174,10 @@ select_template_from_menu() {
         fi
 
         case "$(lower_word "$input")" in
+            help|h|\?)
+                print_template_menu_help
+                continue
+                ;;
             cancel|q|quit|exit)
                 echo ""
                 return 0
@@ -181,75 +205,35 @@ resolve_template_argument() {
     return 1
 }
 
-row_field() {
-    local row="$1" field="$2"
-    printf '%s\n' "$row" | awk -F '\t' -v field="$field" '{print $field}'
-}
-
-load_questions() {
-    local id="$1" row name type required prompt default help
-
-    TEMPLATE_ID="$id"
-    QUESTION_NAMES=()
-    QUESTION_TYPES=()
-    QUESTION_REQUIRED=()
-    QUESTION_PROMPTS=()
-    QUESTION_DEFAULTS=()
-    QUESTION_HELP=()
-    ANSWERS=()
-
-    cc_prompt_template_path "$TEMPLATE_ID" >/dev/null
-
-    while IFS= read -r row; do
-        name="$(row_field "$row" 1)"
-        type="$(row_field "$row" 2)"
-        required="$(row_field "$row" 3)"
-        prompt="$(row_field "$row" 4)"
-        default="$(row_field "$row" 5)"
-        help="$(row_field "$row" 6)"
-
-        [ -n "$name" ] || continue
-        QUESTION_NAMES+=("$name")
-        QUESTION_TYPES+=("$type")
-        QUESTION_REQUIRED+=("$required")
-        QUESTION_PROMPTS+=("$prompt")
-        QUESTION_DEFAULTS+=("$default")
-        QUESTION_HELP+=("$help")
-        ANSWERS+=("$default")
-    done < <(cc_prompt_question_rows "$TEMPLATE_ID")
-
-    if [ "${#QUESTION_NAMES[@]}" -eq 0 ]; then
-        cc_error "No questions defined for prompt template: $TEMPLATE_ID"
-        return 1
-    fi
-}
-
 answer_valid() {
-    local index="$1" value="${ANSWERS[$index]-}"
-
-    if [ "${QUESTION_REQUIRED[$index]}" = "yes" ] && [ -z "$value" ]; then
-        return 1
-    fi
-
-    return 0
+    cc_prompt_session_validate_answer "$1"
 }
 
 print_question() {
-    local index="$1" total="${#QUESTION_NAMES[@]}"
+    local index="$1" total title prompt required answer default
+
+    total="$(cc_prompt_session_question_count)"
+    title="$(cc_prompt_session_template_title)"
+    prompt="$(cc_prompt_session_question_field "$index" prompt)"
+    required="$(cc_prompt_session_question_field "$index" required)"
+    answer="$(cc_prompt_session_question_field "$index" answer)"
+    default="$(cc_prompt_session_question_field "$index" default)"
 
     echo >&2
-    printf 'Question %s of %s\n' "$((index + 1))" "$total" >&2
+    echo "Captain Cronos Prompt Engine" >&2
+    echo "============================" >&2
+    printf 'Template: %s (%s)\n' "$title" "$(cc_prompt_session_template)" >&2
+    printf 'Breadcrumbs: Prompt Engine > %s > Question %s\n' "$title" "$((index + 1))" >&2
+    printf 'Progress: %s/%s\n' "$((index + 1))" "$total" >&2
     printf '%s\n' "----------------" >&2
-    printf '%s (%s)\n' "${QUESTION_PROMPTS[$index]}" "$(required_label "${QUESTION_REQUIRED[$index]}")" >&2
-    if [ -n "${QUESTION_HELP[$index]}" ]; then
-        printf '%s\n' "${QUESTION_HELP[$index]}" >&2
+    printf '%s (%s)\n' "$prompt" "$(required_label "$required")" >&2
+    cc_prompt_session_help_text "$index" >&2
+    if [ -n "$answer" ]; then
+        printf 'Current: %s\n' "$answer" >&2
+    elif [ -n "$default" ]; then
+        printf 'Default: %s\n' "$default" >&2
     fi
-    if [ -n "${ANSWERS[$index]-}" ]; then
-        printf 'Current: %s\n' "${ANSWERS[$index]}" >&2
-    elif [ -n "${QUESTION_DEFAULTS[$index]}" ]; then
-        printf 'Default: %s\n' "${QUESTION_DEFAULTS[$index]}" >&2
-    fi
-    printf 'Command or answer [previous/next/edit/cancel]: ' >&2
+    printf 'Answer or command [previous/back/next/help/cancel]: ' >&2
 }
 
 read_answer() {
@@ -272,8 +256,8 @@ read_answer() {
             echo "__COMMAND__:next"
             return 0
             ;;
-        edit)
-            echo "__COMMAND__:edit"
+        help|h|\?)
+            echo "__COMMAND__:help"
             return 0
             ;;
         cancel|quit|exit)
@@ -286,49 +270,56 @@ read_answer() {
 }
 
 run_question_flow() {
-    local index="${1:-0}" result command
+    local result command
 
-    while [ "$index" -lt "${#QUESTION_NAMES[@]}" ]; do
+    cc_prompt_session_set_question "${1:-0}" || return $?
+
+    while ! cc_prompt_session_complete; do
+        local index
+        index="$(cc_prompt_session_current_question)"
         result="$(read_answer "$index")" || return $?
 
         if [[ "$result" == __COMMAND__:* ]]; then
             command="${result#__COMMAND__:}"
             case "$command" in
                 previous)
-                    if [ "$index" -gt 0 ]; then
-                        index=$((index - 1))
-                    else
+                    if ! cc_prompt_session_back; then
                         cc_warn "Already at the first question."
                     fi
                     ;;
                 next)
                     if answer_valid "$index"; then
-                        index=$((index + 1))
+                        cc_prompt_session_next
                     else
-                        cc_warn "A value is required for ${QUESTION_PROMPTS[$index]}."
+                        cc_warn "Answer failed validation."
                     fi
                     ;;
-                edit)
-                    ANSWERS[$index]=""
+                help)
+                    echo >&2
+                    cc_prompt_session_help_text "$index" >&2
                     ;;
                 cancel)
+                    cc_prompt_session_cancel
                     return 130
                     ;;
             esac
             continue
         fi
 
-        ANSWERS[$index]="$result"
+        cc_prompt_session_answer_set "$index" "$result"
         if answer_valid "$index"; then
-            index=$((index + 1))
+            cc_prompt_session_next
         else
-            cc_warn "A value is required for ${QUESTION_PROMPTS[$index]}."
+            cc_warn "Answer failed validation."
         fi
     done
 }
 
 edit_single_answer() {
-    local index="$1" result command
+    local index="$1" result command original_index
+
+    original_index="$(cc_prompt_session_current_question)"
+    cc_prompt_session_set_question "$index" || return $?
 
     while true; do
         result="$(read_answer "$index")" || return $?
@@ -338,45 +329,34 @@ edit_single_answer() {
             case "$command" in
                 previous|next)
                     if answer_valid "$index"; then
+                        cc_prompt_session_set_question "$original_index"
                         return 0
                     fi
-                    cc_warn "A value is required for ${QUESTION_PROMPTS[$index]}."
+                    cc_warn "Answer failed validation."
                     ;;
-                edit)
-                    ANSWERS[$index]=""
+                help)
+                    echo >&2
+                    cc_prompt_session_help_text "$index" >&2
                     ;;
                 cancel)
+                    cc_prompt_session_cancel
                     return 130
                     ;;
             esac
             continue
         fi
 
-        ANSWERS[$index]="$result"
+        cc_prompt_session_answer_set "$index" "$result"
         if answer_valid "$index"; then
+            cc_prompt_session_set_question "$original_index"
             return 0
         fi
-        cc_warn "A value is required for ${QUESTION_PROMPTS[$index]}."
-    done
-}
-
-assignments() {
-    local index
-
-    for index in "${!QUESTION_NAMES[@]}"; do
-        printf '%s=%s\n' "${QUESTION_NAMES[$index]}" "${ANSWERS[$index]-}"
+        cc_warn "Answer failed validation."
     done
 }
 
 render_prompt() {
-    local rendered
-    local -a vars=()
-
-    while IFS= read -r rendered; do
-        vars+=("$rendered")
-    done < <(assignments)
-
-    cc_prompt_render "$TEMPLATE_ID" "${vars[@]}"
+    cc_prompt_session_render
 }
 
 print_preview() {
@@ -385,20 +365,27 @@ print_preview() {
     echo
     echo "Prompt Preview"
     echo "=============="
+    printf 'Template: %s (%s)\n' "$(cc_prompt_session_template_title)" "$(cc_prompt_session_template)"
+    echo "Breadcrumbs: Prompt Engine > $(cc_prompt_session_template_title) > Preview"
     echo
     printf '%s\n' "$rendered"
 }
 
 choose_edit_question() {
-    local input index total="${#QUESTION_NAMES[@]}"
+    local input index total prompt name
+    total="$(cc_prompt_session_question_count)"
 
     echo >&2
     echo "Edit Answer" >&2
     echo "===========" >&2
-    for index in "${!QUESTION_NAMES[@]}"; do
-        printf '%s. %s\n' "$((index + 1))" "${QUESTION_PROMPTS[$index]}" >&2
+    printf 'Template: %s (%s)\n' "$(cc_prompt_session_template_title)" "$(cc_prompt_session_template)" >&2
+    echo "Breadcrumbs: Prompt Engine > $(cc_prompt_session_template_title) > Edit" >&2
+    for ((index = 0; index < total; index++)); do
+        prompt="$(cc_prompt_session_question_field "$index" prompt)"
+        name="$(cc_prompt_session_question_field "$index" name)"
+        printf '%2s. %s [%s]\n' "$((index + 1))" "$prompt" "$name" >&2
     done
-    printf 'Field number, variable name, or cancel: ' >&2
+    printf 'Field number, variable name, help, or cancel: ' >&2
 
     if ! IFS= read -r input; then
         echo >&2
@@ -406,6 +393,12 @@ choose_edit_question() {
     fi
 
     case "$(lower_word "$input")" in
+        help|h|\?)
+            echo >&2
+            echo "Choose the field number or variable name to edit. Existing answers are preserved until replaced." >&2
+            choose_edit_question
+            return $?
+            ;;
         cancel|quit|exit|"") return 130 ;;
     esac
 
@@ -414,8 +407,9 @@ choose_edit_question() {
         return 0
     fi
 
-    for index in "${!QUESTION_NAMES[@]}"; do
-        if [ "$input" = "${QUESTION_NAMES[$index]}" ]; then
+    for ((index = 0; index < total; index++)); do
+        name="$(cc_prompt_session_question_field "$index" name)"
+        if [ "$input" = "$name" ]; then
             echo "$index"
             return 0
         fi
@@ -429,11 +423,14 @@ generate_choice() {
     local input
 
     echo >&2
-    echo "Generate?" >&2
-    echo "[Y]es" >&2
-    echo "[E]dit" >&2
-    echo "[C]ancel" >&2
-    printf 'Selection: ' >&2
+    echo "Generate" >&2
+    echo "========" >&2
+    printf 'Template: %s (%s)\n' "$(cc_prompt_session_template_title)" "$(cc_prompt_session_template)" >&2
+    echo "Breadcrumbs: Prompt Engine > $(cc_prompt_session_template_title) > Preview" >&2
+    echo "1. Generate" >&2
+    echo "2. Edit" >&2
+    echo "3. Cancel" >&2
+    printf 'Selection [1-3/help]: ' >&2
 
     if ! IFS= read -r input; then
         echo >&2
@@ -441,11 +438,16 @@ generate_choice() {
     fi
 
     case "$(lower_word "$input")" in
-        y|yes|"") echo "yes" ;;
-        e|edit) echo "edit" ;;
-        c|cancel|quit|exit) echo "cancel" ;;
+        1|g|generate|y|yes|"") echo "yes" ;;
+        2|e|edit) echo "edit" ;;
+        3|c|cancel|quit|exit) echo "cancel" ;;
+        help|h|\?)
+            echo >&2
+            echo "Generate copies the rendered prompt when a clipboard tool exists, then prints it. Edit returns to one saved answer." >&2
+            generate_choice
+            ;;
         *)
-            cc_warn "Choose Yes, Edit, or Cancel."
+            cc_warn "Choose 1, 2, or 3."
             generate_choice
             ;;
     esac
@@ -469,7 +471,8 @@ run_prompt_template() {
     local template_id="$1"
     local rendered choice edit_index
 
-    load_questions "$template_id"
+    TEMPLATE_ID="$template_id"
+    cc_prompt_session_start "$template_id"
     run_question_flow 0 || return $?
 
     while true; do

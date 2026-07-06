@@ -7,7 +7,11 @@
 # Order       : 10
 # Version     : 1.0.0-alpha1
 # Category    : Prompt
+# Author      : Captain Cronos Project
 # Tags        : feature, implementation, planning
+# Validation  : question-rules
+# Default     : question defaults
+# Examples    : feature_name, repository_context, objective
 # Output      : markdown
 # Clipboard   : planned
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -15,11 +19,11 @@
 # ==============================================================================
 
 [questions]
-feature_name|text|yes|Feature name||Short name for the feature.
-repository_context|textarea|yes|Repository context||Relevant project, module, or command area.
-objective|textarea|yes|Objective||What should be implemented.
-constraints|textarea|no|Constraints||Important limits, compatibility rules, or standards.
-validation|textarea|yes|Validation||Commands or checks that must pass.
+feature_name|text|yes|Feature name||Short name for the feature.|regex=^[A-Za-z0-9][A-Za-z0-9 ._-]*$|Prompt Engine session framework
+repository_context|textarea|yes|Repository context||Relevant project, module, or command area.||CaptainCronos-01-ShellToolkit lib/cc-prompt-engine.sh
+objective|textarea|yes|Objective||What should be implemented.||Add reusable session state and validation helpers.
+constraints|textarea|no|Constraints||Important limits, compatibility rules, or standards.||Do not add a new namespace.
+validation|textarea|yes|Validation||Commands or checks that must pass.||cc verify
 
 [template]
 # Feature Implementation Prompt

@@ -456,15 +456,16 @@ Dynamic Prompt Engine:
   TEMPLATE may be a template id or template title.
 
 Navigation:
-  previous  Go back one question.
+  previous  Move to the previous question.
+  back      Move to the previous question.
   next      Keep the current answer and continue.
-  edit      Clear and re-enter the current answer.
+  help      Show help for the current menu or question.
   cancel    Exit without rendering.
 
 After preview:
-  [Y]es     Generate, copy when supported, and print the rendered prompt.
-  [E]dit    Edit a collected answer and preview again.
-  [C]ancel  Exit without generating.
+  1 Generate  Copy when supported and print the rendered prompt.
+  2 Edit      Edit a collected answer and preview again.
+  3 Cancel    Exit without generating.
 ~~~
 
 ## cc registry
