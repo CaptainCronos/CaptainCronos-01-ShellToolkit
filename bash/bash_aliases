@@ -65,9 +65,6 @@ alias drives-short='lsblk -e 7 -o NAME,LABEL,SIZE,MOUNTPOINTS'
 # @alias edit Open nano with line wrapping disabled.
 alias edit='/bin/nano -w'
 
-# @alias edit-in-kitty Open a new Kitty window running nano.
-alias edit-in-kitty='kitty edit-in-kitty'
-
 # =============================
 # GREP COLORS
 # =============================
