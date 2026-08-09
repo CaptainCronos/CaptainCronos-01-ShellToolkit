@@ -34,6 +34,7 @@ Important libraries:
 - `cc-config.sh` — toolkit configuration helpers
 - `cc-programs.sh` — configured command-line capability resolution
 - `cc-packages.sh` — semantic, platform-aware system package operations
+- `cc-network.sh` — semantic, platform-aware network-state inspection
 - `cc-metadata.sh` — command metadata and registry helpers
 - `cc-assets.sh` — local asset database helpers
 - `cc-prompt-engine.sh` — internal prompt template discovery, rendering, and formatting helpers
@@ -59,6 +60,18 @@ Maintenance updates are split into three surfaces:
 On Debian-family systems, toolkit automation uses the configured `apt-get` interface for package operations, `apt-cache` for repository queries, and `dpkg` for the installed-package database. Interactive administrators may still use `apt` directly at a terminal. Other supported platform families retain their native package-manager syntax behind `lib/cc-packages.sh`.
 
 `cc dev-update` owns developer ecosystem reporting and explicit mutation. It defaults to dry-run/reporting. Mutating developer updates require `--apply`; only package managers with a conservative global update path are applied. Normal `cc update --apply` includes developer updates only when `DEV_UPDATES=yes` is set in toolkit config.
+
+### Network Inspection Architecture
+
+On Linux, interface, address, and route inspection resolves the configured `ip`
+capability. Listener and connection inspection resolves the configured `ss`
+capability. Shared helpers use one-record and headerless output where practical,
+and active commands consume those helpers instead of selecting executables.
+
+FreeBSD-native `ifconfig`, `route`, `netstat`, and `sockstat` behavior remains
+behind explicit platform branches. NetworkManager configuration, resolver/DNS
+inspection, reachability probes, and network scanning are separate capabilities;
+they are not treated as substitutes for kernel network or socket state.
 
 ### Reports
 Historical reports are stored under:

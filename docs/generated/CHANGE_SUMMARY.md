@@ -1,9 +1,10 @@
 # Recent Change Summary
 
-Generated: Sun Aug  9 08:21:44 EDT 2026
+Generated: Sun Aug  9 08:33:29 EDT 2026
 
 ~~~text
-0901395 (HEAD -> feature/package-management-standardization, origin/main, origin/HEAD, main) feat(programs): add program interface management
+7058a43 (HEAD -> feature/network-interface-standardization, origin/main, origin/HEAD, main) feat(packages): standardize package management
+0901395 feat(programs): add program interface management
 059e9e1 Update kitty terminal and edit SU access
 c977887 Removed edit in kitty alias from bashrc
 58dda69 docs(context): establish canonical AI engineering guidance
@@ -42,5 +43,4 @@ bf6a39f Add SMART library metadata helpers
 86c68dd Add storage library metadata helpers
 53d5e0c Add report library metadata helpers
 94be091 Add shared library checks to selftest
-e1e8c70 Use shared report helpers for drive qualification
 ~~~

@@ -59,6 +59,14 @@ The default remains:
 DEV_UPDATES="no"
 ```
 
+## Network Inspection
+
+Captain Cronos reads Linux interface, address, and route state through the
+configured `ip` interface and socket/listener state through `ss`. These are
+read-only inspection paths. Connectivity checks such as `ping`, DNS tools, and
+NetworkManager control have distinct purposes and are not replaced by `ip` or
+`ss`.
+
 ## Storage Workflow
 1. `cc drive-report`
 2. `cc drive-qualify`

@@ -14,6 +14,14 @@ Debian and Ubuntu package automation now uses semantic package operations backed
 by the centralized `apt-get`, `apt-cache`, and `dpkg` capability interfaces.
 Nala selection and automated `apt` execution have been removed from active code.
 
+## Network Interface Standardization
+
+Status: **Complete**
+
+Linux network-state automation now uses semantic inspection helpers backed by
+the centralized `ip` and `ss` capability interfaces. Active Linux `netstat`
+fallback and independent network executable selection have been removed.
+
 ---
 
 ## Milestone M1 — Engineering Foundation

@@ -117,6 +117,28 @@ configured `apt-get`, `apt-cache`, and `dpkg` interfaces. Other detected package
 families retain their native syntax. Dry-run reporting and `sudo` remain in the
 execution library, never in `config/programs.conf`.
 
+Network inspection follows the same capability-oriented boundary through
+`lib/cc-network.sh`:
+
+```text
+Captain Cronos command
+        |
+        v
+semantic network inspection
+        |
+        +--> Linux: configured ip / ss capabilities
+        |
+        +--> FreeBSD: native inspection interfaces
+        |
+        v
+read-only network state
+```
+
+`_cc_net_interfaces`, `_cc_net_addresses`, `_cc_net_default_route`,
+`_cc_net_routes`, `_cc_net_listeners`, and `_cc_net_connections` keep
+machine-oriented command syntax out of higher-level commands. NetworkManager,
+DNS, reachability, and scanning interfaces remain separate concerns.
+
 ---
 
 ## Installation Model

@@ -24,6 +24,11 @@ package database through `pkg-manager`, `pkg-query`, and `pkg-database`.
 Configuration contains executable choices only; dry-run behavior, arguments,
 and privilege escalation remain in the library.
 
+Network-state inspection is implemented in `lib/cc-network.sh`. Linux interface,
+address, and route operations resolve `network`; listener and connection
+operations resolve `sockets`. NetworkManager control, DNS resolution, and
+connectivity probes are separate concerns and are not mapped to these interfaces.
+
 ## User Configuration
 
 Toolkit configuration lives in:

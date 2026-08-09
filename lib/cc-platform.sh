@@ -11,6 +11,13 @@
 # Purpose     : Detect platform, package manager, init system, and host capabilities.
 # ==============================================================================
 
+if ! declare -F cc_program_exists >/dev/null 2>&1; then
+    _cc_platform_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    # shellcheck disable=SC1091
+    source "$_cc_platform_lib_dir/cc-programs.sh"
+    unset _cc_platform_lib_dir
+fi
+
 cc_platform_os_value() {
     local key="$1"
     if [ -f /etc/os-release ]; then
@@ -64,9 +71,10 @@ cc_capability_exists() {
         battery) [ -d /sys/class/power_supply ] && ls /sys/class/power_supply/BAT* >/dev/null 2>&1 ;;
         docker) command -v docker >/dev/null 2>&1 ;;
         git) command -v git >/dev/null 2>&1 ;;
-        network) command -v ip >/dev/null 2>&1 || command -v nmcli >/dev/null 2>&1 ;;
+        network) cc_program_exists network ;;
         podman) command -v podman >/dev/null 2>&1 ;;
         smart) command -v smartctl >/dev/null 2>&1 ;;
+        sockets) cc_program_exists sockets ;;
         storage) command -v lsblk >/dev/null 2>&1 ;;
         systemd) [ "$(cc_platform_init_system)" = "systemd" ] ;;
         truenas) command -v midclt >/dev/null 2>&1 ;;
@@ -76,7 +84,7 @@ cc_capability_exists() {
 }
 
 cc_capability_status() { if cc_capability_exists "$1"; then echo yes; else echo no; fi; }
-cc_capability_list() { printf '%s\n' git pkg-manager systemd storage smart zfs truenas docker podman network battery; }
+cc_capability_list() { printf '%s\n' git pkg-manager systemd storage smart zfs truenas docker podman network sockets battery; }
 
 cc_platform_infer_profile() {
     case "$(cc_platform_type)" in

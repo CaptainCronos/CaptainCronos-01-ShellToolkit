@@ -18,6 +18,7 @@ cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-deps.sh"
 source "$PROJECT_ROOT/lib/cc-platform.sh"
+source "$PROJECT_ROOT/lib/cc-network.sh"
 
 ACTION="prepare"
 APPLY=0
@@ -93,7 +94,7 @@ done
 REPO_DIR="$TARGET_ROOT/CaptainCronos-01-ShellToolkit"
 
 network_status() {
-    if command -v ip >/dev/null 2>&1 && ip route get 1.1.1.1 >/dev/null 2>&1; then
+    if _cc_net_route_to 1.1.1.1 >/dev/null 2>&1; then
         echo PASS
     else
         echo WARN

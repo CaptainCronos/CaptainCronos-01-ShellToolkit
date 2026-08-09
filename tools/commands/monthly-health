@@ -16,6 +16,7 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-network.sh"
 
 OUTPUT="file"
 JOURNAL_SINCE="${JOURNAL_SINCE:-24 hours ago}"
@@ -196,9 +197,7 @@ print_services() {
     done
     subsection "MariaDB socket/port"
     [ -S /run/mysqld/mysqld.sock ] || [ -S /var/run/mysqld/mysqld.sock ] && echo "mysql socket present" || echo "mysql socket missing"
-    if have ss; then
-        ss -ltn | awk '{print $4}' | grep -qE '(:|^)3306$' && echo "port 3306 listening" || echo "port 3306 not detected"
-    fi
+    _cc_net_tcp_port_is_listening 3306 && echo "port 3306 listening" || echo "port 3306 not detected"
 }
 
 print_security_network() {
@@ -210,12 +209,10 @@ print_security_network() {
         echo "ufw not installed"
     fi
     subsection "Listening TCP ports"
-    if have ss; then
-        ss -tln 2>/dev/null || true
-    elif have netstat; then
-        netstat -tln 2>/dev/null || true
+    if _cc_net_sockets_available; then
+        _cc_net_listeners 2>/dev/null || true
     else
-        echo "ss/netstat not available"
+        echo "socket inspection interface not available"
     fi
     subsection "Fail2Ban"
     if have fail2ban-client; then
