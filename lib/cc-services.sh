@@ -35,6 +35,8 @@ _cc_service_scope_args() {
     if [ "$scope" = "user" ]; then
         result=(--user)
     else
+        # The nameref intentionally clears the caller-owned array.
+        # shellcheck disable=SC2034
         result=()
     fi
 }
@@ -282,12 +284,14 @@ _cc_service_default_target() {
 
 _cc_log_scope_args() {
     local scope="$1"
-    local -n result="$2"
+    local -n scope_result="$2"
     _cc_service_validate_scope "$scope" || return $?
     if [ "$scope" = "user" ]; then
-        result=(--user)
+        scope_result=(--user)
     else
-        result=()
+        # The nameref intentionally clears the caller-owned array.
+        # shellcheck disable=SC2034
+        scope_result=()
     fi
 }
 

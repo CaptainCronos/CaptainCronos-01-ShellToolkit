@@ -249,6 +249,8 @@ print_path_note() {
             echo
             echo "PATH note:"
             echo "  ~/bin is not currently in PATH. Add this to ~/.bashrc if needed:"
+            # This is literal shell configuration guidance.
+            # shellcheck disable=SC2016
             echo '  export PATH="$HOME/bin:$PATH"'
             ;;
     esac

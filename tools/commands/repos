@@ -222,7 +222,7 @@ repo_default_remote_branch() {
 repo_branch_counts() {
     local repo="$1" local_count remote_count
     local_count="$(git -C "$repo" branch --list 2>/dev/null | wc -l | tr -d ' ')"
-    remote_count="$(git -C "$repo" branch -r 2>/dev/null | grep -v 'HEAD ->' | wc -l | tr -d ' ')"
+    remote_count="$(git -C "$repo" branch -r 2>/dev/null | grep -vc 'HEAD ->' || true)"
     echo "local:$local_count remote:$remote_count"
 }
 

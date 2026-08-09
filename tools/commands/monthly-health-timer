@@ -56,9 +56,17 @@ case "${1:-status}" in
         exit 0
         ;;
     status)
-        _cc_service_list_timers user | grep -E 'NEXT|captaincronos-monthly-health' || true
+        timer_output="$(_cc_service_list_timers user)" || {
+            cc_error "Unable to query user service timers."
+            exit 1
+        }
+        printf '%s\n' "$timer_output" | grep -E 'NEXT|captaincronos-monthly-health' || true
         echo
-        _cc_service_list_unit_files user | grep -E 'captaincronos-monthly-health' || true
+        unit_output="$(_cc_service_list_unit_files user)" || {
+            cc_error "Unable to query user service unit files."
+            exit 1
+        }
+        printf '%s\n' "$unit_output" | grep -E 'captaincronos-monthly-health' || true
         ;;
     retire|remove|uninstall)
         retire_timer

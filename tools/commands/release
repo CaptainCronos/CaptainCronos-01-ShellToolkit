@@ -18,7 +18,6 @@ cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 
 ACTION="plan"
-APPLY=0
 
 usage() {
     cat <<'EOF_HELP'
@@ -37,7 +36,8 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --help|-h) usage; exit 0 ;;
         --version) echo "1.0.0-alpha1"; exit 0 ;;
-        --apply) APPLY=1; shift ;;
+        # Retained for CLI compatibility; the first-stage release engine is observational.
+        --apply) shift ;;
         plan|check) ACTION="$1"; shift ;;
         *) usage; exit 1 ;;
     esac

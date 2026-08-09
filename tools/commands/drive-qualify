@@ -26,7 +26,6 @@ source "$PROJECT_ROOT/lib/cc-report.sh"
 DEVICE=""
 MODE="start"
 START_LONG="no"
-QUAL_ROOT="$(cc_report_root)/drives/qualification"
 
 usage() {
     cat <<'EOF_HELP'

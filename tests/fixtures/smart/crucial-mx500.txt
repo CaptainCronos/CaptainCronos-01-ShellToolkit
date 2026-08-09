@@ -1,0 +1,5 @@
+SMART overall-health self-assessment test result: PASSED
+ID# ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_FAILED RAW_VALUE
+  9 Power_On_Hours          0x0032   100   100   000    Old_age   Always       -       43599
+194 Temperature_Celsius     0x0022   061   034   000    Old_age   Always       -       39 (Min/Max 21/66)
+202 Percent_Lifetime_Remain 0x0030   099   099   001    Old_age   Offline      -       1

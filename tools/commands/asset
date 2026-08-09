@@ -161,7 +161,7 @@ case "$ACTION" in
         ;;
     path)
         cc_assets_init
-        if [ -n "$TYPE" ]; then echo "$(cc_asset_dir "$TYPE")"; else echo "$(cc_assets_root)"; fi
+        if [ -n "$TYPE" ]; then cc_asset_dir "$TYPE"; else cc_assets_root; fi
         ;;
     list)
         cc_assets_init

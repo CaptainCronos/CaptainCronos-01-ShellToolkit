@@ -67,11 +67,11 @@ cc_dep_install_hint() {
 cc_dep_check_list() {
     local missing=0 dep status
     for dep in "$@"; do
-        status="$(cc_dep_status "$dep")"
-        if [ "$status" = "present" ]; then
+        status="$(cc_dep_execution_status "$dep")"
+        if [ "$status" = "OK" ]; then
             printf '%-18s %s\n' "$dep" "PASS"
         else
-            printf '%-18s %s\n' "$dep" "MISSING"
+            printf '%-18s %s\n' "$dep" "$status"
             missing=$((missing + 1))
         fi
     done

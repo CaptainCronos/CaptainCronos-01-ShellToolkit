@@ -41,6 +41,9 @@ case "${1:-}" in
         ;;
 esac
 
+# The source path is resolved from PROJECT_ROOT at runtime; the fragment is
+# checked independently because ShellCheck cannot follow this dynamic path.
+# shellcheck disable=SC1091
 source "$PROJECT_ROOT/bash/bash_functions"
 
 if ! declare -F gitflow >/dev/null 2>&1; then

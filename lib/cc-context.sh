@@ -9,6 +9,8 @@
 # Purpose     : Shared toolkit and repository context helpers.
 # ==============================================================================
 
+# Consumed by other libraries after this file is sourced.
+# shellcheck disable=SC2034
 CC_CONTEXT_LOADED=1
 
 cc_context_default_toolkit_root() {
