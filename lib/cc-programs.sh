@@ -149,13 +149,16 @@ _cc_program_compatibility_json() {
 }
 
 _cc_program_compatibility_yaml() {
-    local program="$1" version output
+    local program="$1" version output transform_filter validation_filter
     version="$("$program" --version 2>&1)" || return 1
     case "$version" in
         yq\ [0-9]*) ;;
         *) return 1 ;;
     esac
 
+    # These are yq expressions, not shell expressions.
+    # shellcheck disable=SC2016
+    transform_filter='.captain = $cc_value | .positional = $ARGS.positional[0]'
     output="$(
         printf '%s\n' 'captain: "cronos"' |
             "$program" \
@@ -163,11 +166,14 @@ _cc_program_compatibility_yaml() {
                 --yaml-output-grammar-version 1.1 \
                 --arg cc_value validated \
                 --args \
-                '.captain = $cc_value | .positional = $ARGS.positional[0]' \
+                "$transform_filter" \
                 probe 2>/dev/null
     )" || return 1
+    # This is a yq expression, not a shell expression.
+    # shellcheck disable=SC2016
+    validation_filter='.captain == "validated" and .positional == "probe"'
     printf '%s\n' "$output" |
-        "$program" --exit-status '.captain == "validated" and .positional == "probe"' >/dev/null 2>&1
+        "$program" --exit-status "$validation_filter" >/dev/null 2>&1
 }
 
 cc_program_compatible() {

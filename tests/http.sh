@@ -146,7 +146,7 @@ PATH="$TEST_DIR:$PATH"
 export PATH
 CC_PROGRAMS_CONFIG="$TEST_DIR/programs.conf"
 CC_PROGRAMS_LOADED=0
-export CC_PROGRAMS_CONFIG
+export CC_PROGRAMS_CONFIG CC_PROGRAMS_LOADED
 
 : > "$TRACE_FILE"
 _cc_download_to https://example.invalid/archive.tar "$TEST_DIR/mock.out" 3

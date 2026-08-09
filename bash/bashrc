@@ -54,7 +54,11 @@ esac
 # COLOR + BASE ALIASES
 # =============================
 if [ -x /usr/bin/dircolors ]; then
-    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+    if [ -r "$HOME/.dircolors" ]; then
+        eval "$(dircolors -b "$HOME/.dircolors")"
+    else
+        eval "$(dircolors -b)"
+    fi
     alias ls='ls --color=auto'
     alias grep='grep --color=auto'
     alias fgrep='fgrep --color=auto'
@@ -70,16 +74,26 @@ alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo
 # =============================
 # LOAD CAPTAIN CRONOS USER CONFIG
 # =============================
-[ -f "$HOME/.bash_functions" ] && . "$HOME/.bash_functions"
-[ -f "$HOME/.bash_aliases" ] && . "$HOME/.bash_aliases"
+if [ -f "$HOME/.bash_functions" ]; then
+    # Dynamic user configuration path cannot be followed statically.
+    # shellcheck disable=SC1091
+    . "$HOME/.bash_functions"
+fi
+if [ -f "$HOME/.bash_aliases" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.bash_aliases"
+fi
 
 # =============================
 # COMPLETION
 # =============================
 if ! shopt -oq posix; then
   if [ -f /usr/share/bash-completion/bash_completion ]; then
+    # External distribution-provided completion file.
+    # shellcheck disable=SC1091
     . /usr/share/bash-completion/bash_completion
   elif [ -f /etc/bash_completion ]; then
+    # shellcheck disable=SC1091
     . /etc/bash_completion
   fi
 fi
@@ -93,8 +107,15 @@ fi
 # NVM
 # =============================
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    # Dynamic third-party installation path cannot be followed statically.
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/nvm.sh"
+fi
+if [ -s "$NVM_DIR/bash_completion" ]; then
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/bash_completion"
+fi
 
 # =============================
 # OPTIONAL BANNER (local only)

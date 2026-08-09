@@ -238,10 +238,26 @@ echo
 
 if [ "$APPLY" -eq 0 ]; then
     cc_log "DRY RUN: would initialize Captain Cronos host environment."
-    [ -d "$HOME/bin" ] && cc_log "~/bin exists." || cc_warn "~/bin missing; would create."
-    path_has_home_bin && cc_log "~/bin is in PATH." || cc_warn "~/bin not found in PATH."
-    [ -f "$HOME/bin/cc" ] && cc_log "~/bin/cc exists." || cc_warn "~/bin/cc missing; would install launcher."
-    [ -f "$CONFIG_FILE" ] && cc_log "Host config exists: $CONFIG_FILE" || cc_warn "Host config missing; would create."
+    if [ -d "$HOME/bin" ]; then
+        cc_log "$HOME/bin exists."
+    else
+        cc_warn "$HOME/bin missing; would create."
+    fi
+    if path_has_home_bin; then
+        cc_log "$HOME/bin is in PATH."
+    else
+        cc_warn "$HOME/bin not found in PATH."
+    fi
+    if [ -f "$HOME/bin/cc" ]; then
+        cc_log "$HOME/bin/cc exists."
+    else
+        cc_warn "$HOME/bin/cc missing; would install launcher."
+    fi
+    if [ -f "$CONFIG_FILE" ]; then
+        cc_log "Host config exists: $CONFIG_FILE"
+    else
+        cc_warn "Host config missing; would create."
+    fi
     echo
     cc_log "Re-run with: cc init --apply"
     exit 0
@@ -261,9 +277,9 @@ else
 fi
 
 if path_has_home_bin; then
-    cc_log "~/bin is already in PATH."
+    cc_log "$HOME/bin is already in PATH."
 else
-    cc_warn "~/bin is not currently in PATH."
+    cc_warn "$HOME/bin is not currently in PATH."
     cc_warn "Add this to your shell profile if needed: export PATH=\"$HOME/bin:\$PATH\""
 fi
 

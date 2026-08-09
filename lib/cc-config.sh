@@ -11,6 +11,9 @@
 # Purpose     : Shared configuration helper functions.
 # ==============================================================================
 
+# Stored expansion syntax is deliberately matched as literal configuration data.
+# shellcheck disable=SC2016
+
 cc_config_dir() {
     echo "${CAPTAIN_CRONOS_CONFIG_DIR:-$HOME/.captaincronos}"
 }

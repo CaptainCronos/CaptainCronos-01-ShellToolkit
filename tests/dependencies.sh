@@ -97,6 +97,8 @@ source "$PROJECT_ROOT/lib/cc-packages.sh"
 (
     PATH="$TEST_DIR:$PATH"
     export PATH
+    # Called indirectly by the sourced package abstraction.
+    # shellcheck disable=SC2329
     cc_platform_package_manager() { printf '%s\n' dnf; }
     [ "$(cc_dep_resolve_program pkg-manager)" = "dnf" ] || fail "non-Debian package-manager resolution changed"
     [ "$(cc_dep_execution_status pkg-manager)" = "OK" ] || fail "non-Debian package-manager status changed"

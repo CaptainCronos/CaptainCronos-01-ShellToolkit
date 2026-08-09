@@ -49,6 +49,8 @@ if _cc_json_validate "$TEST_DIR/malformed.json"; then
 fi
 [ "$(_cc_json_query '.nested' "$TEST_DIR/valid.json")" = $'{\n  "enabled": true\n}' ] || fail "structured JSON query output changed"
 [ "$(_cc_json_query_raw '.name' "$TEST_DIR/valid.json")" = "cronos" ] || fail "raw JSON query output changed"
+# This is a jq expression, not a shell expression.
+# shellcheck disable=SC2016
 generated_json="$(_cc_json_generate '{name: $name, count: $count, content: $content}' --compact-output --arg name cronos --argjson count 2 --arg content $'line 1\nline "2"')"
 printf '%s\n' "$generated_json" | _cc_json_validate || fail "generated JSON was invalid"
 [ "$(printf '%s\n' "$generated_json" | _cc_json_query_raw '.count | type')" = "number" ] || fail "generated JSON number semantics changed"

@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Literal expansion syntax is security-test data and must remain unexpanded.
+# shellcheck disable=SC2016
+
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"

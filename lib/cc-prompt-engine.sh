@@ -11,8 +11,6 @@
 # Purpose     : Shared prompt template discovery, rendering, and formatting helpers.
 # ==============================================================================
 
-CC_PROMPT_ENGINE_LOADED=1
-
 if [ -z "${CC_CONTEXT_LOADED:-}" ]; then
     _cc_prompt_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
     # shellcheck disable=SC1091
@@ -429,9 +427,8 @@ cc_prompt_validation_rule_supported() {
 }
 
 _cc_prompt_regex_valid() {
-    local pattern="$1" status=0
-    [[ "" =~ $pattern ]] || status=$?
-    [ "$status" -ne 2 ]
+    local pattern="(${1})|.*"
+    [[ "" =~ $pattern ]]
 }
 
 _cc_prompt_numeric() {
@@ -948,6 +945,8 @@ cc_prompt_output_json() {
         return 1
     fi
     rendered="$(cat)"
+    # This is a jq expression, not a shell expression.
+    # shellcheck disable=SC2016
     _cc_json_generate \
         '{template: $template, format: "json", content: $content}' \
         --compact-output \
@@ -1279,7 +1278,7 @@ cc_prompt_session_answer_set() {
         return 2
     fi
 
-    CC_PROMPT_SESSION_ANSWERS[$index]="$value"
+    CC_PROMPT_SESSION_ANSWERS[index]="$value"
 }
 
 cc_prompt_session_current_answer_set() {

@@ -94,7 +94,8 @@ has_header() {
 }
 
 check_command() {
-    local cmd="$1" file="tools/commands/$cmd" issues=0
+    local cmd="$1" file issues=0
+    file="tools/commands/$cmd"
     local executable="skip" syntax="ok" script="ok" version="ok" category="skip" requires="skip" repository="ok" purpose="ok" help="ok" verflag="ok"
 
     if [ "$STRICT" -eq 1 ]; then

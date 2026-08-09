@@ -14,7 +14,7 @@
 set -uo pipefail
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cd "$PROJECT_ROOT"
+cd "$PROJECT_ROOT" || exit 1
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
 source "$PROJECT_ROOT/lib/cc-packages.sh"
@@ -59,7 +59,7 @@ run_log() {
         return 0
     fi
     "$@" 2>&1 | tee -a "$LOG"
-    return ${PIPESTATUS[0]}
+    return "${PIPESTATUS[0]}"
 }
 
 need(){ have "$1" || { say "Missing dependency: $1"; return 1; }; }
@@ -123,7 +123,8 @@ run_daily_update(){
 }
 
 latest_boot_kernel(){
-    ls /boot/vmlinuz-* 2>/dev/null | sed 's#/boot/vmlinuz-##' | grep -Ev '\.safe$' | sort -V | tail -1
+    find /boot -maxdepth 1 -type f -name 'vmlinuz-*' -printf '%f\n' 2>/dev/null |
+        sed 's/^vmlinuz-//' | grep -Ev '\.safe$' | sort -V | tail -1
 }
 
 update_cli_safe_boot(){
@@ -156,6 +157,8 @@ update_cli_safe_boot(){
     fi
     run_log sudo mkdir -p "$grub_backup_dir"
     if compgen -G "/etc/grub.d/40_custom.bak*" >/dev/null; then
+        # Variables expand in the explicit sudo sh process.
+        # shellcheck disable=SC2016
         run_log sudo sh -c 'for f in /etc/grub.d/40_custom.bak*; do [ -e "$f" ] && mv "$f" /root/grub-custom-backups/; done'
     fi
     if [ -f "$grub_custom" ]; then

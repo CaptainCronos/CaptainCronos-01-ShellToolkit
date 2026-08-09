@@ -49,6 +49,7 @@ IFS=$'\t' read -r device model serial size transport health hours mounts <<< "$r
 [ "$device" = /dev/sdz ] || fail 'inventory device changed'
 [ "$model" = 'Vendor "Model", Series' ] || fail 'lsblk model spaces or quotes were split'
 [ "$serial" = SERIAL-1 ] || fail 'inventory serial changed'
+[ "$transport" = sata ] || fail 'inventory transport changed'
 [ "$health" = PASSED ] || fail 'SMART health parsing changed'
 [ "$hours" = 1234 ] || fail 'SMART hours parsing changed'
 [ "$mounts" = - ] || fail 'unmounted disk did not use the mount placeholder'

@@ -11,6 +11,9 @@
 # Purpose     : Provide semantic JSON and YAML processing operations.
 # ==============================================================================
 
+# Single-quoted jq/yq programs must reach the configured processor literally.
+# shellcheck disable=SC2016
+
 if [ -z "${CC_DATA_LOADED:-}" ]; then
     _cc_data_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
     # shellcheck disable=SC1091

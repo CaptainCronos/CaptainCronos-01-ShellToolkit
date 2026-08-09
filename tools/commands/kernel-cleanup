@@ -62,7 +62,10 @@ run_pkg_log() {
 : > "$LOG"
 
 running="$(uname -r)"
-mapfile -t kernels < <(ls /boot/vmlinuz-* 2>/dev/null | sed 's#/boot/vmlinuz-##' | grep -Ev '\.safe$' | sort -V)
+mapfile -t kernels < <(
+    find /boot -maxdepth 1 -type f -name 'vmlinuz-*' -printf '%f\n' 2>/dev/null |
+        sed 's/^vmlinuz-//' | grep -Ev '\.safe$' | sort -V
+)
 
 cc_banner
 log "Kernel cleanup review"

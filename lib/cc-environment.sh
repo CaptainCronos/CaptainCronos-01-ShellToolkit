@@ -128,17 +128,19 @@ EOF_CONFIG
 }
 
 cc_env_export() {
-    export CC_HOME="$(cc_env_home)"
-    export CC_HOST_ID="$(cc_env_host_id)"
-    export CC_HOST_HOME="$(cc_env_host_home)"
-    export CC_CONFIG="$(cc_env_config)"
-    export CC_REPORT_DIR="$(cc_env_report_dir)"
-    export CC_ASSET_DIR="$(cc_env_asset_dir)"
-    export CC_CACHE_DIR="$(cc_env_cache_dir)"
-    export CC_LOG_DIR="$(cc_env_log_dir)"
-    export CC_PLUGIN_DIR="$(cc_env_plugin_dir)"
-    export CC_ROLE="$(cc_env_role)"
-    export CC_PROFILE="$(cc_env_profile)"
+    CC_HOME="$(cc_env_home)"
+    CC_HOST_ID="$(cc_env_host_id)"
+    CC_HOST_HOME="$(cc_env_host_home)"
+    CC_CONFIG="$(cc_env_config)"
+    CC_REPORT_DIR="$(cc_env_report_dir)"
+    CC_ASSET_DIR="$(cc_env_asset_dir)"
+    CC_CACHE_DIR="$(cc_env_cache_dir)"
+    CC_LOG_DIR="$(cc_env_log_dir)"
+    CC_PLUGIN_DIR="$(cc_env_plugin_dir)"
+    CC_ROLE="$(cc_env_role)"
+    CC_PROFILE="$(cc_env_profile)"
+    export CC_HOME CC_HOST_ID CC_HOST_HOME CC_CONFIG CC_REPORT_DIR CC_ASSET_DIR
+    export CC_CACHE_DIR CC_LOG_DIR CC_PLUGIN_DIR CC_ROLE CC_PROFILE
 }
 
 cc_env_summary() {

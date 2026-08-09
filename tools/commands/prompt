@@ -26,7 +26,6 @@ source "$TOOLKIT_ROOT/lib/cc-prompt-engine.sh"
 cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 COMMAND_VERSION="1.0.0-alpha1"
-TEMPLATE_ID=""
 
 declare -a TEMPLATE_IDS=()
 declare -a TEMPLATE_TITLES=()
@@ -79,7 +78,7 @@ required_label() {
 }
 
 load_template_menu() {
-    local row id title description category tags
+    local id title description category tags
 
     TEMPLATE_IDS=()
     TEMPLATE_TITLES=()
@@ -471,7 +470,6 @@ run_prompt_template() {
     local template_id="$1"
     local rendered choice edit_index
 
-    TEMPLATE_ID="$template_id"
     cc_prompt_session_start "$template_id"
     run_question_flow 0 || return $?
 

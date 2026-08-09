@@ -80,14 +80,14 @@ run_check() {
     if [ "$VERBOSE" -eq 1 ]; then
         echo
         echo "$label"
-        echo "$(printf '%*s' "${#label}" '' | tr ' ' '-')"
+        printf '%*s\n' "${#label}" '' | tr ' ' '-'
         if "$@"; then
             rc=0
         else
             rc=$?
         fi
     else
-        output="$($@ 2>&1)" && rc=0 || rc=$?
+        output="$("$@" 2>&1)" && rc=0 || rc=$?
     fi
 
     if [ "$rc" -eq 0 ]; then
@@ -207,6 +207,8 @@ run_check "Plugin status load" bash "$PROJECT_ROOT/tools/cc" plugin status
 if [ "$JSON" -eq 1 ]; then
     status="PASS"
     [ "$FAILED" -eq 0 ] || status="FAIL"
+    # This is a jq expression, not a shell expression.
+    # shellcheck disable=SC2016
     _cc_json_generate \
         '{status: $status, passed: $passed, failed: $failed}' \
         --compact-output \

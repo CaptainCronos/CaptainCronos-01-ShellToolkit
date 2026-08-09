@@ -62,7 +62,7 @@ PATH="$TEST_DIR:$PATH"
 export PATH
 CC_PROGRAMS_CONFIG="$TEST_DIR/programs.conf"
 CC_PROGRAMS_LOADED=0
-export CC_PROGRAMS_CONFIG
+export CC_PROGRAMS_CONFIG CC_PROGRAMS_LOADED
 
 _cc_service_exists system active.service || fail "mock service existence detection failed"
 if _cc_service_exists system missing.service; then
