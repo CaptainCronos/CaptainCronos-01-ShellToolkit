@@ -1,0 +1,4 @@
+SMART overall-health self-assessment test result: PASSED
+Temperature:                        41 Celsius
+Power On Hours:                     12,345
+Percentage Used:                    7%

@@ -82,7 +82,13 @@ cc_storage_report_dir_for_device() {
 
 cc_storage_mounts_for_device() {
     local device="$1"
-    lsblk -nr -o MOUNTPOINT "$device" 2>/dev/null | grep -v '^$' | paste -sd ',' - 2>/dev/null
+    lsblk -nr -o MOUNTPOINT "$device" 2>/dev/null | grep -v '^$' | paste -sd ',' - 2>/dev/null || true
+}
+
+cc_storage_lsblk_value() {
+    local device="$1" column="$2" value
+    value="$(lsblk -dnro "$column" "$device" 2>/dev/null | head -n 1)"
+    printf '%b' "$value" | tr '\t\r\n' '   '
 }
 
 cc_storage_smart_text_for_device() {
@@ -93,24 +99,29 @@ cc_storage_smart_text_for_device() {
 }
 
 cc_storage_inventory_rows() {
-    lsblk -dn -o NAME,MODEL,SERIAL,SIZE,TRAN,TYPE 2>/dev/null | while read -r name model serial size tran type; do
+    local name type dev model serial size tran smart_text health hours temp mounts
+    lsblk -dn -o NAME,TYPE 2>/dev/null | while read -r name type; do
         [ "$type" = "disk" ] || continue
-        local dev smart_text health hours temp mounts
+        cc_smart_device_candidate "$name" || continue
         dev="/dev/$name"
+        model="$(cc_storage_lsblk_value "$dev" MODEL)"
+        serial="$(cc_storage_lsblk_value "$dev" SERIAL)"
+        size="$(cc_storage_lsblk_value "$dev" SIZE)"
+        tran="$(cc_storage_lsblk_value "$dev" TRAN)"
         smart_text="$(cc_storage_smart_text_for_device "$dev")"
         health="$(cc_smart_field_first "$smart_text" 'SMART overall-health self-assessment test result|SMART Health Status')"
-        hours="$(cc_smart_attr_raw "$smart_text" 'Power_On_Hours|Power_On_Hours_and_Msec')"
-        [ -n "$hours" ] || hours="$(cc_smart_nvme_metric "$smart_text" 'Power On Hours')"
+        hours="$(printf '%s\n' "$smart_text" | cc_smart_power_on_hours)"
         temp="$(cc_smart_attr_raw "$smart_text" 'Temperature_Celsius|Airflow_Temperature_Cel')"
         [ -n "$temp" ] || temp="$(cc_smart_nvme_metric "$smart_text" 'Temperature')"
         mounts="$(cc_storage_mounts_for_device "$dev")"
         [ -n "$health" ] || health="unknown"
-        [ -n "$hours" ] || hours="unknown"
+        [ "$hours" != "--" ] || hours="unknown"
         [ -n "$temp" ] || temp="unknown"
         [ -n "$mounts" ] || mounts="-"
         [ -n "$tran" ] || tran="-"
         [ -n "$model" ] || model="unknown"
         [ -n "$serial" ] || serial="unknown"
+        [ -n "$size" ] || size="unknown"
         printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$dev" "$model" "$serial" "$size" "$tran" "$health" "$hours" "$mounts"
     done
 }
@@ -124,8 +135,17 @@ cc_storage_inventory_table() {
 }
 
 cc_storage_inventory_csv() {
+    local dev model serial size tran health hours mounts
     echo "device,model,serial,size,transport,smart,hours,mounts"
     cc_storage_inventory_rows | while IFS=$'\t' read -r dev model serial size tran health hours mounts; do
+        dev="${dev//\"/\"\"}"
+        model="${model//\"/\"\"}"
+        serial="${serial//\"/\"\"}"
+        size="${size//\"/\"\"}"
+        tran="${tran//\"/\"\"}"
+        health="${health//\"/\"\"}"
+        hours="${hours//\"/\"\"}"
+        mounts="${mounts//\"/\"\"}"
         printf '"%s","%s","%s","%s","%s","%s","%s","%s"\n' "$dev" "$model" "$serial" "$size" "$tran" "$health" "$hours" "$mounts"
     done
 }

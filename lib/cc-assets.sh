@@ -59,13 +59,28 @@ cc_assets_init() {
         "$root/.history/purchases"
 }
 
+cc_asset_type_valid() {
+    case "$1" in
+        drives|systems|repositories|licenses|purchases) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 cc_asset_dir() {
     local type="$1"
+    if ! cc_asset_type_valid "$type"; then
+        printf '[CC ERROR] Unknown asset type: %s\n' "$type" >&2
+        return 2
+    fi
     echo "$(cc_assets_root)/$type"
 }
 
 cc_asset_history_dir() {
     local type="$1"
+    if ! cc_asset_type_valid "$type"; then
+        printf '[CC ERROR] Unknown asset type: %s\n' "$type" >&2
+        return 2
+    fi
     echo "$(cc_assets_root)/.history/$type"
 }
 

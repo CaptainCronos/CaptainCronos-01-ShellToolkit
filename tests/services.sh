@@ -29,6 +29,7 @@ sed \
 cat > "$TEST_DIR/service-manager-mock" <<'EOF_MANAGER'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$TRACE_FILE"
+[ "${SERVICE_MANAGER_FAIL:-0}" -eq 0 ] || exit 1
 args=("$@")
 if [ "${args[0]:-}" = "--user" ]; then
     args=("${args[@]:1}")
@@ -44,8 +45,8 @@ case "${args[0]:-}" in
     is-enabled)
         [ "${args[${#args[@]}-1]}" = "enabled.service" ]
         ;;
-    list-timers) printf '%s\n' 'mock.timer loaded active waiting' ;;
-    list-unit-files) printf '%s\n' 'mock.service enabled' ;;
+    list-timers) printf '%s\n' 'captaincronos-monthly-health.timer loaded active waiting' ;;
+    list-unit-files) printf '%s\n' 'captaincronos-monthly-health.timer enabled' ;;
     get-default) printf '%s\n' multi-user.target ;;
 esac
 EOF_MANAGER
@@ -97,6 +98,12 @@ fi
 reload_dry_run="$(CC_SERVICE_DRY_RUN=1 _cc_service_daemon_reload user)"
 [ ! -s "$TRACE_FILE" ] || fail "daemon-reload dry-run executed the service manager"
 printf '%s\n' "$reload_dry_run" | grep -q 'service-manager-mock --user daemon-reload' || fail "user daemon-reload scope was incorrect"
+
+timer_status="$(bash "$PROJECT_ROOT/tools/cc" monthly-health-timer status)" || fail "user timer status failed with a working service manager"
+printf '%s\n' "$timer_status" | grep -q 'captaincronos-monthly-health.timer' || fail "user timer status omitted timer output"
+if SERVICE_MANAGER_FAIL=1 bash "$PROJECT_ROOT/tools/cc" monthly-health-timer status >/dev/null 2>&1; then
+    fail "user timer status hid a service-manager query failure"
+fi
 
 : > "$TRACE_FILE"
 [ "$(_cc_log_since system "1 hour ago" 10)" = "mock journal record" ] || fail "semantic system-log query failed"

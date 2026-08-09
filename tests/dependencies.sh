@@ -52,6 +52,11 @@ done
 printf '%b' "$semantic_dependencies" | grep -qx pkg-manager || fail "pkg-manager command declaration was not audited"
 printf '%b' "$semantic_dependencies" | grep -qx yaml || fail "yaml command declarations were not audited"
 
+deps_output="$(bash "$PROJECT_ROOT/tools/cc" deps command system-update)" || fail "command dependency reporting failed"
+printf '%s\n' "$deps_output" | grep -Eq '^pkg-manager[[:space:]]+PASS$' || fail "cc deps treated pkg-manager as a literal executable"
+deps_output="$(bash "$PROJECT_ROOT/tools/cc" deps command drive-report)" || fail "YAML dependency reporting failed"
+printf '%s\n' "$deps_output" | grep -Eq '^yaml[[:space:]]+PASS$' || fail "cc deps treated yaml as a literal executable"
+
 sed 's/CC_PKG_MANAGER="apt-get"/CC_PKG_MANAGER="apt-get-regression-mock"/' \
     "$PROJECT_ROOT/config/programs.conf" > "$TEST_DIR/programs-compatible.conf"
 cat > "$TEST_DIR/apt-get-regression-mock" <<'EOF_MOCK'

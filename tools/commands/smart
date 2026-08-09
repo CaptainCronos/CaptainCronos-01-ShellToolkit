@@ -16,6 +16,7 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-smart.sh"
 
 usage() {
     echo "Usage: cc smart [device] [--full] [--logs]"
@@ -36,6 +37,18 @@ case "${1:-}" in
         cc_version
         exit 0
         ;;
+esac
+
+if [ "$#" -gt 2 ]; then
+    usage
+    exit 2
+fi
+case "${1:-}" in
+    -*) cc_error "Unknown option: $1"; usage; exit 2 ;;
+esac
+case "${2:-}" in
+    ''|--full|--logs) ;;
+    *) cc_error "Unknown option: $2"; usage; exit 2 ;;
 esac
 
 if ! command -v smartctl >/dev/null 2>&1; then
@@ -67,34 +80,6 @@ cc_smart_health() {
         /SMART overall-health self-assessment test result:/ {print $NF; found=1; exit}
         /SMART Health Status:/ {print $NF; found=1; exit}
         END {if (!found) print "UNKNOWN"}
-    '
-}
-
-cc_smart_temp() {
-    awk '
-        /Temperature_Celsius/ {print $NF "C"; found=1; exit}
-        /Airflow_Temperature_Cel/ {print $NF "C"; found=1; exit}
-        /Current Drive Temperature:/ {print $(NF-1) "C"; found=1; exit}
-        /Composite Temperature:/ {print $(NF-1) "C"; found=1; exit}
-        END {if (!found) print "--"}
-    '
-}
-
-cc_smart_hours() {
-    awk '
-        /Power_On_Hours/ {print $NF; found=1; exit}
-        /Power On Hours:/ {print $NF; found=1; exit}
-        /number of hours powered up/ {print int($NF); found=1; exit}
-        END {if (!found) print "--"}
-    '
-}
-
-cc_smart_life() {
-    awk '
-        /Percentage Used:/ {gsub("%", "", $3); if ($3 ~ /^[0-9]+$/) print (100-$3) "%"; found=1; exit}
-        /Percent_Lifetime_Remain/ {print $NF "%"; found=1; exit}
-        /Media_Wearout_Indicator/ {print $NF "%"; found=1; exit}
-        END {if (!found) print "--"}
     '
 }
 
@@ -131,9 +116,9 @@ cc_smart_summary_one() {
     attr_data="$(cc_smart_read -A "$dev")"
     log_data="$(cc_smart_read -l "$dev")"
     health="$(printf '%s\n' "$health_data" | cc_smart_health)"
-    temp="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_temp)"
-    hours="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_hours)"
-    life="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_life)"
+    temp="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_temperature)"
+    hours="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_power_on_hours)"
+    life="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_life_remaining)"
     test="$(printf '%s\n' "$log_data" | cc_smart_test)"
     printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s\n' "$name" "$type" "$health" "$test" "$temp" "$hours" "$life"
 }
@@ -178,5 +163,6 @@ printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s\n' "------" "----" "------" "----" 
 
 while read -r name type; do
     [ "$type" = "disk" ] || continue
+    cc_smart_device_candidate "$name" || continue
     cc_smart_summary_one "/dev/$name"
 done < <(lsblk -ndo NAME,TYPE 2>/dev/null)
