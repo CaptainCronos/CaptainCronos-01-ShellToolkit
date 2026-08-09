@@ -45,10 +45,17 @@ cc_config_get() {
     local cfg value
     [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 2
     cfg="$(cc_config_file)"
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "configuration key" "$key"
+        cc_debug_kv "configuration path" "$cfg"
+    fi
     if [ -f "$cfg" ]; then
         value="$(grep -E "^${key}=" "$cfg" 2>/dev/null || true)"
         value="$(printf '%s\n' "$value" | tail -n 1 | cut -d= -f2-)"
         if [ -n "$value" ]; then
+            if declare -F cc_debug_kv >/dev/null 2>&1; then
+                cc_debug_kv "configuration key present" "yes"
+            fi
             if [[ "$value" == \"*\" ]]; then
                 value="${value:1:${#value}-2}"
                 value="${value//\\\"/\"}"
@@ -63,6 +70,9 @@ cc_config_get() {
             printf '%s\n' "$value"
             return 0
         fi
+    fi
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "configuration key present" "no; using default"
     fi
     printf '%s\n' "$default"
 }

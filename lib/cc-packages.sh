@@ -33,6 +33,10 @@ _cc_pkg_manager() {
     else
         printf '%s\n' "$family"
     fi
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "platform adapter" "package operations"
+        cc_debug_kv "package-manager family" "$family"
+    fi
 }
 
 _cc_pkg_query_program() {

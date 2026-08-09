@@ -42,12 +42,19 @@ _cc_service_scope_args() {
 }
 
 _cc_service_manager() {
-    case "$(cc_platform_init_system)" in
-        systemd) cc_program_get service-manager ;;
-        openrc) printf '%s\n' rc-service ;;
-        freebsd-rc) printf '%s\n' service ;;
+    local init_system manager
+    init_system="$(cc_platform_init_system)"
+    case "$init_system" in
+        systemd) manager="$(cc_program_get service-manager)" ;;
+        openrc) manager="rc-service" ;;
+        freebsd-rc) manager=service ;;
         *) return 1 ;;
     esac
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "service platform adapter" "$init_system"
+        cc_debug_kv "selected implementation" "$manager"
+    fi
+    printf '%s\n' "$manager"
 }
 
 _cc_system_log_program() {
@@ -259,7 +266,19 @@ _cc_service_list_timers() {
     [ "$(cc_platform_init_system)" = "systemd" ] || return 1
     manager="$(_cc_service_manager)" || return 1
     _cc_service_scope_args "$1" scope_args || return $?
-    "$manager" "${scope_args[@]}" list-timers --all --no-pager
+    local rc=0
+    if "$manager" "${scope_args[@]}" list-timers --all --no-pager; then
+        rc=0
+    else
+        rc=$?
+    fi
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "service operation" "list-timers"
+        cc_debug_kv "service scope" "$1"
+        cc_debug_kv "underlying exit status" "$rc"
+        cc_debug_kv "failure propagation" "service manager -> semantic helper -> caller"
+    fi
+    return "$rc"
 }
 
 _cc_service_list_unit_files() {

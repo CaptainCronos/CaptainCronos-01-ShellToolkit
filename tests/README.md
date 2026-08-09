@@ -21,3 +21,10 @@ Focused shell tests supplement `cc selftest`:
   SMART-summary parsing against representative vendor fixtures.
 - `assets.sh` validates asset-type containment, safe names, and structured-data
   round trips through the public asset command.
+- `diagnostics.sh` validates shared debug state, stderr isolation, semantic and
+  literal dependency traces, captured failures, and secret redaction.
+- `progress.sh` validates reusable count-based TTY, non-TTY, debug, machine,
+  failure, and cleanup progress behavior.
+- `selftest-output.sh` validates normal/debug exit equivalence, sequential debug
+  activity, invalid options, JSON integrity, and stdout/stderr separation. It is
+  run separately because invoking it from `cc selftest` would recurse.

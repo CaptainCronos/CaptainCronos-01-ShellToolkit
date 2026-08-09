@@ -33,14 +33,21 @@ cc_platform_kernel() { uname -r 2>/dev/null || echo unknown; }
 cc_platform_arch() { uname -m 2>/dev/null || echo unknown; }
 
 cc_platform_package_manager() {
-    if command -v apt-get >/dev/null 2>&1; then echo apt-get
-    elif command -v dnf >/dev/null 2>&1; then echo dnf
-    elif command -v yum >/dev/null 2>&1; then echo yum
-    elif command -v zypper >/dev/null 2>&1; then echo zypper
-    elif command -v pacman >/dev/null 2>&1; then echo pacman
-    elif command -v pkg >/dev/null 2>&1; then echo pkg
-    else echo none
+    local manager
+    if command -v apt-get >/dev/null 2>&1; then manager=apt-get
+    elif command -v dnf >/dev/null 2>&1; then manager=dnf
+    elif command -v yum >/dev/null 2>&1; then manager=yum
+    elif command -v zypper >/dev/null 2>&1; then manager=zypper
+    elif command -v pacman >/dev/null 2>&1; then manager=pacman
+    elif command -v pkg >/dev/null 2>&1; then manager=pkg
+    else manager=none
     fi
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "platform adapter" "package-manager detection"
+        cc_debug_kv "detected platform" "$(cc_platform_type)"
+        cc_debug_kv "selected implementation" "$manager"
+    fi
+    printf '%s\n' "$manager"
 }
 
 cc_platform_init_system() {

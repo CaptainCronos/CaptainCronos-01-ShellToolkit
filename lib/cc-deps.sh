@@ -36,27 +36,59 @@ cc_dep_is_program_capability() {
 }
 
 cc_dep_resolve_program() {
-    local resolver="_cc_dep_resolve_${1//-/_}"
+    local dep="$1" resolver selected rc=0
+    resolver="_cc_dep_resolve_${dep//-/_}"
     if declare -F "$resolver" >/dev/null 2>&1; then
-        "$resolver"
-    elif cc_dep_is_program_capability "$1"; then
-        cc_program_get "$1"
+        selected="$($resolver)" || rc=$?
+    elif cc_dep_is_program_capability "$dep"; then
+        selected="$(cc_program_get "$dep")" || rc=$?
     else
-        printf '%s\n' "$1"
+        selected="$dep"
     fi
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "dependency requested" "$dep"
+        cc_debug_kv "capability resolver" "${resolver#_cc_dep_resolve_}"
+        cc_debug_kv "selected implementation" "$selected"
+    fi
+    printf '%s\n' "$selected"
+    return "$rc"
 }
 
 cc_dep_execution_status() {
-    local validator="_cc_dep_status_${1//-/_}"
-    if declare -F "$validator" >/dev/null 2>&1; then
-        "$validator"
-    elif cc_dep_is_program_capability "$1"; then
-        cc_program_status "$1"
-    elif cc_dep_exists "$1"; then
-        printf '%s\n' "OK"
+    local dep="$1" validator status classification resolver
+    validator="_cc_dep_status_${dep//-/_}"
+    if cc_dep_is_program_capability "$dep"; then
+        classification="semantic capability"
+        resolver="Program Management"
     else
-        printf '%s\n' "MISSING"
+        classification="literal executable"
+        resolver="command -v"
     fi
+    if declare -F "$validator" >/dev/null 2>&1; then
+        status="$($validator)"
+    elif [ "$classification" = "semantic capability" ]; then
+        status="$(cc_program_status "$dep")"
+    elif cc_dep_exists "$dep"; then
+        status="OK"
+    else
+        status="MISSING"
+    fi
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "dependency requested" "$dep"
+        cc_debug_kv "dependency class" "$classification"
+        cc_debug_kv "resolver" "$resolver"
+        if declare -F cc_platform_type >/dev/null 2>&1; then
+            cc_debug_kv "detected platform" "$(cc_platform_type)"
+        fi
+        if [ "$classification" = "semantic capability" ]; then
+            cc_debug_kv "selected implementation" "$(cc_program_get "$dep" 2>/dev/null || printf unknown)"
+            cc_debug_kv "capability status" "$status"
+        else
+            cc_debug_kv "command lookup" "$dep"
+            cc_debug_kv "executable status" "$status"
+        fi
+    fi
+    printf '%s\n' "$status"
 }
 
 cc_dep_install_hint() {
