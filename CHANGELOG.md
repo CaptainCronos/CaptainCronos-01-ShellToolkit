@@ -10,6 +10,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Program Management System with data-only defaults in `config/programs.conf`.
+- Capability-oriented program resolution and validation in `lib/cc-programs.sh`.
+- Read-only `cc programs`, `cc programs check`, and `cc programs show` commands.
 - Public `cc prompt` menu backed by dynamically discovered templates under `templates/prompts/`.
 - Interactive prompt collection with previous, next, edit, cancel, preview, and generate flow.
 - Prompt clipboard copy helpers for supported host clipboard tools.

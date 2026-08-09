@@ -170,6 +170,7 @@ fi
 run_check "Common library" check_library cc-common.sh
 run_check "Context library" check_library cc-context.sh
 run_check "Config library" check_library cc-config.sh
+run_check "Programs library" check_library cc-programs.sh
 run_check "Storage library" check_library cc-storage.sh
 run_check "SMART library" check_library cc-smart.sh
 run_check "Asset library" check_library cc-assets.sh

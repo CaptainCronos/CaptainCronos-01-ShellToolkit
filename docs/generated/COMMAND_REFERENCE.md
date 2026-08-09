@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Mon Jul  6 03:07:43 EDT 2026
+Generated: Sun Aug  9 08:02:52 EDT 2026
 
 ## cc about
 
@@ -441,6 +441,22 @@ Actions:
   info NAME   Show detail for one plugin directory.
 
 This command only inspects plugin directories. It does not enable, disable, or execute plugins yet.
+~~~
+
+## cc programs
+
+~~~text
+Usage:
+  cc programs
+  cc programs check
+  cc programs show CAPABILITY
+
+Read-only program interface reporting.
+
+Examples:
+  cc programs show pkg-manager
+  cc programs show download
+  cc programs show http-api
 ~~~
 
 ## cc prompt

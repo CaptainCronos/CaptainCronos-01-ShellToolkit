@@ -69,6 +69,33 @@ The baseline represents factory/reference state. Defaults represent approved too
 
 ---
 
+## Program Management
+
+Preferred external program interfaces are centralized through:
+
+```text
+Engineering Manual
+        |
+        v
+config/programs.conf
+        |
+        v
+lib/cc-programs.sh
+        |
+        v
+Captain Cronos commands
+```
+
+The configuration contains executable choices only. The library validates the
+data-only format and exposes capability-oriented lookup, existence, requirement,
+and validation functions. Commands request capabilities such as package manager,
+download client, or HTTP API client instead of selecting applications directly.
+
+`cc programs`, `cc programs check`, and `cc programs show CAPABILITY` provide
+read-only reporting. They do not install programs or modify host configuration.
+
+---
+
 ## Installation Model
 
 The installer performs:

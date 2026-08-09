@@ -1,5 +1,25 @@
 # Toolkit Configuration
 
+## Program Interfaces
+
+Preferred command-line program choices are defined in `config/programs.conf`
+and resolved by `lib/cc-programs.sh`. The file is intentionally limited to
+executable names; command arguments, pipelines, privilege escalation, and shell
+logic belong in libraries.
+
+Inspect the configured capability interfaces with:
+
+```bash
+cc programs
+cc programs check
+cc programs show pkg-manager
+```
+
+Program reporting is read-only. Missing programs are reported and are never
+installed automatically.
+
+## User Configuration
+
 Toolkit configuration lives in:
 
 ```text

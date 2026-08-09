@@ -80,6 +80,8 @@ cc update
 cc update dev --dry-run
 cc baseline
 cc defaults
+cc programs
+cc programs check
 cc help
 ```
 
@@ -118,6 +120,11 @@ cc asset
 ```
 
 Commands live under `tools/commands/`, where each command is a standalone script discovered by the `cc` dispatcher.
+
+Preferred external executables are defined centrally in `config/programs.conf`
+and exposed to commands as capabilities through `lib/cc-programs.sh`. Use
+`cc programs show pkg-manager`, `cc programs show download`, or
+`cc programs show http-api` to inspect an interface without changing the host.
 
 ---
 

@@ -36,24 +36,29 @@ esac
 
 cc_banner
 
-for d in bash install lib baseline/ubuntu-26.04 defaults/v1 docs templates templates/prompts; do
+for d in bash config install lib baseline/ubuntu-26.04 defaults/v1 docs templates templates/prompts; do
     cc_require_dir "$d"
 done
 
-for f in VERSION manifest.yml lib/cc-context.sh lib/cc-common.sh lib/cc-prompt-engine.sh bash/bashrc bash/bash_aliases bash/bash_functions install/install.sh; do
+for f in VERSION manifest.yml config/programs.conf lib/cc-context.sh lib/cc-common.sh lib/cc-programs.sh lib/cc-prompt-engine.sh bash/bashrc bash/bash_aliases bash/bash_functions install/install.sh; do
     cc_require_file "$f"
 done
 
 bash -n lib/cc-context.sh
 bash -n lib/cc-common.sh
+bash -n lib/cc-programs.sh
 bash -n lib/cc-prompt-engine.sh
 bash -n bash/bashrc
 bash -n bash/bash_aliases
 bash -n bash/bash_functions
 bash -n install/install.sh
 bash -n tools/commands/prompt
+bash -n tools/commands/programs
 
 source "$TOOLKIT_ROOT/lib/cc-prompt-engine.sh"
 cc_prompt_validate_templates
+
+source "$TOOLKIT_ROOT/lib/cc-programs.sh"
+cc_program_load
 
 cc_log "Verification passed."

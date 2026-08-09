@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : programs
+# Version     : 1.0.0-alpha1
+# Category    : Diagnostics
+# Requires    : bash git command
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show and validate preferred command-line program interfaces.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-programs.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc programs
+  cc programs check
+  cc programs show CAPABILITY
+
+Read-only program interface reporting.
+
+Examples:
+  cc programs show pkg-manager
+  cc programs show download
+  cc programs show http-api
+EOF_HELP
+}
+
+program_row() {
+    local capability="$1" label="$2" program status
+    program="$(cc_program_get "$capability")"
+    status="$(cc_program_status "$capability")"
+    printf '  %-16s %-14s ' "$label" "$program"
+    cc_status_word "$status"
+    printf '\n'
+}
+
+program_report() {
+    local section="" current_section capability label _variable _requirement
+    echo "Captain Cronos Program Interfaces"
+    echo "================================="
+    echo
+    while IFS='|' read -r current_section capability label _variable _requirement; do
+        if [ "$current_section" != "$section" ]; then
+            [ -z "$section" ] || echo
+            echo "$current_section"
+            section="$current_section"
+        fi
+        program_row "$capability" "$label"
+    done < <(_cc_program_metadata)
+}
+
+program_show() {
+    local capability="$1" section row label _variable requirement program status
+    while IFS='|' read -r section row label _variable requirement; do
+        [ "$row" = "$capability" ] || continue
+        program="$(cc_program_get "$capability")"
+        status="$(cc_program_status "$capability")"
+        printf '%-14s %s\n' "Capability:" "$capability"
+        printf '%-14s %s\n' "Interface:" "$label"
+        printf '%-14s %s\n' "Category:" "$section"
+        printf '%-14s %s\n' "Program:" "$program"
+        printf '%-14s %s\n' "Requirement:" "$requirement"
+        printf '%-14s ' "Status:"
+        cc_status_word "$status"
+        printf '\n'
+        return 0
+    done < <(_cc_program_metadata)
+    cc_error "Unknown program capability: $capability"
+    return 1
+}
+
+ACTION="${1:-list}"
+case "$ACTION" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        echo "1.0.0-alpha1"
+        exit 0
+        ;;
+    list)
+        [ "$#" -eq 0 ] || { usage; exit 1; }
+        cc_program_load
+        program_report
+        ;;
+    check)
+        [ "$#" -eq 1 ] || { usage; exit 1; }
+        validation_status=0
+        cc_program_validate || validation_status=$?
+        [ "$validation_status" -ne 2 ] || exit 2
+        program_report
+        echo
+        printf '%-20s %s\n' "Required missing:" "$CC_PROGRAMS_MISSING_REQUIRED"
+        printf '%-20s %s\n' "Optional missing:" "$CC_PROGRAMS_MISSING_OPTIONAL"
+        if [ "$validation_status" -eq 0 ]; then
+            cc_status_line "Program interface check" "PASS"
+        else
+            cc_status_line "Program interface check" "FAIL"
+        fi
+        exit "$validation_status"
+        ;;
+    show)
+        [ "$#" -eq 2 ] || { usage; exit 1; }
+        cc_program_load
+        program_show "$2"
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

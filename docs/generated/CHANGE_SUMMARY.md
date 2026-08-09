@@ -1,9 +1,19 @@
 # Recent Change Summary
 
-Generated: Sat Jul  4 15:09:04 EDT 2026
+Generated: Sun Aug  9 08:02:54 EDT 2026
 
 ~~~text
-571191d (HEAD -> feat/update-dev-package-status, origin/main, origin/HEAD, main) feat(repos): add batch commit, push, and publish actions
+059e9e1 (HEAD -> feature/program-management-system, origin/main, origin/HEAD, main) Update kitty terminal and edit SU access
+c977887 Removed edit in kitty alias from bashrc
+58dda69 docs(context): establish canonical AI engineering guidance
+28c8011 docs(context): add canonical project context
+7328d4c feat(prompt): add reusable session framework
+be5eb80 feat(prompt): add dynamic prompt template menu
+e0f8195 feat(prompt): add interactive feature command
+9278eb0 feat(prompt): add prompt engine foundation
+b630d7e feat(repos): guard batch publishing workflows
+21dcba0 feat(update): report developer package manager update status
+571191d feat(repos): add batch commit, push, and publish actions
 694e958 refactor(context): introduce centralized context library
 5ad0a61 feat(install): deploy user launcher from toolkit root
 cb41e58 fix(context): separate toolkit root from current repo
@@ -33,14 +43,4 @@ bf6a39f Add SMART library metadata helpers
 94be091 Add shared library checks to selftest
 e1e8c70 Use shared report helpers for drive qualification
 7328edc Restore executable bit on framework command
-11915c4 Add framework verify gate
-64068c9 Use report helpers in drive-report
-f24c7f8 Add shared report helper library
-c4bea39 Refactor drive-burnin to storage helpers
-d1a0e22 Refactor drive-qualify to storage helpers
-c4d0268 Refactor drive-test status and start actions to storage library
-1804cc0 Add storage SMART self-test helpers
-1c7bb27 Refactor drive inventory to storage library
-3913407 Add storage inventory helpers
-2bbf537 Add shared storage helper library
 ~~~

@@ -97,19 +97,22 @@ generate_inventory() {
 }
 
 generate_reference() {
-    local cmd
+    local cmd first=1
     echo "# Captain Cronos Command Reference"
     echo
     echo "Generated: $(date)"
     echo
     while read -r cmd; do
         [ -n "$cmd" ] || continue
+        if [ "$first" -eq 0 ]; then
+            echo
+        fi
+        first=0
         echo "## cc $cmd"
         echo
         echo "~~~text"
         bash "$PROJECT_ROOT/tools/cc" "$cmd" --help 2>&1 || true
         echo "~~~"
-        echo
     done < <(command_list)
 }
 
