@@ -6,7 +6,7 @@
 # Script      : kernel-cleanup
 # Version     : 1.0.0-alpha1
 # Category    : Storage
-# Requires    : bash apt dpkg uname awk
+# Requires    : bash pkg-manager uname awk
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Review and optionally purge obsolete kernel packages safely.
 # ==============================================================================
@@ -16,6 +16,7 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-packages.sh"
 
 DRY_RUN=1
 KEEP_COUNT="${KEEP_COUNT:-2}"
@@ -53,6 +54,10 @@ esac
 
 have(){ command -v "$1" >/dev/null 2>&1; }
 log(){ echo "$*" | tee -a "$LOG" ; }
+run_pkg_log() {
+    "$@" 2>&1 | tee -a "$LOG"
+    return "${PIPESTATUS[0]}"
+}
 
 : > "$LOG"
 
@@ -107,11 +112,11 @@ packages=()
 for k in "${purge_kernels[@]}"; do
     while read -r pkg; do
         [ -n "$pkg" ] && packages+=("$pkg")
-    done < <(dpkg -l 2>/dev/null | awk -v k="$k" '$1 ~ /^(ii|rc)$/ && $2 ~ k {print $2}')
+    done < <(_cc_pkg_find_removable_matching "$k")
 done
 
 if [ "${#packages[@]}" -eq 0 ]; then
-    log "Obsolete kernel files found, but no matching dpkg packages selected."
+    log "Obsolete kernel files found, but no matching package database entries were selected."
     exit 0
 fi
 
@@ -125,8 +130,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
 fi
 
 log "Purging obsolete kernel packages..."
-sudo apt purge -y "${packages[@]}" 2>&1 | tee -a "$LOG"
-sudo apt autoremove --purge -y 2>&1 | tee -a "$LOG"
-sudo apt autoclean 2>&1 | tee -a "$LOG"
+CC_PKG_RUNNER=run_pkg_log _cc_pkg_purge "${packages[@]}"
+CC_PKG_RUNNER=run_pkg_log _cc_pkg_autoremove
+CC_PKG_RUNNER=run_pkg_log _cc_pkg_clean
 sudo update-grub 2>&1 | tee -a "$LOG"
 log "Kernel cleanup complete."

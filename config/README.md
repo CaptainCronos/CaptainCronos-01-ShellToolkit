@@ -18,6 +18,12 @@ cc programs show pkg-manager
 Program reporting is read-only. Missing programs are reported and are never
 installed automatically.
 
+System package behavior is implemented in `lib/cc-packages.sh`. On Debian-family
+systems it resolves package operations, repository queries, and the installed
+package database through `pkg-manager`, `pkg-query`, and `pkg-database`.
+Configuration contains executable choices only; dry-run behavior, arguments,
+and privilege escalation remain in the library.
+
 ## User Configuration
 
 Toolkit configuration lives in:

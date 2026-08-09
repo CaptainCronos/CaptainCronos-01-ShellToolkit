@@ -15,6 +15,7 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-packages.sh"
 
 case "${1:-}" in
     --help|-h)
@@ -48,7 +49,7 @@ mkdir -p "$BASELINE_DIR"
     lsb_release -a 2>/dev/null || cat /etc/os-release
 } > "$BASELINE_DIR/shell-version.txt"
 
-apt-mark showmanual > "$BASELINE_DIR/packages.list" 2>/dev/null || true
+_cc_pkg_list_installed > "$BASELINE_DIR/packages.list" 2>/dev/null || true
 env | sort > "$BASELINE_DIR/env.txt"
 
 cat > "$BASELINE_DIR/README.md" <<'EOFBASE'

@@ -10,6 +10,8 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Semantic, platform-aware system package operations in `lib/cc-packages.sh`.
+- Focused package-management capability, query, dry-run, and platform tests.
 - Program Management System with data-only defaults in `config/programs.conf`.
 - Capability-oriented program resolution and validation in `lib/cc-programs.sh`.
 - Read-only `cc programs`, `cc programs check`, and `cc programs show` commands.
@@ -20,6 +22,15 @@ The format follows a simple milestone-based structure until the project reaches 
 - Metadata-discovered prompt templates for feature, framework, bugfix, docs, workflow, and architecture prompts.
 - Required prompt menu metadata for title, description, category, and tags.
 - Prompt Engine validation in `install/verify.sh` and `cc selftest`.
+
+### Changed
+
+- Debian-family automation now resolves `apt-get`, `apt-cache`, and `dpkg` through the Program Management System.
+- System update, kernel cleanup, dependency previews, and baseline package capture now use shared package semantics.
+
+### Removed
+
+- Nala and Aptitude selection and fallback paths from active system package automation.
 
 ---
 

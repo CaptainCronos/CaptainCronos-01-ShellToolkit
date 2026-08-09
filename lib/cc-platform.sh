@@ -26,7 +26,7 @@ cc_platform_kernel() { uname -r 2>/dev/null || echo unknown; }
 cc_platform_arch() { uname -m 2>/dev/null || echo unknown; }
 
 cc_platform_package_manager() {
-    if command -v apt >/dev/null 2>&1; then echo apt
+    if command -v apt-get >/dev/null 2>&1; then echo apt-get
     elif command -v dnf >/dev/null 2>&1; then echo dnf
     elif command -v yum >/dev/null 2>&1; then echo yum
     elif command -v zypper >/dev/null 2>&1; then echo zypper
@@ -60,7 +60,7 @@ cc_platform_type() {
 cc_capability_exists() {
     local cap="$1"
     case "$cap" in
-        apt) command -v apt >/dev/null 2>&1 ;;
+        pkg-manager) [ "$(cc_platform_package_manager)" != "none" ] ;;
         battery) [ -d /sys/class/power_supply ] && ls /sys/class/power_supply/BAT* >/dev/null 2>&1 ;;
         docker) command -v docker >/dev/null 2>&1 ;;
         git) command -v git >/dev/null 2>&1 ;;
@@ -76,7 +76,7 @@ cc_capability_exists() {
 }
 
 cc_capability_status() { if cc_capability_exists "$1"; then echo yes; else echo no; fi; }
-cc_capability_list() { printf '%s\n' git apt systemd storage smart zfs truenas docker podman network battery; }
+cc_capability_list() { printf '%s\n' git pkg-manager systemd storage smart zfs truenas docker podman network battery; }
 
 cc_platform_infer_profile() {
     case "$(cc_platform_type)" in

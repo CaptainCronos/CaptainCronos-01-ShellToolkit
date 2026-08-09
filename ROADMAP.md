@@ -6,12 +6,13 @@ Current version line: **v1.3.0-beta1 — Blackbeard**
 
 The Shell Toolkit has moved from a personal Bash collection into an engineered, installable toolkit with versioning, verification, baseline capture, defaults, storage workflows, asset history, shared libraries, and a GitHub-backed development workflow.
 
-## Next Migration Phase — Package Management
+## Package Management Standardization
 
-After validation of the Program Management System, migrate Debian and Ubuntu
-package-management automation to the centralized capability interfaces. That
-phase should remove Nala support and replace automated `apt` usage with the
-approved `apt-get`, `apt-cache`, and `dpkg` interfaces in controlled changes.
+Status: **Complete**
+
+Debian and Ubuntu package automation now uses semantic package operations backed
+by the centralized `apt-get`, `apt-cache`, and `dpkg` capability interfaces.
+Nala selection and automated `apt` execution have been removed from active code.
 
 ---
 

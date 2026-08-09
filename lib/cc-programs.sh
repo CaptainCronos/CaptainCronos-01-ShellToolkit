@@ -43,7 +43,7 @@ EOF_PROGRAMS
 }
 
 _cc_program_variable() {
-    local capability="$1" row
+    local capability="$1" row _section _label _variable _requirement
     while IFS='|' read -r _section row _label _variable _requirement; do
         if [ "$row" = "$capability" ]; then
             printf '%s\n' "$_variable"
@@ -54,7 +54,7 @@ _cc_program_variable() {
 }
 
 _cc_program_known_variable() {
-    local candidate="$1" variable
+    local candidate="$1" variable _section _capability _label _requirement
     while IFS='|' read -r _section _capability _label variable _requirement; do
         [ "$variable" = "$candidate" ] && return 0
     done < <(_cc_program_metadata)
@@ -63,6 +63,7 @@ _cc_program_known_variable() {
 
 cc_program_load() {
     local config line key value line_number=0
+    local capability _section _label _requirement
     config="${1:-$(cc_program_config_file)}"
     CC_PROGRAMS_LOADED=0
 
@@ -142,7 +143,7 @@ cc_program_status() {
 }
 
 cc_program_requirement() {
-    local capability="$1" row
+    local capability="$1" row requirement _section _label _variable
     while IFS='|' read -r _section row _label _variable requirement; do
         if [ "$row" = "$capability" ]; then
             printf '%s\n' "$requirement"

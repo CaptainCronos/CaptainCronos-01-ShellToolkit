@@ -94,6 +94,29 @@ download client, or HTTP API client instead of selecting applications directly.
 `cc programs`, `cc programs check`, and `cc programs show CAPABILITY` provide
 read-only reporting. They do not install programs or modify host configuration.
 
+System package execution is layered separately in `lib/cc-packages.sh`:
+
+```text
+Captain Cronos command
+        |
+        v
+semantic package operation
+        |
+        +--> platform family
+        |
+        +--> configured Debian program capability
+        |
+        v
+privileged mutation or unprivileged query
+```
+
+Commands call `_cc_pkg_update`, `_cc_pkg_upgrade`, `_cc_pkg_install`,
+`_cc_pkg_remove`, and the narrower query/cleanup helpers instead of embedding
+package-manager syntax. On Debian-family systems these functions use the
+configured `apt-get`, `apt-cache`, and `dpkg` interfaces. Other detected package
+families retain their native syntax. Dry-run reporting and `sudo` remain in the
+execution library, never in `config/programs.conf`.
+
 ---
 
 ## Installation Model

@@ -68,6 +68,7 @@ cd "$TOOLKIT_ROOT"
 source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
 source "$TOOLKIT_ROOT/lib/cc-deps.sh"
+source "$TOOLKIT_ROOT/lib/cc-packages.sh"
 cc_context_init "$TOOLKIT_ROOT" "$ORIGINAL_PWD"
 
 COMMAND_DIR="$TOOLKIT_ROOT/tools/commands"
@@ -113,6 +114,7 @@ script_field() {
 
 check_command_deps() {
     local file="$1" command_name="$2" deps dep missing=0 package
+    local -a packages=()
     deps="$(script_field "$file" "Requires")"
     [ -n "$deps" ] || return 0
 
@@ -122,34 +124,39 @@ check_command_deps() {
                 continue
                 ;;
         esac
-        if ! cc_dep_exists "$dep"; then
-            if [ "$missing" -eq 0 ]; then
-                cc_error "Missing required dependency for cc $command_name"
-                echo
-                echo "Dependency Check"
-                echo "----------------"
-            fi
-            package="$(cc_dep_package_hint "$dep")"
-            printf '%-18s %s' "$dep" "MISSING"
-            if [ -n "$package" ] && [ "$package" != "$dep" ]; then
-                printf '  install package: %s' "$package"
-            fi
-            printf '\n'
-            missing=$((missing + 1))
+        if [ "$dep" = "pkg-manager" ]; then
+            _cc_pkg_manager_exists && continue
+        elif cc_dep_exists "$dep"; then
+            continue
         fi
+        if [ "$missing" -eq 0 ]; then
+            cc_error "Missing required dependency for cc $command_name"
+            echo
+            echo "Dependency Check"
+            echo "----------------"
+        fi
+        package="$(cc_dep_package_hint "$dep")"
+        printf '%-18s %s' "$dep" "MISSING"
+        if [ -n "$package" ] && [ "$package" != "$dep" ]; then
+            printf '  install package: %s' "$package"
+        fi
+        printf '\n'
+        missing=$((missing + 1))
     done
 
     if [ "$missing" -gt 0 ]; then
         echo
         echo "Resolve missing dependencies and retry."
-        if command -v apt >/dev/null 2>&1; then
+        if _cc_pkg_manager_exists; then
             echo
-            echo "Ubuntu/Debian hint:"
-            printf '  sudo apt install'
+            echo "Package installation preview:"
             for dep in $deps; do
-                cc_dep_exists "$dep" || printf ' %s' "$(cc_dep_package_hint "$dep")"
+                case "$dep" in
+                    bash|sh|pkg-manager) continue ;;
+                esac
+                cc_dep_exists "$dep" || packages+=("$(cc_dep_package_hint "$dep")")
             done
-            printf '\n'
+            CC_PKG_DRY_RUN=1 _cc_pkg_install "${packages[@]}"
         fi
         exit 127
     fi

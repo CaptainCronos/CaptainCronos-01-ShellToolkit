@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Sun Aug  9 08:02:52 EDT 2026
+Generated: Sun Aug  9 08:21:42 EDT 2026
 
 ## cc about
 
@@ -653,7 +653,7 @@ Examples:
 ~~~text
 Usage: cc system-update [--dry-run]
 
-Runs the managed system update workflow: apt/nala/aptitude, snap, flatpak, Firefox, Thunderbird, and GRUB CLI Safe Boot refresh.
+Runs the managed system update workflow: platform package operations, snap, flatpak, Firefox, Thunderbird, and GRUB CLI Safe Boot refresh.
 
 Notes:
   Developer package managers are detected and reported, but not updated by system-update.

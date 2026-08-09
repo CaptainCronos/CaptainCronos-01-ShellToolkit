@@ -16,6 +16,7 @@ cd "$PROJECT_ROOT"
 
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-deps.sh"
+source "$PROJECT_ROOT/lib/cc-packages.sh"
 
 INSTALL_VERSION="2.2.0-alpha1"
 BACKUP_ROOT="$HOME/.captaincronos/backups"
@@ -179,10 +180,11 @@ verify_dependencies() {
     if [ "$missing" -gt 0 ]; then
         echo
         cc_error "Missing required install dependencies: $missing"
-        if command -v apt >/dev/null 2>&1; then
+        if _cc_pkg_manager_exists; then
             echo
-            echo "Ubuntu/Debian hint:"
-            echo "  sudo apt install$packages"
+            echo "Package installation preview:"
+            # shellcheck disable=SC2086
+            CC_PKG_DRY_RUN=1 _cc_pkg_install $packages
         fi
         echo
         echo "Install aborted before changing files."
