@@ -40,7 +40,7 @@ for d in bash config install lib baseline/ubuntu-26.04 defaults/v1 docs template
     cc_require_dir "$d"
 done
 
-for f in VERSION manifest.yml config/programs.conf lib/cc-context.sh lib/cc-common.sh lib/cc-programs.sh lib/cc-packages.sh lib/cc-network.sh lib/cc-services.sh lib/cc-http.sh lib/cc-prompt-engine.sh bash/bashrc bash/bash_aliases bash/bash_functions install/install.sh; do
+for f in VERSION manifest.yml config/programs.conf lib/cc-context.sh lib/cc-common.sh lib/cc-programs.sh lib/cc-packages.sh lib/cc-network.sh lib/cc-services.sh lib/cc-http.sh lib/cc-data.sh lib/cc-yaml.sh lib/cc-prompt-engine.sh bash/bashrc bash/bash_aliases bash/bash_functions install/install.sh; do
     cc_require_file "$f"
 done
 
@@ -51,6 +51,8 @@ bash -n lib/cc-packages.sh
 bash -n lib/cc-network.sh
 bash -n lib/cc-services.sh
 bash -n lib/cc-http.sh
+bash -n lib/cc-data.sh
+bash -n lib/cc-yaml.sh
 bash -n lib/cc-prompt-engine.sh
 bash -n bash/bashrc
 bash -n bash/bash_aliases
@@ -81,5 +83,8 @@ fi
 source "$TOOLKIT_ROOT/lib/cc-http.sh"
 _cc_download_available
 _cc_http_available
+
+source "$TOOLKIT_ROOT/lib/cc-data.sh"
+_cc_yaml_available
 
 cc_log "Verification passed."

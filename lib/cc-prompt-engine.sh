@@ -21,6 +21,13 @@ if [ -z "${CC_CONTEXT_LOADED:-}" ]; then
     unset _cc_prompt_lib_dir
 fi
 
+if [ -z "${CC_DATA_LOADED:-}" ]; then
+    _cc_prompt_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    # shellcheck disable=SC1091
+    source "$_cc_prompt_lib_dir/cc-data.sh"
+    unset _cc_prompt_lib_dir
+fi
+
 _cc_prompt_error() {
     if command -v cc_error >/dev/null 2>&1; then
         cc_error "$@"
@@ -908,24 +915,6 @@ cc_prompt_output_format_supported() {
     esac
 }
 
-cc_prompt_json_escape() {
-    awk '
-        BEGIN {first = 1}
-        {
-            line = $0
-            gsub(/\\/, "\\\\", line)
-            gsub(/"/, "\\\"", line)
-            gsub(/\t/, "\\t", line)
-            gsub(/\r/, "\\r", line)
-            if (!first) {
-                printf "\\n"
-            }
-            printf "%s", line
-            first = 0
-        }
-    '
-}
-
 cc_prompt_output_markdown() {
     cat
 }
@@ -953,10 +942,17 @@ cc_prompt_output_clipboard() {
 }
 
 cc_prompt_output_json() {
-    local id="${1:-prompt}" rendered escaped
+    local id="${1:-prompt}" rendered
+    if ! _cc_json_available; then
+        _cc_prompt_error "JSON output requires a compatible configured JSON processor."
+        return 1
+    fi
     rendered="$(cat)"
-    escaped="$(printf '%s' "$rendered" | cc_prompt_json_escape)"
-    printf '{"template":"%s","format":"json","content":"%s"}\n' "$id" "$escaped"
+    _cc_json_generate \
+        '{template: $template, format: "json", content: $content}' \
+        --compact-output \
+        --arg template "$id" \
+        --arg content "$rendered"
 }
 
 cc_prompt_format_output() {

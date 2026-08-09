@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Sun Aug  9 09:04:12 EDT 2026
+Generated: Sun Aug  9 09:36:35 EDT 2026
 
 ## cc about
 
@@ -457,6 +457,8 @@ Examples:
   cc programs show pkg-manager
   cc programs show download
   cc programs show http-api
+  cc programs show json
+  cc programs show yaml
 ~~~
 
 ## cc prompt

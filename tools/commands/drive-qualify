@@ -6,7 +6,7 @@
 # Script      : drive-qualify
 # Version     : 1.1.0-alpha1
 # Category    : Storage
-# Requires    : bash smartctl awk grep date mkdir tee
+# Requires    : bash yaml smartctl awk grep date mkdir tee
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Run non-destructive drive qualification workflow.
 # ==============================================================================
@@ -71,7 +71,7 @@ latest_asset_for_device() {
     cc_assets_init
     for file in "$(cc_asset_dir drives)"/*.yaml; do
         [ -f "$file" ] || continue
-        if grep -q "current_device: \"$dev\"" "$file"; then
+        if [ "$(cc_yaml_get "$file" current_device)" = "$dev" ]; then
             echo "$file"
             return 0
         fi

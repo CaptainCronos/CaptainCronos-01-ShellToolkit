@@ -18,6 +18,8 @@ The format follows a simple milestone-based structure until the project reaches 
 - Focused service state, scope, dry-run, journal, and non-systemd tests.
 - Semantic file-download and HTTP request operations in `lib/cc-http.sh`.
 - Focused local HTTP tests for redirects, failures, output, TLS defaults, and secret-safe dry runs.
+- Semantic JSON/YAML operations and compatibility checks in `lib/cc-data.sh`.
+- Focused structured-data validation, query, compatibility, and injection-safety tests.
 - Program Management System with data-only defaults in `config/programs.conf`.
 - Capability-oriented program resolution and validation in `lib/cc-programs.sh`.
 - Read-only `cc programs`, `cc programs check`, and `cc programs show` commands.
@@ -39,6 +41,10 @@ The format follows a simple milestone-based structure until the project reaches 
 - Monthly health and its optional user timer now use scoped semantic service operations.
 - File downloads now resolve `download`, while API-style GET/HEAD requests resolve `http-api`.
 - Firefox and Thunderbird archive retrieval now uses the configured download interface.
+- Program reporting now distinguishes missing programs from incompatible interfaces.
+- Asset and drive YAML processing now uses the compatible configured YAML capability.
+- Prompt and selftest JSON output now uses semantic JSON generation.
+- YAML is required by active asset workflows; JSON remains optional.
 
 ### Removed
 
@@ -46,6 +52,7 @@ The format follows a simple milestone-based structure until the project reaches 
 - Linux `netstat` fallback and independent `ip`/`nmcli` selection from active network automation.
 - Direct `systemctl` and `journalctl` execution from higher-level toolkit commands.
 - Direct HTTP client execution from active higher-level toolkit commands.
+- Awk-based YAML parsing and predictable YAML mutation temporary filenames.
 
 ---
 

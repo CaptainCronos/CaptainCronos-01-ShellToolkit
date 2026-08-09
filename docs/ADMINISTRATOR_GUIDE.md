@@ -89,6 +89,20 @@ TLS certificate verification is enabled by default. HTTP failures return failure
 status, dry-run retrieval performs no transfer, and credential-bearing URL
 components are redacted from dry-run reports.
 
+## JSON and YAML
+
+Captain Cronos resolves JSON processing through `jq` and YAML processing through
+the Kislyuk yq jq-wrapper. An executable named `yq` is not sufficient: several
+unrelated implementations use that name with incompatible command syntax.
+`cc programs` reports `INCOMPATIBLE` when the configured executable exists but
+does not provide the required interface.
+
+No arbitrary minimum yq version is required. Compatibility is established by
+the implementation identity and a behavioral query/serialization probe. YAML is
+required by asset and drive workflows. JSON remains optional and is used by
+explicit JSON output modes. Checks are observational and never install or
+replace a processor.
+
 ## Storage Workflow
 1. `cc drive-report`
 2. `cc drive-qualify`

@@ -51,7 +51,7 @@ cc_dep_storage_list() {
 }
 
 cc_dep_optional_list() {
-    printf '%s\n' jq tree bat flatpak snap gh
+    printf '%s\n' tree bat flatpak snap gh
 }
 
 cc_dep_package_hint() {

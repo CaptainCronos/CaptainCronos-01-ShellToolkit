@@ -175,6 +175,29 @@ retry behavior. `_cc_http_get` and `_cc_http_head` provide redirect-following,
 HTTP-error-aware, parseable request output. Dry-run output redacts user-info and
 query strings, and TLS verification remains enabled by default.
 
+Structured-data behavior is centralized in `lib/cc-data.sh`:
+
+```text
+Captain Cronos caller
+        |
+        +--> JSON validation/query/output --> json capability --> jq behavior
+        |
+        +--> YAML validation/query/write --> yaml capability
+                                      --> compatible Kislyuk yq behavior
+```
+
+`cc_program_status` reports `MISSING` when no executable resolves and
+`INCOMPATIBLE` when an executable fails its registered capability probe. Probe
+functions follow a reusable capability-naming convention in `cc-programs.sh`.
+The YAML probe verifies the Kislyuk identity form and the jq-compatible YAML
+serialization syntax actually used; it does not impose an unrelated version
+floor.
+
+Query and generation expressions remain separate process arguments. Dynamic keys and values
+use `--arg` or `--args`, never shell command construction or `eval`. The legacy
+`cc-yaml.sh` API delegates to these helpers so asset callers retain their API
+while gaining real YAML parsing and safe atomic writes.
+
 ---
 
 ## Installation Model
