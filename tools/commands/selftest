@@ -173,6 +173,7 @@ fi
 run_check "Common library" check_library cc-common.sh
 run_check "Context library" check_library cc-context.sh
 run_check "Config library" check_library cc-config.sh
+run_check "Semantic dependencies" bash "$PROJECT_ROOT/tests/dependencies.sh"
 run_check "Programs library" check_library cc-programs.sh
 run_check "Packages library" check_library cc-packages.sh
 run_check "Package operations" bash "$PROJECT_ROOT/tests/package-management.sh"

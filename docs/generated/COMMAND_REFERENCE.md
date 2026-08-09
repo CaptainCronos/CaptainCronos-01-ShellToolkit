@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Sun Aug  9 09:36:35 EDT 2026
+Generated: Sun Aug  9 09:52:56 EDT 2026
 
 ## cc about
 

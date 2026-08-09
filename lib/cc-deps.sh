@@ -11,6 +11,13 @@
 # Purpose     : Shared dependency and capability check helpers.
 # ==============================================================================
 
+if ! declare -F cc_program_get >/dev/null 2>&1; then
+    _cc_deps_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    # shellcheck disable=SC1091
+    source "$_cc_deps_lib_dir/cc-programs.sh"
+    unset _cc_deps_lib_dir
+fi
+
 cc_dep_exists() {
     command -v "$1" >/dev/null 2>&1
 }
@@ -22,6 +29,39 @@ cc_dep_status() {
     else
         echo "missing"
     fi
+}
+
+cc_dep_is_program_capability() {
+    cc_program_is_capability "$1"
+}
+
+cc_dep_resolve_program() {
+    local resolver="_cc_dep_resolve_${1//-/_}"
+    if declare -F "$resolver" >/dev/null 2>&1; then
+        "$resolver"
+    elif cc_dep_is_program_capability "$1"; then
+        cc_program_get "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
+cc_dep_execution_status() {
+    local validator="_cc_dep_status_${1//-/_}"
+    if declare -F "$validator" >/dev/null 2>&1; then
+        "$validator"
+    elif cc_dep_is_program_capability "$1"; then
+        cc_program_status "$1"
+    elif cc_dep_exists "$1"; then
+        printf '%s\n' "OK"
+    else
+        printf '%s\n' "MISSING"
+    fi
+}
+
+cc_dep_install_hint() {
+    cc_dep_is_program_capability "$1" && return 1
+    cc_dep_package_hint "$1"
 }
 
 cc_dep_check_list() {

@@ -118,6 +118,11 @@ cc_program_capabilities() {
     done < <(_cc_program_metadata)
 }
 
+cc_program_is_capability() {
+    [ "$#" -eq 1 ] || return 2
+    _cc_program_variable "$1" >/dev/null 2>&1
+}
+
 cc_program_get() {
     local capability="$1" variable
     [ "$CC_PROGRAMS_LOADED" -eq 1 ] || cc_program_load || return 1

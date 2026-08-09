@@ -113,42 +113,32 @@ script_field() {
 }
 
 check_command_deps() {
-    local file="$1" command_name="$2" deps dep missing=0 package status program capability
+    local file="$1" command_name="$2" deps dep missing=0 package status program
     local -a packages=()
     deps="$(script_field "$file" "Requires")"
     [ -n "$deps" ] || return 0
 
     for dep in $deps; do
-        capability=0
         case "$dep" in
             bash|sh)
                 continue
                 ;;
         esac
-        if [ "$dep" = "pkg-manager" ]; then
-            _cc_pkg_manager_exists && continue
-            status="MISSING"
-            program="$(_cc_pkg_manager 2>/dev/null || printf '%s' pkg-manager)"
-        elif _cc_program_variable "$dep" >/dev/null 2>&1; then
-            capability=1
-            status="$(cc_program_status "$dep")"
-            [ "$status" = "OK" ] && continue
-            program="$(cc_program_get "$dep")"
-        elif cc_dep_exists "$dep"; then
-            continue
-        else
-            status="MISSING"
-            program="$dep"
-        fi
+        status="$(cc_dep_execution_status "$dep")"
+        [ "$status" = "OK" ] && continue
+        program="$(cc_dep_resolve_program "$dep")"
         if [ "$missing" -eq 0 ]; then
             cc_error "Missing required dependency for cc $command_name"
             echo
             echo "Dependency Check"
             echo "----------------"
         fi
-        package="$(cc_dep_package_hint "$program")"
         printf '%-18s %s' "$dep" "$status"
-        if [ "$status" = "MISSING" ] && [ "$capability" -eq 0 ] && [ -n "$package" ]; then
+        package=""
+        if [ "$status" = "MISSING" ]; then
+            package="$(cc_dep_install_hint "$dep" 2>/dev/null || true)"
+        fi
+        if [ -n "$package" ]; then
             if [ "$package" != "$program" ]; then
                 printf '  install package: %s' "$package"
             fi

@@ -38,6 +38,7 @@ Important libraries:
 - `cc-services.sh` — scoped service lifecycle, timer, and system-log operations
 - `cc-http.sh` — semantic file downloads and HTTP/API requests
 - `cc-data.sh` — compatible JSON/YAML validation, queries, and YAML mutation
+- `cc-deps.sh` — semantic capability and literal executable dependency checks
 - `cc-yaml.sh` — compatibility API for existing asset YAML operations
 - `cc-metadata.sh` — command metadata and registry helpers
 - `cc-assets.sh` — local asset database helpers
@@ -51,6 +52,13 @@ User configuration is stored under:
 ```
 
 Use `cc config` to view or modify it.
+
+Command `Requires` metadata may name either a Program Management capability or
+a literal executable. The dependency layer resolves known capabilities through
+`cc-programs.sh`, preserving compatibility status, and generates package hints
+only for literal executable dependencies. Capability-specific platform adapters,
+such as the package library's native manager resolver, plug into this generic
+dependency contract without teaching the dispatcher executable mappings.
 
 ### Update Architecture
 Maintenance updates are split into three surfaces:

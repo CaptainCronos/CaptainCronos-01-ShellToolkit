@@ -51,6 +51,27 @@ _cc_pkg_manager_exists() {
     [ "$manager" != "none" ] && command -v "$manager" >/dev/null 2>&1
 }
 
+_cc_dep_resolve_pkg_manager() {
+    _cc_pkg_manager
+}
+
+_cc_dep_status_pkg_manager() {
+    local manager
+    if [ "$(_cc_pkg_family)" = "apt-get" ]; then
+        cc_program_status pkg-manager
+        return
+    fi
+    manager="$(_cc_pkg_manager)" || {
+        printf '%s\n' "MISSING"
+        return
+    }
+    if [ "$manager" != "none" ] && command -v "$manager" >/dev/null 2>&1; then
+        printf '%s\n' "OK"
+    else
+        printf '%s\n' "MISSING"
+    fi
+}
+
 _cc_pkg_print_command() {
     local rendered="DRY RUN:" argument
     for argument in "$@"; do

@@ -1,15 +1,17 @@
 # Recent Change Summary
 
-Generated: Sun Aug  9 09:36:39 EDT 2026
+Generated: Sun Aug  9 09:53:00 EDT 2026
 
 ~~~text
-1aafa29 (HEAD -> feature/data-interface-standardization, origin/main, origin/HEAD, main) feat(http): standardize HTTP interfaces
+3f50139 (HEAD -> main, origin/main, origin/HEAD) Merge branch 'feature/data-interface-standardization'
+d05c51f (origin/feature/data-interface-standardization, feature/data-interface-standardization) feat(data): standardize structured data interfaces
+1aafa29 feat(http): standardize HTTP interfaces
 b9034e3 feat(services): standardize service management
 be7bec8 feat(network): standardize network interfaces
 7058a43 feat(packages): standardize package management
 0901395 feat(programs): add program interface management
 059e9e1 Update kitty terminal and edit SU access
-c977887 Removed edit in kitty alias from bashrc
+c977887 (origin/feature/sukitty-terminal-helpers) Removed edit in kitty alias from bashrc
 58dda69 docs(context): establish canonical AI engineering guidance
 28c8011 docs(context): add canonical project context
 7328d4c feat(prompt): add reusable session framework
@@ -41,6 +43,4 @@ c0f4149 Document v1.3.0-beta1 framework completion
 e175f81 Use status color helpers in framework verify
 d653e1b Use status color helpers in selftest
 a07c48c Add terminal status color helpers
-dba479e Add asset library metadata helpers
-bf6a39f Add SMART library metadata helpers
 ~~~
