@@ -35,6 +35,12 @@ requires an explicit `system` or `user` scope. Queries remain unprivileged,
 system mutations apply privilege escalation in the library, and user mutations
 never add `sudo`.
 
+HTTP behavior is implemented in `lib/cc-http.sh`. File acquisition resolves the
+`download` capability (`wget` by default); API-style requests resolve `http-api`
+(`curl` by default). The two interfaces are selected by operation semantics, not
+treated as interchangeable clients. URLs, retry policy, output paths, and HTTP
+arguments remain in the execution library or caller—not program configuration.
+
 ## User Configuration
 
 Toolkit configuration lives in:

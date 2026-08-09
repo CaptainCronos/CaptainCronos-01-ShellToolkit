@@ -160,6 +160,21 @@ on systemd. Mutation helpers keep dry-run, privilege, and scope behavior in the
 library. System log helpers provide no-pager, stable timestamp output with an
 explicit record limit where appropriate, without requiring privilege escalation.
 
+HTTP and download behavior is centralized in `lib/cc-http.sh`:
+
+```text
+Captain Cronos caller
+        |
+        +--> file acquisition --> download capability --> wget semantics
+        |
+        +--> HTTP/API request --> http-api capability --> curl semantics
+```
+
+`_cc_download` and `_cc_download_to` preserve file-oriented destination and
+retry behavior. `_cc_http_get` and `_cc_http_head` provide redirect-following,
+HTTP-error-aware, parseable request output. Dry-run output redacts user-info and
+query strings, and TLS verification remains enabled by default.
+
 ---
 
 ## Installation Model

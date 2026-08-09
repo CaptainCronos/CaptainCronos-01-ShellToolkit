@@ -36,6 +36,7 @@ Important libraries:
 - `cc-packages.sh` — semantic, platform-aware system package operations
 - `cc-network.sh` — semantic, platform-aware network-state inspection
 - `cc-services.sh` — scoped service lifecycle, timer, and system-log operations
+- `cc-http.sh` — semantic file downloads and HTTP/API requests
 - `cc-metadata.sh` — command metadata and registry helpers
 - `cc-assets.sh` — local asset database helpers
 - `cc-prompt-engine.sh` — internal prompt template discovery, rendering, and formatting helpers
@@ -86,6 +87,18 @@ parsing status screens. Read-only queries run without privilege escalation.
 System mutations add `sudo` in the execution library, user mutations do not, and
 dry-run mode reports commands without executing them. OpenRC and FreeBSD rc
 behavior remains behind explicit platform branches.
+
+### HTTP and Download Architecture
+
+HTTP retrieval is split by semantics. File acquisition resolves the configured
+`wget` download interface and preserves destination, redirect, retry, overwrite,
+diagnostic, and failure behavior. API-style GET and HEAD requests resolve the
+configured `curl` interface and emit response data without progress decoration.
+
+Both paths fail on HTTP errors, follow required redirects, and retain TLS
+certificate verification by default. Dry-run reports redact URL credentials and
+query strings and perform no transfer. Authentication, request headers, and
+mutating HTTP methods are not abstracted until an active caller requires them.
 
 ### Reports
 Historical reports are stored under:

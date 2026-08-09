@@ -18,6 +18,7 @@ cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
 source "$PROJECT_ROOT/lib/cc-packages.sh"
+source "$PROJECT_ROOT/lib/cc-http.sh"
 
 VERSION="1.0.0-alpha1"
 LOG="${LOG:-$HOME/upgrade.log}"
@@ -80,11 +81,11 @@ install_app_from_tar(){
     binname="$(basename "$target")"
     say "Downloading $binname..."
     if [ "$DRY_RUN" -eq 1 ]; then
-        say "DRY RUN: download $url -> $arc"
+        CC_HTTP_DRY_RUN=1 CC_HTTP_REPORTER=say _cc_download_to "$url" "$arc" 3
         say "DRY RUN: install $expdir -> $target"
         return 0
     fi
-    if ! curl -fL --retry 3 -o "$arc" "$url" >>"$LOG" 2>&1; then
+    if ! _cc_download_to "$url" "$arc" 3 >>"$LOG" 2>&1; then
         say "Download failed"
         return 1
     fi
@@ -205,7 +206,7 @@ if have flatpak; then
     run_log flatpak uninstall --unused -y || true
 fi
 
-need curl || exit 1
+_cc_download_available || { say "Missing download capability: $(cc_program_get download)"; exit 1; }
 need tar || exit 1
 
 TMP_DIR="$(mktemp -d)"

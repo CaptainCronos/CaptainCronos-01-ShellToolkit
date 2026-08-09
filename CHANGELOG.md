@@ -16,6 +16,8 @@ The format follows a simple milestone-based structure until the project reaches 
 - Focused network capability, helper, and non-Linux abstraction tests.
 - Semantic, explicitly scoped service and system-log operations in `lib/cc-services.sh`.
 - Focused service state, scope, dry-run, journal, and non-systemd tests.
+- Semantic file-download and HTTP request operations in `lib/cc-http.sh`.
+- Focused local HTTP tests for redirects, failures, output, TLS defaults, and secret-safe dry runs.
 - Program Management System with data-only defaults in `config/programs.conf`.
 - Capability-oriented program resolution and validation in `lib/cc-programs.sh`.
 - Read-only `cc programs`, `cc programs check`, and `cc programs show` commands.
@@ -35,12 +37,15 @@ The format follows a simple milestone-based structure until the project reaches 
 - Monthly health and workbench network checks now use shared semantic network helpers.
 - Systemd service and journal consumers now resolve `service-manager` and `system-log` capabilities.
 - Monthly health and its optional user timer now use scoped semantic service operations.
+- File downloads now resolve `download`, while API-style GET/HEAD requests resolve `http-api`.
+- Firefox and Thunderbird archive retrieval now uses the configured download interface.
 
 ### Removed
 
 - Nala and Aptitude selection and fallback paths from active system package automation.
 - Linux `netstat` fallback and independent `ip`/`nmcli` selection from active network automation.
 - Direct `systemctl` and `journalctl` execution from higher-level toolkit commands.
+- Direct HTTP client execution from active higher-level toolkit commands.
 
 ---
 

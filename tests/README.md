@@ -7,3 +7,5 @@ Focused shell tests supplement `cc selftest`:
   and non-Linux program selection.
 - `services.sh` validates scoped service state, dry-run mutations, logs, and
   non-systemd program selection.
+- `http.sh` validates semantic downloads, API requests, redirects, HTTP errors,
+  dry runs, secret redaction, and configured client selection.

@@ -30,6 +30,15 @@ Systemd service, timer, and journal automation now uses explicitly scoped
 semantic helpers backed by the centralized `systemctl` and `journalctl`
 capability interfaces. OpenRC and FreeBSD rc selection remains platform-scoped.
 
+## HTTP Interface Standardization
+
+Status: **Complete**
+
+File acquisition now uses semantic download helpers backed by `wget`, while
+HTTP/API GET and HEAD operations use separate helpers backed by `curl`. Redirect,
+HTTP failure, retry, TLS-verification, output, and secret-safe dry-run behavior
+are validated with local endpoints.
+
 ---
 
 ## Milestone M1 — Engineering Foundation

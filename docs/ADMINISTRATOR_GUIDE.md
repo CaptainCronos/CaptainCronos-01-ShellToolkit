@@ -78,6 +78,17 @@ inside the service library.
 The optional monthly-health timer is a user unit. Its install, enable, disable,
 status, and daemon-reload operations remain user-scoped and do not use `sudo`.
 
+## Downloads and HTTP APIs
+
+Captain Cronos distinguishes file downloads from HTTP/API requests. Release
+archives and other destination-oriented files use the configured `wget`
+download interface. API-oriented GET or HEAD requests use the configured `curl`
+interface so HTTP status, redirects, and response output are handled explicitly.
+
+TLS certificate verification is enabled by default. HTTP failures return failure
+status, dry-run retrieval performs no transfer, and credential-bearing URL
+components are redacted from dry-run reports.
+
 ## Storage Workflow
 1. `cc drive-report`
 2. `cc drive-qualify`
