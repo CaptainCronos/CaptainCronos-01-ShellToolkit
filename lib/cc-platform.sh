@@ -44,8 +44,9 @@ cc_platform_package_manager() {
 }
 
 cc_platform_init_system() {
-    if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then echo systemd
+    if [ -d /run/systemd/system ]; then echo systemd
     elif command -v rc-service >/dev/null 2>&1; then echo openrc
+    elif [ "$(uname -s 2>/dev/null || true)" = "FreeBSD" ]; then echo freebsd-rc
     else echo unknown
     fi
 }

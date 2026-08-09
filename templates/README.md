@@ -52,3 +52,9 @@ present.
 Prompt commands render these templates through the shared engine rather than
 parsing template files themselves. `cc prompt` discovers every `*.prompt` file
 in this directory automatically.
+
+## Systemd User Units
+
+Optional user-unit templates live under `systemd/user/`. Their lifecycle is
+managed through explicitly user-scoped helpers in `lib/cc-services.sh`; these
+units must never be installed or controlled as system services.

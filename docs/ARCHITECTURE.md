@@ -35,6 +35,7 @@ Important libraries:
 - `cc-programs.sh` — configured command-line capability resolution
 - `cc-packages.sh` — semantic, platform-aware system package operations
 - `cc-network.sh` — semantic, platform-aware network-state inspection
+- `cc-services.sh` — scoped service lifecycle, timer, and system-log operations
 - `cc-metadata.sh` — command metadata and registry helpers
 - `cc-assets.sh` — local asset database helpers
 - `cc-prompt-engine.sh` — internal prompt template discovery, rendering, and formatting helpers
@@ -72,6 +73,19 @@ FreeBSD-native `ifconfig`, `route`, `netstat`, and `sockstat` behavior remains
 behind explicit platform branches. NetworkManager configuration, resolver/DNS
 inspection, reachability probes, and network scanning are separate capabilities;
 they are not treated as substitutes for kernel network or socket state.
+
+### Service and System Log Architecture
+
+On systemd Linux hosts, service lifecycle and unit/timer inspection resolves the
+configured `systemctl` capability, while journal inspection resolves
+`journalctl`. Higher-level commands use semantic helpers and must pass either
+`system` or `user`; user services are never silently promoted to system scope.
+
+State tests use command exit status and machine-oriented properties rather than
+parsing status screens. Read-only queries run without privilege escalation.
+System mutations add `sudo` in the execution library, user mutations do not, and
+dry-run mode reports commands without executing them. OpenRC and FreeBSD rc
+behavior remains behind explicit platform branches.
 
 ### Reports
 Historical reports are stored under:

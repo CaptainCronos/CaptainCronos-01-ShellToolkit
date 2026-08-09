@@ -29,6 +29,12 @@ address, and route operations resolve `network`; listener and connection
 operations resolve `sockets`. NetworkManager control, DNS resolution, and
 connectivity probes are separate concerns and are not mapped to these interfaces.
 
+Service and system-log behavior is implemented in `lib/cc-services.sh`.
+Systemd hosts resolve `service-manager` and `system-log`; every service operation
+requires an explicit `system` or `user` scope. Queries remain unprivileged,
+system mutations apply privilege escalation in the library, and user mutations
+never add `sudo`.
+
 ## User Configuration
 
 Toolkit configuration lives in:

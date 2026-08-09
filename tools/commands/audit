@@ -156,7 +156,7 @@ meta = {
     "install": ("Core", "bash"),
     "kernel-cleanup": ("Storage", "bash pkg-manager uname awk"),
     "monthly-health": ("Maintenance", "bash date mkdir df uname uptime"),
-    "monthly-health-timer": ("Maintenance", "bash systemctl"),
+    "monthly-health-timer": ("Maintenance", "bash"),
     "plugin": ("Core", "bash find"),
     "registry": ("Documentation", "bash awk find"),
     "release": ("Engineering", "bash git"),

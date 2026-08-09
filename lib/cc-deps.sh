@@ -51,7 +51,7 @@ cc_dep_storage_list() {
 }
 
 cc_dep_optional_list() {
-    printf '%s\n' curl wget jq tree bat flatpak snap gh systemctl
+    printf '%s\n' curl wget jq tree bat flatpak snap gh
 }
 
 cc_dep_package_hint() {

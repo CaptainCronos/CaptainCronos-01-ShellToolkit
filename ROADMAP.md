@@ -22,6 +22,14 @@ Linux network-state automation now uses semantic inspection helpers backed by
 the centralized `ip` and `ss` capability interfaces. Active Linux `netstat`
 fallback and independent network executable selection have been removed.
 
+## Service Management Standardization
+
+Status: **Complete**
+
+Systemd service, timer, and journal automation now uses explicitly scoped
+semantic helpers backed by the centralized `systemctl` and `journalctl`
+capability interfaces. OpenRC and FreeBSD rc selection remains platform-scoped.
+
 ---
 
 ## Milestone M1 — Engineering Foundation

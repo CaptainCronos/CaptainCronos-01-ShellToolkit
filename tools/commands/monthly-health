@@ -17,6 +17,7 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-network.sh"
+source "$PROJECT_ROOT/lib/cc-services.sh"
 
 OUTPUT="file"
 JOURNAL_SINCE="${JOURNAL_SINCE:-24 hours ago}"
@@ -93,13 +94,7 @@ run_cc() {
 
 service_status() {
     local unit="$1"
-    if systemctl is-active --quiet "$unit" 2>/dev/null; then
-        printf '%-24s %s\n' "$unit" "active"
-    elif systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "$unit.service"; then
-        printf '%-24s %s\n' "$unit" "installed-not-active"
-    else
-        printf '%-24s %s\n' "$unit" "not-found"
-    fi
+    printf '%-24s %s\n' "$unit" "$(_cc_service_status system "$unit")"
 }
 
 mount_check() {
@@ -173,8 +168,8 @@ print_updates() {
 print_backups() {
     section "Backup Systems"
     subsection "Timers"
-    if have systemctl; then
-        systemctl list-timers --all 2>/dev/null | grep -E 'NEXT|timeshift|bitcoin|backup|captain|monthly' || true
+    if _cc_service_manager_available; then
+        _cc_service_list_timers system 2>/dev/null | grep -E 'NEXT|timeshift|bitcoin|backup|captain|monthly' || true
     fi
     subsection "Timeshift"
     if [ -x "$HOME/bin/timeshift-status.sh" ]; then
@@ -227,9 +222,9 @@ print_security_network() {
 print_desktop_gpu() {
     section "Desktop and GPU"
     subsection "Display manager/session"
-    systemctl get-default 2>/dev/null || true
-    systemctl is-active lightdm 2>/dev/null || true
-    systemctl is-active gdm3 2>/dev/null || true
+    _cc_service_default_target system 2>/dev/null || true
+    printf '%-24s %s\n' "lightdm" "$(_cc_service_status system lightdm)"
+    printf '%-24s %s\n' "gdm3" "$(_cc_service_status system gdm3)"
     echo "XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-unavailable}"
     echo "XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-unavailable}"
     pgrep -x Xorg >/dev/null 2>&1 && echo "Xorg detected" || echo "Xorg not detected"
@@ -245,17 +240,17 @@ print_desktop_gpu() {
 print_logs() {
     section "Recent Logs"
     subsection "Important recent errors"
-    if have journalctl; then
-        journalctl --since "$JOURNAL_SINCE" --no-pager -n 800 2>/dev/null | \
+    if _cc_log_available; then
+        _cc_log_since system "$JOURNAL_SINCE" 800 2>/dev/null | \
             grep -Ei 'fail(ed)?|error|segfault|denied|timed out|mariadb|apache2|bitcoind|electrs|timeshift|smart|kernel|nvidia' | \
             grep -Evi 'sshd.*Failed password|invalid user|maximum authentication attempts|apparmor="ALLOWED"' | \
             tail -n 50 || true
     else
-        echo "journalctl not available"
+        echo "system log interface not available"
     fi
     subsection "SSH/auth noise"
-    if have journalctl; then
-        journalctl --since "$JOURNAL_SINCE" --no-pager 2>/dev/null | \
+    if _cc_log_available; then
+        _cc_log_since system "$JOURNAL_SINCE" all 2>/dev/null | \
             grep -Ei 'sshd.*invalid user|Failed password|maximum authentication attempts' | tail -n 25 || true
     fi
 }

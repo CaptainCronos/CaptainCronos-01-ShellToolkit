@@ -175,6 +175,8 @@ run_check "Packages library" check_library cc-packages.sh
 run_check "Package operations" bash "$PROJECT_ROOT/tests/package-management.sh"
 run_check "Network library" check_library cc-network.sh
 run_check "Network interfaces" bash "$PROJECT_ROOT/tests/network.sh"
+run_check "Services library" check_library cc-services.sh
+run_check "Service operations" bash "$PROJECT_ROOT/tests/services.sh"
 run_check "Storage library" check_library cc-storage.sh
 run_check "SMART library" check_library cc-smart.sh
 run_check "Asset library" check_library cc-assets.sh

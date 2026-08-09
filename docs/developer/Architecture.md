@@ -139,6 +139,27 @@ read-only network state
 machine-oriented command syntax out of higher-level commands. NetworkManager,
 DNS, reachability, and scanning interfaces remain separate concerns.
 
+Service and system-log behavior is centralized in `lib/cc-services.sh`:
+
+```text
+Captain Cronos command
+        |
+        v
+semantic operation + explicit system/user scope
+        |
+        +--> systemd: configured systemctl / journalctl
+        |
+        +--> OpenRC / FreeBSD rc: native service interface
+        |
+        v
+service state, timer state, or read-only logs
+```
+
+Service state helpers use `is-active`, `is-enabled`, and `LoadState` semantics
+on systemd. Mutation helpers keep dry-run, privilege, and scope behavior in the
+library. System log helpers provide no-pager, stable timestamp output with an
+explicit record limit where appropriate, without requiring privilege escalation.
+
 ---
 
 ## Installation Model

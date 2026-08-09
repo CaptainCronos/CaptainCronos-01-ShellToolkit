@@ -14,6 +14,8 @@ The format follows a simple milestone-based structure until the project reaches 
 - Focused package-management capability, query, dry-run, and platform tests.
 - Semantic, platform-aware network inspection in `lib/cc-network.sh`.
 - Focused network capability, helper, and non-Linux abstraction tests.
+- Semantic, explicitly scoped service and system-log operations in `lib/cc-services.sh`.
+- Focused service state, scope, dry-run, journal, and non-systemd tests.
 - Program Management System with data-only defaults in `config/programs.conf`.
 - Capability-oriented program resolution and validation in `lib/cc-programs.sh`.
 - Read-only `cc programs`, `cc programs check`, and `cc programs show` commands.
@@ -31,11 +33,14 @@ The format follows a simple milestone-based structure until the project reaches 
 - System update, kernel cleanup, dependency previews, and baseline package capture now use shared package semantics.
 - Linux interface, route, listener, and connection inspection now resolves the configured `ip` and `ss` capabilities.
 - Monthly health and workbench network checks now use shared semantic network helpers.
+- Systemd service and journal consumers now resolve `service-manager` and `system-log` capabilities.
+- Monthly health and its optional user timer now use scoped semantic service operations.
 
 ### Removed
 
 - Nala and Aptitude selection and fallback paths from active system package automation.
 - Linux `netstat` fallback and independent `ip`/`nmcli` selection from active network automation.
+- Direct `systemctl` and `journalctl` execution from higher-level toolkit commands.
 
 ---
 

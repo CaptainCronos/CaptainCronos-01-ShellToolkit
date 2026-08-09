@@ -67,6 +67,17 @@ read-only inspection paths. Connectivity checks such as `ping`, DNS tools, and
 NetworkManager control have distinct purposes and are not replaced by `ip` or
 `ss`.
 
+## Services and Logs
+
+Captain Cronos resolves systemd service operations through the configured
+`systemctl` interface and system logs through `journalctl`. Internal operations
+always distinguish system units from `systemctl --user` units. Status and log
+queries are unprivileged; system-level mutations apply privilege escalation only
+inside the service library.
+
+The optional monthly-health timer is a user unit. Its install, enable, disable,
+status, and daemon-reload operations remain user-scoped and do not use `sudo`.
+
 ## Storage Workflow
 1. `cc drive-report`
 2. `cc drive-qualify`
