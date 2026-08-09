@@ -124,13 +124,20 @@ cc_program_is_capability() {
 }
 
 cc_program_get() {
-    local capability="$1" variable
+    local capability="$1" variable implementation
     [ "$CC_PROGRAMS_LOADED" -eq 1 ] || cc_program_load || return 1
     if ! variable="$(_cc_program_variable "$capability")"; then
         printf '[CC ERROR] Unknown program capability: %s\n' "$capability" >&2
         return 1
     fi
-    printf '%s\n' "${!variable}"
+    implementation="${!variable}"
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "capability requested" "$capability"
+        cc_debug_kv "capability resolver" "Program Management"
+        cc_debug_kv "program configuration" "$(cc_program_config_file)"
+        cc_debug_kv "configured implementation" "$implementation"
+    fi
+    printf '%s\n' "$implementation"
 }
 
 cc_program_exists() {
@@ -189,13 +196,18 @@ cc_program_compatible() {
 }
 
 cc_program_status() {
-    if ! cc_program_exists "$1"; then
-        printf '%s\n' "MISSING"
-    elif cc_program_compatible "$1"; then
-        printf '%s\n' "OK"
+    local capability="$1" status
+    if ! cc_program_exists "$capability"; then
+        status="MISSING"
+    elif cc_program_compatible "$capability"; then
+        status="OK"
     else
-        printf '%s\n' "INCOMPATIBLE"
+        status="INCOMPATIBLE"
     fi
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "capability status" "$status"
+    fi
+    printf '%s\n' "$status"
 }
 
 cc_program_requirement() {

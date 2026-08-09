@@ -34,8 +34,22 @@ cc_smart_dependencies() {
 cc_smart_device_candidate() {
     local name="${1##*/}"
     case "$name" in
-        zram*|ram*) return 1 ;;
-        *) return 0 ;;
+        zram*|ram*)
+            if declare -F cc_debug_kv >/dev/null 2>&1; then
+                cc_debug_kv "device" "$name"
+                cc_debug_kv "device type" "disk"
+                cc_debug_kv "backing type" "RAM"
+                cc_debug_kv "physical-drive candidate" "no"
+            fi
+            return 1
+            ;;
+        *)
+            if declare -F cc_debug_kv >/dev/null 2>&1; then
+                cc_debug_kv "device" "$name"
+                cc_debug_kv "physical-drive candidate" "yes"
+            fi
+            return 0
+            ;;
     esac
 }
 
@@ -50,8 +64,8 @@ cc_smart_field_first() {
 }
 
 cc_smart_attr_raw() {
-    local smart_text="$1" names="$2"
-    printf '%s\n' "$smart_text" | awk -v names="$names" '
+    local smart_text="$1" names="$2" result
+    result="$(printf '%s\n' "$smart_text" | awk -v names="$names" '
         BEGIN { split(names, n, "|") }
         /^[ ]*[0-9]+/ {
             for (i in n) {
@@ -61,12 +75,19 @@ cc_smart_attr_raw() {
                 }
             }
         }
-    '
+    ')"
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "SMART parser" "ATA attribute table"
+        cc_debug_kv "SMART attribute" "$names"
+        cc_debug_kv "SMART field selected" "RAW_VALUE column 10"
+        cc_debug_kv "raw parsed value" "${result:-not found}"
+    fi
+    printf '%s\n' "$result"
 }
 
 cc_smart_attr_normalized() {
-    local smart_text="$1" names="$2"
-    printf '%s\n' "$smart_text" | awk -v names="$names" '
+    local smart_text="$1" names="$2" result
+    result="$(printf '%s\n' "$smart_text" | awk -v names="$names" '
         BEGIN { split(names, n, "|") }
         /^[ ]*[0-9]+/ {
             for (i in n) {
@@ -76,7 +97,14 @@ cc_smart_attr_normalized() {
                 }
             }
         }
-    '
+    ')"
+    if declare -F cc_debug_kv >/dev/null 2>&1; then
+        cc_debug_kv "SMART parser" "ATA attribute table"
+        cc_debug_kv "SMART attribute" "$names"
+        cc_debug_kv "SMART field selected" "normalized VALUE column 4"
+        cc_debug_kv "normalized value" "${result:-not found}"
+    fi
+    printf '%s\n' "$result"
 }
 
 cc_smart_nvme_metric() {

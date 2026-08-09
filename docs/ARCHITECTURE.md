@@ -31,6 +31,7 @@ Common behavior belongs in `lib/`.
 Important libraries:
 
 - `cc-common.sh` — banner, logging, shared display behavior
+- `cc-diagnostics.sh` — debug diagnostics, redaction, and TTY-aware workflow progress
 - `cc-config.sh` — toolkit configuration helpers
 - `cc-programs.sh` — configured command-line capability resolution
 - `cc-packages.sh` — semantic, platform-aware system package operations
@@ -135,6 +136,19 @@ Historical reports are stored under:
 ```
 
 Reports represent timestamped observations.
+
+### Diagnostics and Progress
+
+Commands enable the single shared debug state after parsing `--debug`.
+Framework diagnostics use stderr, apply common secret redaction, and never
+contaminate human or structured stdout. Multi-stage commands use authoritative
+stage counts and identify the current activity; interactive terminals may use a
+live status line, while pipes and logs receive stable line-oriented results.
+Debug mode always uses sequential diagnostic and activity lines.
+
+The first primary consumer is `cc selftest --debug`. Program, dependency,
+platform/package, service, configuration, SMART, and storage helpers expose
+representative decision diagnostics without global shell tracing.
 
 ### Assets
 Current lifecycle state is stored under:

@@ -1,9 +1,13 @@
 # Recent Change Summary
 
-Generated: Sun Aug  9 09:53:00 EDT 2026
+Generated: Sun Aug  9 11:00:15 EDT 2026
 
 ~~~text
-3f50139 (HEAD -> main, origin/main, origin/HEAD) Merge branch 'feature/data-interface-standardization'
+aebeeda (HEAD -> feature/debug-infrastructure, origin/main, origin/HEAD, main) Merge branch 'fix/1.3-stabilization'
+aa63334 (fix/1.3-stabilization) fix(shell): resolve ShellCheck findings
+2cc36a0 fix(core): stabilize integrated toolkit behavior
+855ce6a fix(deps): resolve semantic capabilities generically
+3f50139 Merge branch 'feature/data-interface-standardization'
 d05c51f (origin/feature/data-interface-standardization, feature/data-interface-standardization) feat(data): standardize structured data interfaces
 1aafa29 feat(http): standardize HTTP interfaces
 b9034e3 feat(services): standardize service management
@@ -39,8 +43,4 @@ c0f4149 Document v1.3.0-beta1 framework completion
 59f5a02 Use status color helpers in release checks
 49f9416 Use status color helpers in audit summary
 3d71a8b Allow doctor to run tools cc through bash
-9834acd Use status color helpers in doctor
-e175f81 Use status color helpers in framework verify
-d653e1b Use status color helpers in selftest
-a07c48c Add terminal status color helpers
 ~~~

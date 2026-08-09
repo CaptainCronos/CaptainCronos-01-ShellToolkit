@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Sun Aug  9 09:52:56 EDT 2026
+Generated: Sun Aug  9 11:00:09 EDT 2026
 
 ## cc about
 
@@ -570,7 +570,7 @@ Shows the project roadmap from docs/ROADMAP.md.
 
 ~~~text
 Usage:
-  cc selftest [--verbose] [--json]
+  cc selftest [--verbose] [--json] [--debug]
 
 Runs the toolkit engineering self-test suite.
 
@@ -588,6 +588,7 @@ Checks:
 Options:
   --verbose  Show full command output.
   --json     Emit simple JSON summary.
+  --debug    Emit intentional diagnostic events to stderr.
 ~~~
 
 ## cc smart
