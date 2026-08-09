@@ -31,6 +31,8 @@ Examples:
   cc programs show pkg-manager
   cc programs show download
   cc programs show http-api
+  cc programs show json
+  cc programs show yaml
 EOF_HELP
 }
 
@@ -102,6 +104,8 @@ case "$ACTION" in
         echo
         printf '%-20s %s\n' "Required missing:" "$CC_PROGRAMS_MISSING_REQUIRED"
         printf '%-20s %s\n' "Optional missing:" "$CC_PROGRAMS_MISSING_OPTIONAL"
+        printf '%-24s %s\n' "Required incompatible:" "$CC_PROGRAMS_INCOMPATIBLE_REQUIRED"
+        printf '%-24s %s\n' "Optional incompatible:" "$CC_PROGRAMS_INCOMPATIBLE_OPTIONAL"
         if [ "$validation_status" -eq 0 ]; then
             cc_status_line "Program interface check" "PASS"
         else

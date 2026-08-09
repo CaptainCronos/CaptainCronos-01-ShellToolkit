@@ -16,6 +16,7 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-data.sh"
 
 VERBOSE=0
 JSON=0
@@ -148,15 +149,17 @@ check_prompt_engine() {
     printf '%s\n' "$rendered" | grep -q "Feature Implementation Prompt" || return 1
     printf '%s\n' "$rendered" | grep -q "Prompt Engine Smoke" || return 1
 
-    formatted="$(
-        cc_prompt_render_formatted feature json \
-            "feature_name=Prompt Engine Smoke" \
-            "repository_context=Captain Cronos Shell Toolkit" \
-            "objective=Render a metadata-discovered prompt template." \
-            "constraints=Internal engine only." \
-            "validation=cc selftest"
-    )"
-    printf '%s\n' "$formatted" | grep -q '"template":"feature"'
+    if _cc_json_available; then
+        formatted="$(
+            cc_prompt_render_formatted feature json \
+                "feature_name=Prompt Engine Smoke" \
+                "repository_context=Captain Cronos Shell Toolkit" \
+                "objective=Render a metadata-discovered prompt template." \
+                "constraints=Internal engine only." \
+                "validation=cc selftest"
+        )"
+        printf '%s\n' "$formatted" | grep -q '"template":"feature"'
+    fi
 }
 
 if [ "$JSON" -eq 0 ]; then
@@ -179,10 +182,12 @@ run_check "Services library" check_library cc-services.sh
 run_check "Service operations" bash "$PROJECT_ROOT/tests/services.sh"
 run_check "HTTP library" check_library cc-http.sh
 run_check "HTTP interfaces" bash "$PROJECT_ROOT/tests/http.sh"
+run_check "Data library" check_library cc-data.sh
+run_check "Structured data" bash "$PROJECT_ROOT/tests/data.sh"
 run_check "Storage library" check_library cc-storage.sh
 run_check "SMART library" check_library cc-smart.sh
 run_check "Asset library" check_library cc-assets.sh
-run_check "YAML library" check_library cc-yaml.sh
+run_check "YAML compatibility library" check_library cc-yaml.sh
 run_check "Report library" check_library cc-report.sh
 run_check "Prompt engine library" check_library cc-prompt-engine.sh
 run_check "Prompt engine render" check_prompt_engine
@@ -197,7 +202,12 @@ run_check "Plugin status load" bash "$PROJECT_ROOT/tools/cc" plugin status
 if [ "$JSON" -eq 1 ]; then
     status="PASS"
     [ "$FAILED" -eq 0 ] || status="FAIL"
-    printf '{"status":"%s","passed":%s,"failed":%s}\n' "$status" "$PASSED" "$FAILED"
+    _cc_json_generate \
+        '{status: $status, passed: $passed, failed: $failed}' \
+        --compact-output \
+        --arg status "$status" \
+        --argjson passed "$PASSED" \
+        --argjson failed "$FAILED"
 else
     echo
     echo "------------------------------------"

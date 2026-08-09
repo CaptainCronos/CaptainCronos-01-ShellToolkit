@@ -6,7 +6,7 @@
 # Script      : drive-report
 # Version     : 1.3.1-alpha1
 # Category    : Storage
-# Requires    : bash smartctl date mkdir awk grep hostname uname mv
+# Requires    : bash yaml smartctl date mkdir awk grep hostname uname
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Save SMART reports and update drive asset records.
 # ==============================================================================
@@ -72,43 +72,45 @@ state="inventory"
 qualified="unknown"
 created="$(cc_asset_timestamp)"
 host="$(hostname 2>/dev/null || echo unknown)"
+current_bay=""
+current_pool=""
 
 if [ -f "$asset_file" ]; then
     current_state="$(cc_yaml_get "$asset_file" state)"
     current_created="$(cc_yaml_get "$asset_file" created)"
     current_qualified="$(cc_yaml_get "$asset_file" qualified)"
+    current_bay="$(cc_yaml_get_nested "$asset_file" location bay)"
+    current_pool="$(cc_yaml_get_nested "$asset_file" location pool)"
     [ -n "$current_state" ] && state="$current_state"
     [ -n "$current_created" ] && created="$current_created"
     [ -n "$current_qualified" ] && qualified="$current_qualified"
 fi
 
-cat > "$asset_file" <<EOF_ASSET
-asset_id: "$serial"
-type: "drives"
-asset_type: "drive"
-state: "$state"
-created: "$created"
-updated: "$(cc_asset_timestamp)"
-host_id: "${CC_HOST_ID:-unknown}"
-serial: "$serial"
-model: "$model"
-size: "$size"
-current_device: "$DEVICE"
-last_seen: "$(cc_asset_timestamp)"
-host: "$host"
-smart: "$smart"
-result: "$result"
-power_on_hours: "$hours"
-temperature: "$temp"
-last_report: "$out_dir"
-qualified: "$qualified"
-qualified_date: ""
-location:
-  system: "$host"
-  bay: "$( [ -f "$asset_file" ] && cc_yaml_get_nested "$asset_file" location bay || true )"
-  pool: "$( [ -f "$asset_file" ] && cc_yaml_get_nested "$asset_file" location pool || true )"
-notes: "Asset record created or updated by cc drive-report."
-EOF_ASSET
+_cc_yaml_write_map "$asset_file" \
+    asset_id "$serial" \
+    type "drives" \
+    asset_type "drive" \
+    state "$state" \
+    created "$created" \
+    updated "$(cc_asset_timestamp)" \
+    host_id "${CC_HOST_ID:-unknown}" \
+    serial "$serial" \
+    model "$model" \
+    size "$size" \
+    current_device "$DEVICE" \
+    last_seen "$(cc_asset_timestamp)" \
+    host "$host" \
+    smart "$smart" \
+    result "$result" \
+    power_on_hours "$hours" \
+    temperature "$temp" \
+    last_report "$out_dir" \
+    qualified "$qualified" \
+    qualified_date "" \
+    notes "Asset record created or updated by cc drive-report."
+cc_yaml_set_nested "$asset_file" location system "$host"
+cc_yaml_set_nested "$asset_file" location bay "$current_bay"
+cc_yaml_set_nested "$asset_file" location pool "$current_pool"
 
 cc_asset_append_history drives "$serial" "report" "device=$DEVICE result=$result smart=$smart report=$out_dir"
 

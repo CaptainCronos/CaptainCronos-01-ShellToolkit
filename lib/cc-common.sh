@@ -53,7 +53,7 @@ cc_status_word() {
         WARN|WARNING)
             cc_color_warn; printf '%s' "$status"; cc_color_reset
             ;;
-        FAIL|FAILED|ERROR)
+        FAIL|FAILED|ERROR|INCOMPATIBLE)
             cc_color_fail; printf '%s' "$status"; cc_color_reset
             ;;
         INFO)

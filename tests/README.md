@@ -9,3 +9,5 @@ Focused shell tests supplement `cc selftest`:
   non-systemd program selection.
 - `http.sh` validates semantic downloads, API requests, redirects, HTTP errors,
   dry runs, secret redaction, and configured client selection.
+- `data.sh` validates JSON/YAML compatibility, parsing, validation, querying,
+  safe expressions, YAML mutation, and required/optional capability behavior.

@@ -15,8 +15,8 @@ cc programs check
 cc programs show pkg-manager
 ```
 
-Program reporting is read-only. Missing programs are reported and are never
-installed automatically.
+Program reporting is read-only. Missing and incompatible programs are reported
+separately and are never installed or replaced automatically.
 
 System package behavior is implemented in `lib/cc-packages.sh`. On Debian-family
 systems it resolves package operations, repository queries, and the installed
@@ -40,6 +40,14 @@ HTTP behavior is implemented in `lib/cc-http.sh`. File acquisition resolves the
 (`curl` by default). The two interfaces are selected by operation semantics, not
 treated as interchangeable clients. URLs, retry policy, output paths, and HTTP
 arguments remain in the execution library or caller—not program configuration.
+
+Structured-data behavior is implemented in `lib/cc-data.sh`. JSON operations
+resolve `json` (`jq` by default). YAML operations resolve `yaml`, whose canonical
+interface is the Kislyuk yq jq-wrapper. Because unrelated, incompatible programs
+also use the name `yq`, program status requires both Kislyuk identity and the
+serialization/query behavior Captain Cronos uses. JSON remains optional because
+only optional JSON output modes consume it; YAML is required by asset and drive
+workflows.
 
 ## User Configuration
 

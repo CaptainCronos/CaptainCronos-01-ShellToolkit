@@ -39,6 +39,15 @@ HTTP/API GET and HEAD operations use separate helpers backed by `curl`. Redirect
 HTTP failure, retry, TLS-verification, output, and secret-safe dry-run behavior
 are validated with local endpoints.
 
+## Data Interface Standardization
+
+Status: **Complete**
+
+JSON and YAML processing now uses semantic helpers backed by the configured
+`jq` and compatible Kislyuk `yq` interfaces. Program reporting distinguishes
+missing from incompatible processors, and active asset YAML parsing and mutation
+no longer relies on ad hoc awk parsing.
+
 ---
 
 ## Milestone M1 — Engineering Foundation

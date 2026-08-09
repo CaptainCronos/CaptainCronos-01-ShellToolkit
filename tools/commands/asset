@@ -6,7 +6,7 @@
 # Script      : asset
 # Version     : 1.3.0-alpha1
 # Category    : Core
-# Requires    : bash find cat mkdir awk grep sed date mv
+# Requires    : bash yaml find cat mkdir grep sed date
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Manage local lifecycle asset inventory records.
 # ==============================================================================
@@ -94,15 +94,14 @@ create_asset() {
     file="$(asset_file_path "$type" "$name")"
     [ ! -f "$file" ] || { cc_error "Asset already exists: $file"; exit 1; }
     ts="$(cc_asset_timestamp)"
-    cat > "$file" <<EOF_ASSET
-asset_id: "$name"
-type: "$type"
-state: "new"
-created: "$ts"
-updated: "$ts"
-host_id: "${CC_HOST_ID:-unknown}"
-notes: ""
-EOF_ASSET
+    _cc_yaml_write_map "$file" \
+        asset_id "$name" \
+        type "$type" \
+        state "new" \
+        created "$ts" \
+        updated "$ts" \
+        host_id "${CC_HOST_ID:-unknown}" \
+        notes ""
     shift 2 || true
     for pair in "$@"; do
         key="${pair%%=*}"

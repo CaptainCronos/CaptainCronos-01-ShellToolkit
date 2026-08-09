@@ -36,7 +36,7 @@ HTTP|http-api|API Client|CC_HTTP_API|required
 Services|service-manager|Manager|CC_SERVICE_MANAGER|required
 Services|system-log|Logs|CC_SYSTEM_LOG|required
 Data|json|JSON|CC_JSON|optional
-Data|yaml|YAML|CC_YAML|optional
+Data|yaml|YAML|CC_YAML|required
 Files|sync|Sync|CC_SYNC|optional
 Files|archive|Archive|CC_ARCHIVE|required
 EOF_PROGRAMS
@@ -134,11 +134,56 @@ cc_program_exists() {
     command -v "$program" >/dev/null 2>&1
 }
 
+_cc_program_compatibility_json() {
+    local program="$1" output
+    output="$(
+        printf '%s\n' '{"captain":"cronos"}' |
+            "$program" --exit-status --raw-output '.captain' 2>/dev/null
+    )" || return 1
+    [ "$output" = "cronos" ]
+}
+
+_cc_program_compatibility_yaml() {
+    local program="$1" version output
+    version="$("$program" --version 2>&1)" || return 1
+    case "$version" in
+        yq\ [0-9]*) ;;
+        *) return 1 ;;
+    esac
+
+    output="$(
+        printf '%s\n' 'captain: "cronos"' |
+            "$program" \
+                --yaml-roundtrip \
+                --yaml-output-grammar-version 1.1 \
+                --arg cc_value validated \
+                --args \
+                '.captain = $cc_value | .positional = $ARGS.positional[0]' \
+                probe 2>/dev/null
+    )" || return 1
+    printf '%s\n' "$output" |
+        "$program" --exit-status '.captain == "validated" and .positional == "probe"' >/dev/null 2>&1
+}
+
+cc_program_compatible() {
+    local capability="$1" program validator
+    cc_program_exists "$capability" || return 1
+    program="$(cc_program_get "$capability")" || return 1
+    validator="_cc_program_compatibility_${capability//-/_}"
+    if declare -F "$validator" >/dev/null 2>&1; then
+        "$validator" "$program"
+    else
+        return 0
+    fi
+}
+
 cc_program_status() {
-    if cc_program_exists "$1"; then
+    if ! cc_program_exists "$1"; then
+        printf '%s\n' "MISSING"
+    elif cc_program_compatible "$1"; then
         printf '%s\n' "OK"
     else
-        printf '%s\n' "MISSING"
+        printf '%s\n' "INCOMPATIBLE"
     fi
 }
 
@@ -167,23 +212,29 @@ cc_program_missing() {
 }
 
 cc_program_validate() {
-    local capability requirement missing_required=0 missing_optional=0
+    local capability requirement status
+    local missing_required=0 missing_optional=0
+    local incompatible_required=0 incompatible_optional=0
     cc_program_load "${1:-$(cc_program_config_file)}" || return 2
 
     while IFS= read -r capability; do
         [ -n "$capability" ] || continue
-        if ! cc_program_exists "$capability"; then
-            requirement="$(cc_program_requirement "$capability")"
-            if [ "$requirement" = "required" ]; then
-                missing_required=$((missing_required + 1))
-            else
-                missing_optional=$((missing_optional + 1))
-            fi
-        fi
+        status="$(cc_program_status "$capability")"
+        [ "$status" = "OK" ] && continue
+        requirement="$(cc_program_requirement "$capability")"
+        case "$status:$requirement" in
+            MISSING:required) missing_required=$((missing_required + 1)) ;;
+            MISSING:optional) missing_optional=$((missing_optional + 1)) ;;
+            INCOMPATIBLE:required) incompatible_required=$((incompatible_required + 1)) ;;
+            INCOMPATIBLE:optional) incompatible_optional=$((incompatible_optional + 1)) ;;
+        esac
     done < <(cc_program_capabilities)
 
     CC_PROGRAMS_MISSING_REQUIRED="$missing_required"
     CC_PROGRAMS_MISSING_OPTIONAL="$missing_optional"
+    CC_PROGRAMS_INCOMPATIBLE_REQUIRED="$incompatible_required"
+    CC_PROGRAMS_INCOMPATIBLE_OPTIONAL="$incompatible_optional"
     export CC_PROGRAMS_MISSING_REQUIRED CC_PROGRAMS_MISSING_OPTIONAL
-    [ "$missing_required" -eq 0 ]
+    export CC_PROGRAMS_INCOMPATIBLE_REQUIRED CC_PROGRAMS_INCOMPATIBLE_OPTIONAL
+    [ "$missing_required" -eq 0 ] && [ "$incompatible_required" -eq 0 ]
 }

@@ -142,7 +142,7 @@ Completed framework areas:
 - Asset lifecycle and history framework.
 - Repository inventory and publishing workflows.
 - Shared reporting helpers.
-- Shared YAML helpers.
+- Capability-backed JSON/YAML helpers with yq compatibility validation.
 - Terminal UI helpers for colorized `PASS`, `WARN`, and `FAIL` status output.
 - Dotted leader formatting for status lines.
 
@@ -196,6 +196,8 @@ Current framework libraries include:
 ```text
 lib/cc-common.sh
 lib/cc-config.sh
+lib/cc-programs.sh
+lib/cc-data.sh
 lib/cc-yaml.sh
 lib/cc-smart.sh
 lib/cc-storage.sh

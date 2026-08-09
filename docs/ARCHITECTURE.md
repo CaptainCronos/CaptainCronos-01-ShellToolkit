@@ -37,6 +37,8 @@ Important libraries:
 - `cc-network.sh` — semantic, platform-aware network-state inspection
 - `cc-services.sh` — scoped service lifecycle, timer, and system-log operations
 - `cc-http.sh` — semantic file downloads and HTTP/API requests
+- `cc-data.sh` — compatible JSON/YAML validation, queries, and YAML mutation
+- `cc-yaml.sh` — compatibility API for existing asset YAML operations
 - `cc-metadata.sh` — command metadata and registry helpers
 - `cc-assets.sh` — local asset database helpers
 - `cc-prompt-engine.sh` — internal prompt template discovery, rendering, and formatting helpers
@@ -99,6 +101,23 @@ Both paths fail on HTTP errors, follow required redirects, and retain TLS
 certificate verification by default. Dry-run reports redact URL credentials and
 query strings and perform no transfer. Authentication, request headers, and
 mutating HTTP methods are not abstracted until an active caller requires them.
+
+### Structured Data Architecture
+
+JSON validation, querying, and generation resolve the configured `jq` interface.
+YAML validation, querying, generation, and mutation resolve the configured Kislyuk
+`yq` jq-wrapper interface. Expressions are passed as individual arguments and
+data values use processor arguments; neither path uses `eval` or sources data.
+
+Program status distinguishes executable presence from interface compatibility.
+JSON compatibility uses a jq behavior probe. YAML compatibility requires the
+Kislyuk version identity form plus the YAML output and jq-expression behavior
+used by the toolkit. No minimum yq version is imposed beyond passing that probe.
+Asset YAML writes use securely named temporary files and atomic replacement.
+
+YAML is required because active asset and drive commands read and mutate YAML.
+JSON remains optional because prompt and selftest JSON output modes are optional;
+their non-JSON behavior does not depend on jq.
 
 ### Reports
 Historical reports are stored under:
