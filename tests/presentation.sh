@@ -29,7 +29,7 @@ info="$(unset NO_COLOR; TERM=xterm-256color CC_COLOR_MODE=always cc_status_word 
 redirected="$(unset NO_COLOR; TERM=xterm-256color CC_COLOR_MODE=auto cc_status_word PASS)"
 [ "$redirected" = PASS ] || fail 'redirected output contained color'
 
-no_color="$(NO_COLOR= TERM=xterm-256color CC_COLOR_MODE=always cc_status_word PASS)"
+no_color="$(NO_COLOR='' TERM=xterm-256color CC_COLOR_MODE=always cc_status_word PASS)"
 [ "$no_color" = PASS ] || fail 'NO_COLOR did not suppress color'
 
 dumb="$(unset NO_COLOR; TERM=dumb CC_COLOR_MODE=always cc_status_word FAIL)"
