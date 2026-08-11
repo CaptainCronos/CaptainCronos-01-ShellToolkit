@@ -112,7 +112,9 @@ replace a processor.
 ## Kernel Workflow
 
 Use `cc kernel status`, `cc kernel list`, and `cc kernel running` for read-only
-inspection. Use `cc kernel artifacts` for detailed package, ownership, kernel,
+inspection. Use `cc kernel platform` to see the detected distribution package
+model, initramfs provider evidence, EFI runtime, and exactly which Captain
+Cronos operations are supported. Use `cc kernel artifacts` for detailed package, ownership, kernel,
 initramfs, map, and config correlation; use `cc kernel health` for a concise
 PASS/WARN/FAIL assessment. `cc kernel cleanup` is also read-only by default and prints the
 candidate package plan. Only `cc kernel cleanup --apply` permits package
@@ -136,6 +138,23 @@ Treat every state other than `MATCHED` as a prompt for inspection, not deletion.
 Health warnings include correlation issues, pending reboot state, and boot or
 EFI filesystems at least 90 percent utilized. Only boot-path inspection failure
 or a missing/unsafe running kernel image produces a health failure.
+
+Initramfs tools are detected rather than configured as interchangeable Program
+Management choices. If multiple providers are installed, the platform report
+shows a primary provider only when package/configuration/executable evidence is
+stronger; equal evidence is `ambiguous`. Regardless of detection, kernel
+installation, initramfs regeneration, and bootloader mutation are not
+implemented.
+
+Only the Debian package model currently supports exact package correlation and
+cleanup. RPM, Arch, and openSUSE package models are identified for inspection
+and future adapters, but cleanup remains unsupported. `cc kernel deps` reports
+core requirements, optional filesystem/package capabilities, all provider
+signals, the selected provider, and the read-only mutation policy.
+
+EFI reporting distinguishes a mounted filesystem from active EFI firmware
+runtime. The former indicates accessible EFI storage; only the latter indicates
+that the running kernel exposes EFI runtime services.
 
 ## Documentation
 - `cc docs inventory`

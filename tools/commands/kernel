@@ -26,6 +26,7 @@ Usage:
   cc kernel status
   cc kernel list
   cc kernel running
+  cc kernel platform
   cc kernel artifacts
   cc kernel health
   cc kernel cleanup [--dry-run|--apply]
@@ -35,6 +36,7 @@ Actions:
   status   Show kernel state plus distinct /boot, backing filesystem, and EFI usage.
   list     List installed kernels with RUNNING, PROTECTED, and CANDIDATE states.
   running  Show the running release and matching installed packages.
+  platform  Show detected kernel environment and Captain Cronos support.
   artifacts  Correlate packages with kernel, initramfs, map, and config artifacts.
   health   Evaluate kernel/package/artifact consistency without changing the host.
   cleanup  Review obsolete kernel packages; defaults to --dry-run.
@@ -49,6 +51,7 @@ Compatibility:
 
 Examples:
   cc kernel status
+  cc kernel platform
   cc kernel artifacts
   cc kernel health
   KEEP_COUNT=3 cc kernel list
@@ -72,7 +75,7 @@ kernel_require_linux() {
 }
 
 kernel_status() {
-    local running newest reboot_state keep_count platform_support running_newest=unknown
+    local running newest reboot_state keep_count platform_support package_family initramfs_provider running_newest=unknown
     local boot_dir boot_source boot_mount boot_use boot_bytes boot_human
     local efi_path efi_source efi_type efi_size efi_used efi_avail efi_use
     local -a kernels=() protected=() candidates=()
@@ -89,6 +92,8 @@ kernel_status() {
         if [ "$running" = "$newest" ]; then running_newest=yes; else running_newest=no; fi
     fi
     reboot_state="$(_cc_kernel_reboot_state)"
+    package_family="$(_cc_kernel_distribution_family)"
+    initramfs_provider="$(_cc_kernel_initramfs_provider)"
     boot_dir="$(_cc_kernel_boot_dir)"
     boot_source="$(_cc_kernel_boot_filesystem_field SOURCE 2>/dev/null || printf unknown)"
     boot_mount="$(_cc_kernel_boot_filesystem_field TARGET 2>/dev/null || printf unknown)"
@@ -108,6 +113,8 @@ kernel_status() {
     echo "Kernel Status"
     echo "-------------"
     printf '%-24s %s\n' "Platform support:" "$platform_support"
+    printf '%-24s %s\n' "Kernel package family:" "$package_family"
+    printf '%-24s %s\n' "Initramfs provider:" "$initramfs_provider"
     printf '%-24s %s\n' "Running kernel:" "$running"
     printf '%-24s %s\n' "Newest installed:" "$newest"
     printf '%-24s %s\n' "Installed count:" "${#kernels[@]}"
@@ -135,6 +142,62 @@ kernel_status() {
         printf '%-24s %s\n' "EFI filesystem:" "not mounted at a known path"
     fi
     printf '%-24s %s\n' "Bootloader environment:" "$(_cc_kernel_bootloader_environment)"
+}
+
+kernel_platform() {
+    local cleanup_adapter=none
+    _cc_kernel_can_cleanup && cleanup_adapter="$(_cc_kernel_package_adapter)"
+    cc_banner
+    echo
+    echo "Kernel Platform"
+    echo "---------------"
+    printf '%-28s %s\n' "Operating platform:" "$(_cc_kernel_os)"
+    printf '%-28s %s\n' "Distribution family:" "$(_cc_kernel_distribution_family)"
+    printf '%-28s %s\n' "Kernel package model:" "$(_cc_kernel_package_model)"
+    printf '%-28s %s\n' "Image package model:" "$(_cc_kernel_image_package_pattern)"
+    printf '%-28s %s\n' "Package adapter:" "$(_cc_kernel_package_adapter)"
+    echo
+    printf '%-28s %s\n' "Initramfs provider:" "$(_cc_kernel_initramfs_provider)"
+    printf '%-28s %s\n' "Additional providers:" "$(_cc_kernel_initramfs_additional_providers)"
+    printf '%-28s %s\n' "Initramfs interface:" "$(_cc_kernel_initramfs_interface)"
+    printf '%-28s %s\n' "Initramfs status:" "$(_cc_kernel_initramfs_status)"
+    echo
+    printf '%-28s %s\n' "Bootloader environment:" "$(_cc_kernel_bootloader_environment)"
+    printf '%-28s %s\n' "EFI filesystem:" "$(_cc_kernel_efi_filesystem_state)"
+    printf '%-28s %s\n' "EFI runtime:" "$(_cc_kernel_efi_runtime_state)"
+    echo
+    printf '%-28s %s\n' "Kernel inspection:" "$(_cc_kernel_support_word _cc_kernel_can_inspect)"
+    printf '%-28s %s\n' "Artifact inspection:" "$(_cc_kernel_support_word _cc_kernel_can_inspect_artifacts)"
+    printf '%-28s %s\n' "Package correlation:" "$(_cc_kernel_support_word _cc_kernel_can_correlate_packages)"
+    printf '%-28s %s\n' "Cleanup:" "$(_cc_kernel_support_word _cc_kernel_can_cleanup)"
+    printf '%-28s %s\n' "Cleanup adapter:" "$cleanup_adapter"
+    printf '%-28s %s\n' "Kernel installation:" "not implemented"
+    printf '%-28s %s\n' "Initramfs mutation:" "not implemented"
+    printf '%-28s %s\n' "Bootloader mutation:" "not implemented"
+}
+
+kernel_deps() {
+    local provider interface score
+    bash "$PROJECT_ROOT/tools/cc" deps kernel
+    echo
+    echo "Detected initramfs providers"
+    echo "----------------------------"
+    if _cc_kernel_supported; then
+        for provider in initramfs-tools dracut mkinitcpio; do
+            interface="$(_cc_kernel_provider_interface_name "$provider")"
+            score="$(_cc_kernel_provider_score "$provider")"
+            if [ "$score" -gt 0 ]; then
+                printf '%-20s %-14s %s\n' "$interface" detected "evidence score: $score"
+            else
+                printf '%-20s %-14s\n' "$interface" "not detected"
+            fi
+        done
+        printf '%-20s %s\n' "Primary provider" "$(_cc_kernel_initramfs_provider)"
+    else
+        printf '%-20s %s\n' "Provider inspection" "not applicable"
+    fi
+    printf '%-20s %s\n' "Package database" "$(_cc_pkg_database_available && printf available || printf unavailable)"
+    printf '%-20s %s\n' "Mutation support" "not implemented"
 }
 
 kernel_list() {
@@ -334,9 +397,10 @@ case "${1:-help}" in
     status) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_status ;;
     list) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_list ;;
     running) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_running ;;
+    platform|capabilities) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_platform ;;
     artifacts) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_artifacts ;;
     health) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_health ;;
     cleanup) shift; kernel_cleanup "$@" ;;
-    deps|dependencies) shift; bash "$PROJECT_ROOT/tools/cc" deps kernel "$@" ;;
+    deps|dependencies) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_deps ;;
     *) cc_error "Unknown kernel action: $1"; echo; usage; exit 1 ;;
 esac

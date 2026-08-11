@@ -13,6 +13,7 @@ fail() {
 [ "$(_cc_pkg_manager)" = "$(cc_program_get pkg-manager)" ] || fail "package manager capability did not resolve"
 [ "$(_cc_pkg_query_program)" = "$(cc_program_get pkg-query)" ] || fail "package query capability did not resolve"
 [ "$(_cc_pkg_database_program)" = "$(cc_program_get pkg-database)" ] || fail "package database capability did not resolve"
+_cc_pkg_database_available || fail "package database availability was not detected"
 
 _cc_pkg_is_installed bash || fail "installed-package detection did not find bash"
 if _cc_pkg_is_installed cc-package-that-does-not-exist; then

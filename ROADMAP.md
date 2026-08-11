@@ -249,8 +249,22 @@ Status: **Complete**
 - Conservative artifact states and PASS/WARN/FAIL health reporting.
 - Symlink-safe, filesystem-boundary-preserving fixture validation.
 
-Next phase: broaden native package-family correlation and add read-only
-initramfs implementation/capability reporting before proposing any mutation.
+This health layer provides the artifact evidence consumed by the platform and
+initramfs capability model.
+
+### Kernel Platform and Initramfs Capabilities
+
+Status: **Complete**
+
+- Semantic Debian, RPM, Arch, openSUSE, unknown-Linux, and non-Linux models.
+- Evidence-weighted initramfs provider selection and ambiguity reporting.
+- Separate detection, inspection, correlation, cleanup, and mutation support.
+- Independent EFI filesystem and EFI runtime states.
+- Platform-aware dependency and status reporting.
+
+Next phase: low-risk integration of kernel health and platform summaries into
+`cc doctor` and monthly-health; native non-Debian correlation remains separate
+future work and must precede any additional cleanup adapter.
 
 Completed in active development:
 

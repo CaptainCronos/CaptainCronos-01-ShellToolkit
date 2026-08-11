@@ -10,6 +10,10 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Read-only `cc kernel platform` environment and operation-support reporting.
+- Debian, RPM, Arch, openSUSE, unknown-Linux, and non-Linux kernel package-family classification.
+- Evidence-based initramfs-tools, dracut, and mkinitcpio provider detection with ambiguity reporting.
+- Separate EFI filesystem-presence and EFI runtime-state inspection.
 - Read-only `cc kernel artifacts` package/artifact correlation and `cc kernel health` diagnostics.
 - Filesystem-aware `/boot` consumption, EFI capacity, and bootloader-environment inspection.
 - Fixture coverage for mount boundaries, artifact consistency, health severity, unusual filenames, and symlink safety.
@@ -39,6 +43,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- Kernel cleanup support now requires the implemented Debian adapter, not merely an `apt-get` executable on Linux.
+- Kernel dependency reporting now distinguishes provider evidence from mutation support.
+- Non-Linux bootloader inspection no longer misidentifies a generic `/boot/loader` directory as systemd-boot.
 - Kernel status now distinguishes the filesystem containing `/boot`, actual `/boot` directory consumption, and EFI filesystem utilization.
 - Kernel discovery now uses NUL-delimited filenames and rejects releases that cannot be represented safely.
 - Kernel cleanup now consumes the shared kernel library and retains `cc kernel-cleanup` as a compatibility entry point.

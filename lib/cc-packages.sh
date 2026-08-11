@@ -55,6 +55,21 @@ _cc_pkg_manager_exists() {
     [ "$manager" != "none" ] && command -v "$manager" >/dev/null 2>&1
 }
 
+_cc_pkg_database_available() {
+    local family database
+    family="$(_cc_pkg_family)" || return 1
+    case "$family" in
+        apt-get)
+            database="$(_cc_pkg_database_program)" || return 1
+            command -v "$database" >/dev/null 2>&1
+            ;;
+        dnf|yum|zypper) command -v rpm >/dev/null 2>&1 ;;
+        pacman) command -v pacman >/dev/null 2>&1 ;;
+        pkg) command -v pkg >/dev/null 2>&1 ;;
+        *) return 1 ;;
+    esac
+}
+
 _cc_dep_resolve_pkg_manager() {
     _cc_pkg_manager
 }

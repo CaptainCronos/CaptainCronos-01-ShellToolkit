@@ -125,6 +125,7 @@ Kernel management is available through one safety-first namespace:
 cc kernel status
 cc kernel list
 cc kernel running
+cc kernel platform
 cc kernel artifacts
 cc kernel health
 cc kernel cleanup --dry-run
@@ -142,6 +143,12 @@ artifact inventory correlates kernel images, initramfs images, maps, configs,
 installed packages, ownership, and the existing protection/candidate policy.
 Health inspection is read-only and uses conservative `MATCHED`, `MISSING`,
 `UNMATCHED`, `PARTIAL`, and `UNKNOWN` classifications.
+
+`cc kernel platform` separates detected host facts from Captain Cronos support.
+It reports the distribution/package model, initramfs provider evidence,
+bootloader and EFI runtime state, and the implemented inspection/correlation/
+cleanup capabilities. Detection of a provider never enables initramfs,
+bootloader, or kernel-install mutation.
 
 Commands live under `tools/commands/`, where each command is a standalone script discovered by the `cc` dispatcher.
 

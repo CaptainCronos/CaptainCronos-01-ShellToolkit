@@ -33,6 +33,232 @@ _cc_kernel_supported() {
     [ "$(_cc_kernel_os)" = Linux ]
 }
 
+_cc_kernel_distribution_family() {
+    local id like manager
+    _cc_kernel_supported || { printf '%s\n' not-applicable; return 0; }
+    id="$(cc_platform_os_id 2>/dev/null || printf unknown)"
+    like="$(cc_platform_os_like 2>/dev/null || printf unknown)"
+    manager="$(_cc_pkg_family 2>/dev/null || printf none)"
+    case "$id" in
+        debian|ubuntu|linuxmint|pop|elementary|kali) printf '%s\n' debian; return 0 ;;
+        fedora|rhel|centos|rocky|almalinux|ol) printf '%s\n' rpm; return 0 ;;
+        arch|manjaro|endeavouros|garuda) printf '%s\n' arch; return 0 ;;
+        opensuse*|sles|sled) printf '%s\n' opensuse; return 0 ;;
+    esac
+    if printf '%s\n' "$like" | grep -qw debian; then printf '%s\n' debian
+    elif printf '%s\n' "$like" | grep -Eqw 'fedora|rhel|centos'; then printf '%s\n' rpm
+    elif printf '%s\n' "$like" | grep -qw arch; then printf '%s\n' arch
+    elif printf '%s\n' "$like" | grep -Eqw 'suse|opensuse'; then printf '%s\n' opensuse
+    else
+        case "$manager" in
+            apt-get) printf '%s\n' debian ;;
+            dnf|yum) printf '%s\n' rpm ;;
+            pacman) printf '%s\n' arch ;;
+            zypper) printf '%s\n' opensuse ;;
+            *) printf '%s\n' unknown-linux ;;
+        esac
+    fi
+}
+
+_cc_kernel_package_model() {
+    case "$(_cc_kernel_distribution_family)" in
+        debian) printf '%s\n' 'Debian linux-image packages' ;;
+        rpm) printf '%s\n' 'RPM versioned kernel packages' ;;
+        arch) printf '%s\n' 'Arch kernel pkgbase packages' ;;
+        opensuse) printf '%s\n' 'openSUSE kernel flavor packages' ;;
+        not-applicable) printf '%s\n' 'not applicable' ;;
+        *) printf '%s\n' 'unknown Linux package model' ;;
+    esac
+}
+
+_cc_kernel_image_package_pattern() {
+    case "$(_cc_kernel_distribution_family)" in
+        debian) printf '%s\n' 'linux-image-<release>' ;;
+        rpm) printf '%s\n' 'kernel-core/kernel-modules <version-release.arch>' ;;
+        arch) printf '%s\n' 'linux/linux-lts/linux-zen/linux-hardened pkgbase' ;;
+        opensuse) printf '%s\n' 'kernel-<flavor> with versioned RPM instances' ;;
+        not-applicable) printf '%s\n' 'not applicable' ;;
+        *) printf '%s\n' unknown ;;
+    esac
+}
+
+_cc_kernel_package_adapter() {
+    case "$(_cc_kernel_distribution_family)" in
+        debian) printf '%s\n' debian ;;
+        rpm) printf '%s\n' rpm-observation-only ;;
+        arch) printf '%s\n' arch-pkgbase-observation-only ;;
+        opensuse) printf '%s\n' opensuse-flavor-observation-only ;;
+        not-applicable) printf '%s\n' 'not applicable' ;;
+        *) printf '%s\n' none ;;
+    esac
+}
+
+_cc_kernel_can_inspect() {
+    _cc_kernel_running >/dev/null 2>&1
+}
+
+_cc_kernel_can_inspect_artifacts() {
+    _cc_kernel_supported && [ -d "$(_cc_kernel_boot_dir)" ] && [ -r "$(_cc_kernel_boot_dir)" ] &&
+        command -v find >/dev/null 2>&1
+}
+
+_cc_kernel_can_correlate_packages() {
+    _cc_kernel_supported && [ "$(_cc_kernel_distribution_family)" = debian ] &&
+        [ "$(_cc_pkg_family 2>/dev/null || true)" = apt-get ] &&
+        command -v "$(_cc_pkg_database_program 2>/dev/null || printf cc-missing-package-database)" >/dev/null 2>&1
+}
+
+_cc_kernel_can_cleanup() {
+    _cc_kernel_can_correlate_packages && [ "$(_cc_kernel_package_adapter)" = debian ]
+}
+
+_cc_kernel_support_word() {
+    if "$@"; then printf '%s\n' supported; else printf '%s\n' unsupported; fi
+}
+
+_cc_kernel_provider_config_present() {
+    [ "$#" -eq 1 ] || return 2
+    case "$1" in
+        initramfs-tools)
+            [ -d "${CC_KERNEL_INITRAMFS_TOOLS_DIR:-/etc/initramfs-tools}" ]
+            ;;
+        dracut)
+            [ -f "${CC_KERNEL_DRACUT_CONFIG:-/etc/dracut.conf}" ] ||
+                [ -d "${CC_KERNEL_DRACUT_CONFIG_DIR:-/etc/dracut.conf.d}" ]
+            ;;
+        mkinitcpio)
+            [ -f "${CC_KERNEL_MKINITCPIO_CONFIG:-/etc/mkinitcpio.conf}" ] ||
+                [ -d "${CC_KERNEL_MKINITCPIO_PRESET_DIR:-/etc/mkinitcpio.d}" ]
+            ;;
+        *) return 2 ;;
+    esac
+}
+
+_cc_kernel_provider_interface_name() {
+    case "$1" in
+        initramfs-tools) printf '%s\n' update-initramfs ;;
+        dracut) printf '%s\n' dracut ;;
+        mkinitcpio) printf '%s\n' mkinitcpio ;;
+        *) return 1 ;;
+    esac
+}
+
+_cc_kernel_provider_package_name() {
+    case "$1" in
+        initramfs-tools) printf '%s\n' initramfs-tools ;;
+        dracut) printf '%s\n' dracut ;;
+        mkinitcpio) printf '%s\n' mkinitcpio ;;
+        *) return 1 ;;
+    esac
+}
+
+_cc_kernel_provider_command_present() {
+    local interface
+    interface="$(_cc_kernel_provider_interface_name "$1")" || return
+    command -v "$interface" >/dev/null 2>&1
+}
+
+_cc_kernel_provider_package_present() {
+    local package
+    package="$(_cc_kernel_provider_package_name "$1")" || return
+    _cc_pkg_is_installed "$package" >/dev/null 2>&1
+}
+
+_cc_kernel_provider_score() {
+    [ "$#" -eq 1 ] || return 2
+    local provider="$1" score=0
+    _cc_kernel_provider_interface_name "$provider" >/dev/null || return
+    _cc_kernel_provider_command_present "$provider" && score=$((score + 1))
+    _cc_kernel_provider_package_present "$provider" && score=$((score + 2))
+    _cc_kernel_provider_config_present "$provider" && score=$((score + 2))
+    printf '%s\n' "$score"
+}
+
+_cc_kernel_initramfs_providers() {
+    local provider score
+    _cc_kernel_supported || return 0
+    for provider in initramfs-tools dracut mkinitcpio; do
+        score="$(_cc_kernel_provider_score "$provider")"
+        [ "$score" -gt 0 ] && printf '%s\n' "$provider"
+    done
+}
+
+_cc_kernel_initramfs_provider() {
+    local provider score top_score=-1 top_provider=none tied=0
+    _cc_kernel_supported || { printf '%s\n' 'not applicable'; return 0; }
+    while IFS= read -r provider; do
+        [ -n "$provider" ] || continue
+        score="$(_cc_kernel_provider_score "$provider")"
+        if [ "$score" -gt "$top_score" ]; then
+            top_score="$score"
+            top_provider="$provider"
+            tied=0
+        elif [ "$score" -eq "$top_score" ]; then
+            tied=1
+        fi
+    done < <(_cc_kernel_initramfs_providers)
+    if [ "$top_provider" = none ]; then printf '%s\n' none
+    elif [ "$tied" -eq 1 ]; then printf '%s\n' ambiguous
+    else printf '%s\n' "$top_provider"
+    fi
+}
+
+_cc_kernel_initramfs_additional_providers() {
+    local primary provider first=1
+    primary="$(_cc_kernel_initramfs_provider)"
+    while IFS= read -r provider; do
+        [ -n "$provider" ] || continue
+        [ "$primary" != ambiguous ] && [ "$provider" = "$primary" ] && continue
+        if [ "$first" -eq 0 ]; then printf ', '; fi
+        printf '%s' "$provider"
+        first=0
+    done < <(_cc_kernel_initramfs_providers)
+    [ "$first" -eq 0 ] && printf '\n' || printf '%s\n' none
+}
+
+_cc_kernel_initramfs_interface() {
+    local provider
+    provider="$(_cc_kernel_initramfs_provider)"
+    case "$provider" in
+        initramfs-tools|dracut|mkinitcpio) _cc_kernel_provider_interface_name "$provider" ;;
+        'not applicable') printf '%s\n' 'not applicable' ;;
+        *) printf '%s\n' "$provider" ;;
+    esac
+}
+
+_cc_kernel_initramfs_status() {
+    local provider
+    provider="$(_cc_kernel_initramfs_provider)"
+    case "$provider" in
+        ambiguous) printf '%s\n' ambiguous ;;
+        none) printf '%s\n' 'not detected' ;;
+        'not applicable') printf '%s\n' 'not applicable' ;;
+        *)
+            if _cc_kernel_provider_command_present "$provider"; then printf '%s\n' detected
+            else printf '%s\n' evidence-only
+            fi
+            ;;
+    esac
+}
+
+_cc_kernel_efi_filesystem_state() {
+    _cc_kernel_supported || { printf '%s\n' unknown; return 0; }
+    command -v "${CC_KERNEL_FINDMNT_PROGRAM:-findmnt}" >/dev/null 2>&1 || {
+        printf '%s\n' unknown
+        return 0
+    }
+    if _cc_kernel_efi_path >/dev/null 2>&1; then printf '%s\n' present; else printf '%s\n' absent; fi
+}
+
+_cc_kernel_efi_runtime_state() {
+    _cc_kernel_supported || { printf '%s\n' unknown; return 0; }
+    if [ -d "${CC_KERNEL_EFI_RUNTIME_PATH:-/sys/firmware/efi}" ]; then
+        printf '%s\n' active
+    else
+        printf '%s\n' inactive
+    fi
+}
+
 _cc_kernel_running() {
     if [ -n "${CC_KERNEL_RUNNING:-}" ]; then
         printf '%s\n' "$CC_KERNEL_RUNNING"
@@ -240,7 +466,7 @@ _cc_kernel_artifact_unsafe_count() {
 
 _cc_kernel_package_releases() {
     local package release
-    _cc_kernel_supported || return 0
+    _cc_kernel_can_correlate_packages || return 0
     while IFS= read -r package; do
         case "$package" in
             linux-image-unsigned-*) release="${package#linux-image-unsigned-}" ;;
@@ -363,7 +589,7 @@ _cc_kernel_packages_for_version() {
     [ "$#" -eq 1 ] || return 2
     local version="$1" boot_path owner
     local -a primary=() owners=() packages=()
-    _cc_kernel_supported || return 3
+    _cc_kernel_can_correlate_packages || return 3
     mapfile -t primary < <(_cc_kernel_primary_packages_for_version "$version")
     [ "${#primary[@]}" -eq 1 ] || return 4
 
@@ -383,6 +609,7 @@ _cc_kernel_packages_for_version() {
 _cc_kernel_package_state() {
     [ "$#" -eq 1 ] || return 2
     local -a packages=()
+    _cc_kernel_can_correlate_packages || { printf '%s\n' unsupported; return 0; }
     mapfile -t packages < <(_cc_kernel_primary_packages_for_version "$1")
     case "${#packages[@]}" in
         0) printf '%s\n' absent ;;
@@ -395,6 +622,7 @@ _cc_kernel_artifact_ownership() {
     [ "$#" -eq 1 ] || return 2
     local release="$1" path
     local -a packages=() owners=()
+    _cc_kernel_can_correlate_packages || { printf '%s\n' unsupported; return 0; }
     [ "$(_cc_kernel_artifact_presence kernel "$release")" = yes ] || {
         printf '%s\n' missing
         return 0
@@ -428,6 +656,14 @@ _cc_kernel_artifact_state() {
     config="$(_cc_kernel_artifact_presence config "$release")"
     package="$(_cc_kernel_package_state "$release")"
 
+    if [ "$package" = unsupported ]; then
+        if [ "$kernel" = no ] || [ "$initramfs" = no ]; then
+            printf '%s\n' MISSING
+        else
+            printf '%s\n' UNKNOWN
+        fi
+        return 0
+    fi
     if [ "$package" = ambiguous ] || [ "$kernel" = unknown ] || [ "$initramfs" = unknown ] || \
         [ "$system_map" = unknown ] || [ "$config" = unknown ]; then
         printf '%s\n' UNKNOWN
@@ -507,12 +743,20 @@ _cc_kernel_percent_value() {
 }
 
 _cc_kernel_bootloader_environment() {
-    local boot_dir efi_path
+    local boot_dir efi_path grub_present=0 systemd_boot_present=0
+    _cc_kernel_supported || { printf '%s\n' unknown; return 0; }
     boot_dir="$(_cc_kernel_boot_dir)"
     efi_path="$(_cc_kernel_efi_path 2>/dev/null || true)"
-    if [ -d "$boot_dir/loader" ] && [ ! -L "$boot_dir/loader" ]; then
+    if [ -d "$boot_dir/loader" ] && [ ! -L "$boot_dir/loader" ]; then systemd_boot_present=1; fi
+    if { [ -d "$boot_dir/grub" ] && [ ! -L "$boot_dir/grub" ]; } ||
+        { [ -d "$boot_dir/grub2" ] && [ ! -L "$boot_dir/grub2" ]; }; then
+        grub_present=1
+    fi
+    if [ "$systemd_boot_present" -eq 1 ] && [ "$grub_present" -eq 1 ]; then
+        printf '%s\n' ambiguous
+    elif [ "$systemd_boot_present" -eq 1 ]; then
         printf '%s\n' systemd-boot
-    elif [ -d "$boot_dir/grub" ] && [ ! -L "$boot_dir/grub" ]; then
+    elif [ "$grub_present" -eq 1 ]; then
         printf '%s\n' grub
     elif [ -n "$efi_path" ] && [ -d "$efi_path/EFI" ] && [ ! -L "$efi_path/EFI" ]; then
         printf '%s\n' efi-present
@@ -548,14 +792,27 @@ _cc_kernel_health_findings() {
         issue_count=$((issue_count + 1))
     fi
 
-    while IFS= read -r release; do
-        [ -n "$release" ] || continue
-        state="$(_cc_kernel_artifact_state "$release")"
-        [ "$state" = MATCHED ] && continue
-        severity=WARN
-        printf '%s\t%s artifact correlation is %s.\n' "$severity" "$release" "$state"
+    if _cc_kernel_can_correlate_packages; then
+        while IFS= read -r release; do
+            [ -n "$release" ] || continue
+            state="$(_cc_kernel_artifact_state "$release")"
+            [ "$state" = MATCHED ] && continue
+            severity=WARN
+            printf '%s\t%s artifact correlation is %s.\n' "$severity" "$release" "$state"
+            issue_count=$((issue_count + 1))
+        done < <(_cc_kernel_artifact_releases)
+    else
+        printf 'WARN\tPackage correlation is unsupported for the %s kernel package family.\n' "$(_cc_kernel_distribution_family)"
         issue_count=$((issue_count + 1))
-    done < <(_cc_kernel_artifact_releases)
+        while IFS= read -r release; do
+            [ -n "$release" ] || continue
+            if [ "$(_cc_kernel_artifact_presence kernel "$release")" != yes ] ||
+                [ "$(_cc_kernel_artifact_presence initramfs "$release")" != yes ]; then
+                printf 'WARN\t%s has an incomplete kernel/initramfs artifact pair.\n' "$release"
+                issue_count=$((issue_count + 1))
+            fi
+        done < <(_cc_kernel_artifact_releases)
+    fi
 
     case "$(_cc_kernel_reboot_state)" in
         required)
@@ -611,11 +868,7 @@ _cc_kernel_health_severity() {
 }
 
 _cc_kernel_cleanup_supported() {
-    _cc_kernel_supported || return 1
-    case "$(_cc_pkg_family 2>/dev/null || true)" in
-        apt-get) return 0 ;;
-        *) return 1 ;;
-    esac
+    _cc_kernel_can_cleanup
 }
 
 _cc_kernel_refresh_bootloader() {

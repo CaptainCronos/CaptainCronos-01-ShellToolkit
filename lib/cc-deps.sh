@@ -127,7 +127,7 @@ cc_dep_kernel_list() {
 }
 
 cc_dep_kernel_optional_list() {
-    printf '%s\n' pkg-database findmnt du stat
+    printf '%s\n' findmnt du stat
 }
 
 cc_dep_optional_list() {

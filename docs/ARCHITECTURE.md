@@ -122,6 +122,54 @@ set with no findings is `PASS`. Bootloader inspection reports only directory
 evidence for GRUB, systemd-boot, EFI presence, or an unknown environment and
 never executes boot artifacts or management utilities.
 
+### Kernel Environment and Capability Model
+
+Kernel environment detection is distinct from operation support. The shared
+kernel library classifies Debian, RPM, Arch, openSUSE, unknown Linux, and
+non-Linux environments using OS identity first and the package-manager family
+as a fallback. Each family exposes a descriptive package model without implying
+that Captain Cronos can correlate or remove its packages.
+
+Current support is:
+
+| Environment | Running inspection | Artifact inspection | Package correlation | Cleanup mutation |
+|---|---:|---:|---:|---:|
+| Debian family | yes | yes | yes | yes, Debian adapter only |
+| Fedora/RHEL RPM family | yes | yes | not implemented | no |
+| Arch family | yes | yes | not implemented | no |
+| openSUSE family | yes | yes | not implemented | no |
+| Unknown Linux | yes | yes when `/boot` is readable | no | no |
+| Non-Linux | running release only | no Linux semantics | not applicable | no |
+
+RPM hosts are modeled around versioned `kernel-core`, `kernel-modules`,
+`kernel-modules-extra`, and related RPM instances. Arch is explicitly modeled
+around pkgbase names such as `linux`, `linux-lts`, and `linux-zen`, which do not
+encode the complete running release like Debian package names. openSUSE is
+modeled around versioned `kernel-<flavor>` RPM instances such as
+`kernel-default`. These are detection models for future exact correlation, not
+cleanup adapters.
+
+Initramfs provider detection evaluates `initramfs-tools`/`update-initramfs`,
+dracut, and mkinitcpio using executable, installed-package, and configuration
+evidence. Package and configuration evidence carry more weight than executable
+presence. A unique strongest provider is primary; other detected providers are
+reported separately; tied evidence is `ambiguous`. Provider detection supports
+read-only artifact interpretation only. Initramfs regeneration remains not
+implemented.
+
+Provider tools are intentionally absent from `config/programs.conf`. They are
+platform-specific implementations with different package hooks, presets,
+configuration, and output models—not interchangeable administrator preferences.
+The kernel capability layer detects them, while the package layer supplies
+semantic installed-package and database-availability queries.
+
+EFI filesystem state and EFI runtime state are independent. A mounted known EFI
+path produces `present`; `/sys/firmware/efi` produces runtime `active`. A mounted
+EFI filesystem does not prove the current kernel booted through EFI. Bootloader
+detection remains observational and Linux-scoped. Kernel installation,
+initramfs mutation, and bootloader mutation are always reported as not
+implemented.
+
 `cc dev-update` owns developer ecosystem reporting and explicit mutation. It defaults to dry-run/reporting. Mutating developer updates require `--apply`; only package managers with a conservative global update path are applied. Normal `cc update --apply` includes developer updates only when `DEV_UPDATES=yes` is set in toolkit config.
 
 ### Network Inspection Architecture

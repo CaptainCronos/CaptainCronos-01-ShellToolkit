@@ -10,6 +10,11 @@ filesystems, mounted and absent EFI paths, non-crossing usage, symlink safety,
 kernel/initramfs/package correlation, every artifact state, shared kernel
 classification, health severity, and command output using temporary fixtures.
 
+`tests/kernel-platform.sh` validates Debian, RPM, Arch, openSUSE, unknown Linux,
+and FreeBSD models; initramfs-tools, dracut, mkinitcpio, absent, additional, and
+ambiguous provider states; EFI filesystem/runtime separation; bootloader
+environments; support-matrix isolation; and platform/dependency output.
+
 Focused shell tests supplement `cc selftest`:
 
 - `dependencies.sh` validates semantic capability resolution, literal executable
