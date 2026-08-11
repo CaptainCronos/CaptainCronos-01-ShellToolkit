@@ -33,8 +33,8 @@ if grep -Fq '[CC DEBUG]' "$TEST_DIR/normal.err"; then
     fail 'normal selftest emitted debug diagnostics'
 fi
 grep -Fq '[CC DEBUG]' "$TEST_DIR/debug.err" || fail 'selftest --debug emitted no diagnostics'
-grep -Fq '[CC TEST] [1/36] Common library ... RUNNING' "$TEST_DIR/debug.err" || fail 'debug sequential activity was absent'
-grep -Fq '[CC TEST] [36/36] Plugin status load' "$TEST_DIR/debug.err" || fail 'debug completed/total count was absent'
+grep -Fq '[CC TEST] [1/44] Common library ... RUNNING' "$TEST_DIR/debug.err" || fail 'debug sequential activity was absent'
+grep -Eq '\[CC TEST\] \[44/44\] Plugin status load.*PASS' "$TEST_DIR/debug.err" || fail 'debug completed/total count was absent'
 if grep -q $'\r\|\033' "$TEST_DIR/debug.err"; then
     fail 'debug selftest emitted terminal animation'
 fi

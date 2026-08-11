@@ -185,7 +185,9 @@ verify_dependencies() {
 
     for dep in $deps; do
         if cc_dep_exists "$dep"; then
-            printf '%-18s %s\n' "$dep" "PASS"
+            printf '%-18s ' "$dep"
+            cc_status_word PASS
+            printf '\n'
         else
             printf '%-18s %s\n' "$dep" "MISSING"
             missing=$((missing + 1))

@@ -11,6 +11,13 @@
 # Purpose     : Resolve and validate preferred command-line program interfaces.
 # ==============================================================================
 
+if ! declare -F cc_error >/dev/null 2>&1; then
+    _cc_programs_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    # shellcheck disable=SC1091
+    source "$_cc_programs_lib_dir/cc-common.sh"
+    unset _cc_programs_lib_dir
+fi
+
 CC_PROGRAMS_LOADED=0
 
 cc_program_config_file() {
@@ -68,7 +75,7 @@ cc_program_load() {
     CC_PROGRAMS_LOADED=0
 
     if [ ! -f "$config" ]; then
-        printf '[CC ERROR] Missing program configuration: %s\n' "$config" >&2
+        cc_error "Missing program configuration: $config"
         return 1
     fi
 
@@ -86,16 +93,16 @@ cc_program_load() {
             key="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
         else
-            printf '[CC ERROR] Invalid program configuration at %s:%s\n' "$config" "$line_number" >&2
+            cc_error "Invalid program configuration at $config:$line_number"
             return 1
         fi
 
         if ! _cc_program_known_variable "$key"; then
-            printf '[CC ERROR] Unknown program setting at %s:%s: %s\n' "$config" "$line_number" "$key" >&2
+            cc_error "Unknown program setting at $config:$line_number: $key"
             return 1
         fi
         if [ -n "${!key:-}" ]; then
-            printf '[CC ERROR] Duplicate program setting at %s:%s: %s\n' "$config" "$line_number" "$key" >&2
+            cc_error "Duplicate program setting at $config:$line_number: $key"
             return 1
         fi
         printf -v "$key" '%s' "$value"
@@ -103,7 +110,7 @@ cc_program_load() {
 
     while IFS='|' read -r _section capability _label key _requirement; do
         if [ -z "${!key:-}" ]; then
-            printf '[CC ERROR] Missing program setting for capability: %s\n' "$capability" >&2
+            cc_error "Missing program setting for capability: $capability"
             return 1
         fi
     done < <(_cc_program_metadata)
@@ -127,7 +134,7 @@ cc_program_get() {
     local capability="$1" variable implementation
     [ "$CC_PROGRAMS_LOADED" -eq 1 ] || cc_program_load || return 1
     if ! variable="$(_cc_program_variable "$capability")"; then
-        printf '[CC ERROR] Unknown program capability: %s\n' "$capability" >&2
+        cc_error "Unknown program capability: $capability"
         return 1
     fi
     implementation="${!variable}"
@@ -218,7 +225,7 @@ cc_program_requirement() {
             return 0
         fi
     done < <(_cc_program_metadata)
-    printf '[CC ERROR] Unknown program capability: %s\n' "$capability" >&2
+    cc_error "Unknown program capability: $capability"
     return 1
 }
 

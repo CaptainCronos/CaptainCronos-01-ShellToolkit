@@ -206,6 +206,8 @@ else
 fi
 
 echo
-echo "Maintenance workflow result: $(cc_result_overall)"
+printf 'Maintenance workflow result: '
+cc_status_word "$(cc_result_overall)"
+printf '\n'
 printf 'PASS=%s WARN=%s FAIL=%s SKIP=%s\n' "$CC_RESULT_PASS" "$CC_RESULT_WARN" "$CC_RESULT_FAIL" "$CC_RESULT_SKIP"
 cc_result_exit_status

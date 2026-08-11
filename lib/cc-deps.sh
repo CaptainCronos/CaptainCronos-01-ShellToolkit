@@ -101,7 +101,9 @@ cc_dep_check_list() {
     for dep in "$@"; do
         status="$(cc_dep_execution_status "$dep")"
         if [ "$status" = "OK" ]; then
-            printf '%-18s %s\n' "$dep" "PASS"
+            printf '%-18s ' "$dep"
+            cc_status_word PASS
+            printf '\n'
         else
             printf '%-18s %s\n' "$dep" "$status"
             missing=$((missing + 1))

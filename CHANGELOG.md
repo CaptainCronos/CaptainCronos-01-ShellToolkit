@@ -10,6 +10,8 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Focused terminal-presentation fixtures for semantic colors, TTY detection,
+  `NO_COLOR`, `TERM=dumb`, redirection, summaries, and long status labels.
 - Shared PASS/WARN/FAIL/SKIP result aggregation for maintenance and reports.
 - Read-only generated-document freshness and consolidated RC release gates.
 - Focused RC integrity fixtures for stage aggregation, report privacy,
@@ -52,6 +54,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- PASS/WARN/FAIL/SKIP rendering, dotted status rows, summaries, progress rows,
+  and diagnostic prefixes now use the shared presentation layer; ordinary
+  data and generated or redirected output remain uncolored.
 - `cc update` now continues safe diagnostics, reports every requested or skipped
   stage truthfully, and exits nonzero when any stage fails.
 - Monthly-health reports are staged atomically at mode 0600, redact identity and

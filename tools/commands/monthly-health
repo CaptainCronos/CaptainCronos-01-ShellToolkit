@@ -352,7 +352,9 @@ print_logs() {
 
 print_footer() {
     section "Report Summary"
-    echo "Overall report result: $(cc_result_overall)"
+    printf 'Overall report result: '
+    cc_status_word "$(cc_result_overall)"
+    printf '\n'
     printf 'PASS=%s WARN=%s FAIL=%s SKIP=%s\n' "$CC_RESULT_PASS" "$CC_RESULT_WARN" "$CC_RESULT_FAIL" "$CC_RESULT_SKIP"
     echo "Suggested follow-up commands:"
     echo "  cc update --dry-run"

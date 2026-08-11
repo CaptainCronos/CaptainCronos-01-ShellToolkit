@@ -128,13 +128,11 @@ show_verify() {
     run_gate "cc release check" bash "$PROJECT_ROOT/tools/cc" release check || failed=$((failed + 1))
 
     echo
-    printf '%-16s ' "Overall Status:"
     if [ "$failed" -eq 0 ]; then
-        cc_pass
+        cc_summary_status "Overall Status:" PASS
     else
-        cc_fail
+        cc_summary_status "Overall Status:" FAIL
     fi
-    printf '\n'
 
     [ "$failed" -eq 0 ]
 }

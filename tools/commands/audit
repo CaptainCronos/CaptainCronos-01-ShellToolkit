@@ -248,15 +248,14 @@ case "$MODE" in
             cc_status_line "Failures" "PASS"
         fi
         echo
-        printf '%-16s ' "Overall Status:"
         if [ "$fail" -gt 0 ]; then
-            cc_fail
+            overall=FAIL
         elif [ "$warn" -gt 0 ]; then
-            cc_warning
+            overall=WARN
         else
-            cc_pass
+            overall=PASS
         fi
-        printf '\n'
+        cc_summary_status "Overall Status:" "$overall"
         echo
         if [ "$warn" -gt 0 ] || [ "$fail" -gt 0 ]; then
             echo "Run detail: cc audit commands"

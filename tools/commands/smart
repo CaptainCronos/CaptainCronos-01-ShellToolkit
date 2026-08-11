@@ -120,7 +120,11 @@ cc_smart_summary_one() {
     hours="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_power_on_hours)"
     life="$(printf '%s\n%s\n' "$attr_data" "$health_data" | cc_smart_life_remaining)"
     test="$(printf '%s\n' "$log_data" | cc_smart_test)"
-    printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s\n' "$name" "$type" "$health" "$test" "$temp" "$hours" "$life"
+    printf '%-12s %-6s ' "$name" "$type"
+    cc_status_cell "$health" 8
+    printf ' '
+    cc_status_cell "$test" 8
+    printf ' %-8s %-10s %-8s\n' "$temp" "$hours" "$life"
 }
 
 cc_smart_detail() {

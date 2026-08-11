@@ -113,6 +113,9 @@ check_storage_deps() {
 }
 
 print_status() {
+    local network storage
+    network="$(network_status)"
+    if check_storage_deps; then storage=PASS; else storage=WARN; fi
     cc_banner
     echo
     echo "Workbench Status"
@@ -120,11 +123,15 @@ print_status() {
     printf '%-18s %s\n' "Hostname:" "$(hostname 2>/dev/null || echo unknown)"
     printf '%-18s %s\n' "Platform:" "$(cc_platform_name)"
     printf '%-18s %s\n' "Type:" "$(cc_platform_type)"
-    printf '%-18s %s\n' "Network:" "$(network_status)"
+    printf '%-18s ' "Network:"
+    cc_status_word "$network"
+    printf '\n'
     printf '%-18s %s\n' "Repo dir:" "$REPO_DIR"
     printf '%-18s %s\n' "Repo present:" "$([ -d "$REPO_DIR/.git" ] && echo yes || echo no)"
     printf '%-18s %s\n' "Host ID:" "$HOST_ID"
-    printf '%-18s %s\n' "Storage deps:" "$(check_storage_deps && echo PASS || echo WARN)"
+    printf '%-18s ' "Storage deps:"
+    cc_status_word "$storage"
+    printf '\n'
     echo
     echo "Storage Dependencies"
     echo "--------------------"

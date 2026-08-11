@@ -105,9 +105,13 @@ path_status_for() {
     fi
 
     if [ -n "$note" ]; then
-        printf '%-18s %-6s %s\n' "$label" "$status" "$note"
+        printf '%-18s ' "$label"
+        cc_status_word "$status"
+        printf ' %s\n' "$note"
     else
-        printf '%-18s %-6s\n' "$label" "$status"
+        printf '%-18s ' "$label"
+        cc_status_word "$status"
+        printf '\n'
     fi
 }
 
@@ -157,7 +161,9 @@ show_path() {
     path_status_for "~/bin" "$HOME/bin"
     # shellcheck disable=SC2088
     path_status_for "~/.local/bin" "$HOME/.local/bin"
-    printf '%-18s %-6s\n' "Overall" "$overall"
+    printf '%-18s ' "Overall"
+    cc_status_word "$overall"
+    printf '\n'
     echo
     echo "Current PATH"
     echo "------------"
@@ -185,9 +191,13 @@ show_shell() {
     echo "-----------"
     for file in "$HOME/.bashrc" "$HOME/.bash_aliases" "$HOME/.bash_functions"; do
         if [ -f "$file" ]; then
-            printf '%-24s PASS\n' "$(basename "$file")"
+            printf '%-24s ' "$(basename "$file")"
+            cc_status_word PASS
+            printf '\n'
         else
-            printf '%-24s WARN missing\n' "$(basename "$file")"
+            printf '%-24s ' "$(basename "$file")"
+            cc_status_word WARN
+            printf ' missing\n'
         fi
     done
 }

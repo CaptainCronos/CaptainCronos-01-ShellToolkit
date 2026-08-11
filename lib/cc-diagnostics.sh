@@ -92,7 +92,7 @@ CC_PROGRESS_LABEL=""
 CC_PROGRESS_TAG="STATUS"
 
 cc_progress_terminal_available() {
-    [ -t 2 ]
+    [ -t 2 ] && [ "${TERM:-}" != dumb ]
 }
 
 cc_progress_init() {
@@ -129,15 +129,27 @@ cc_progress_start() {
     fi
 }
 
+_cc_progress_status_line() {
+    local label="$1" status="$2"
+    if declare -F cc_status_line_fd >/dev/null 2>&1; then
+        cc_status_line_fd 2 "$label" "$status" "${CC_PROGRESS_WIDTH:-62}"
+    else
+        printf '%s ... %s\n' "$label" "$status" >&2
+    fi
+}
+
 cc_progress_finish() {
     local status="$1"
     CC_PROGRESS_COMPLETED=$((CC_PROGRESS_COMPLETED + 1))
     if [ "$CC_PROGRESS_LIVE" -eq 1 ]; then
-        printf '\r\033[2K[CC %s] [%2d/%d] %s ... %s\n' \
-            "$CC_PROGRESS_TAG" "$CC_PROGRESS_CURRENT" "$CC_PROGRESS_TOTAL" "$CC_PROGRESS_LABEL" "$status" >&2
+        printf '\r\033[2K' >&2
+        _cc_progress_status_line \
+            "[CC $CC_PROGRESS_TAG] [$(printf '%2d' "$CC_PROGRESS_CURRENT")/$CC_PROGRESS_TOTAL] $CC_PROGRESS_LABEL" \
+            "$status"
     elif [ "$CC_PROGRESS_SEQUENTIAL" -eq 1 ]; then
-        printf '[CC %s] [%d/%d] %s ... %s\n' \
-            "$CC_PROGRESS_TAG" "$CC_PROGRESS_CURRENT" "$CC_PROGRESS_TOTAL" "$CC_PROGRESS_LABEL" "$status" >&2
+        _cc_progress_status_line \
+            "[CC $CC_PROGRESS_TAG] [$CC_PROGRESS_CURRENT/$CC_PROGRESS_TOTAL] $CC_PROGRESS_LABEL" \
+            "$status"
     fi
     CC_PROGRESS_ACTIVE=0
 }

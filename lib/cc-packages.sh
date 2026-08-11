@@ -125,7 +125,7 @@ _cc_pkg_update() {
         zypper) _cc_pkg_run "$manager" refresh ;;
         pacman) _cc_pkg_run "$manager" -Sy ;;
         pkg) _cc_pkg_run "$manager" update ;;
-        *) printf '[CC ERROR] Unsupported package manager: %s\n' "$manager" >&2; return 1 ;;
+        *) cc_error "Unsupported package manager: $manager"; return 1 ;;
     esac
 }
 
@@ -140,7 +140,7 @@ _cc_pkg_upgrade() {
         zypper) _cc_pkg_run "$manager" update -y ;;
         pacman) _cc_pkg_run "$manager" -Syu --noconfirm ;;
         pkg) _cc_pkg_run "$manager" upgrade -y ;;
-        *) printf '[CC ERROR] Unsupported package manager: %s\n' "$manager" >&2; return 1 ;;
+        *) cc_error "Unsupported package manager: $manager"; return 1 ;;
     esac
 }
 
@@ -155,7 +155,7 @@ _cc_pkg_install() {
         zypper) _cc_pkg_run "$manager" install -y "$@" ;;
         pacman) _cc_pkg_run "$manager" -S --noconfirm "$@" ;;
         pkg) _cc_pkg_run "$manager" install -y "$@" ;;
-        *) printf '[CC ERROR] Unsupported package manager: %s\n' "$manager" >&2; return 1 ;;
+        *) cc_error "Unsupported package manager: $manager"; return 1 ;;
     esac
 }
 
@@ -170,7 +170,7 @@ _cc_pkg_remove() {
         zypper) _cc_pkg_run "$manager" remove -y "$@" ;;
         pacman) _cc_pkg_run "$manager" -R --noconfirm "$@" ;;
         pkg) _cc_pkg_run "$manager" delete -y "$@" ;;
-        *) printf '[CC ERROR] Unsupported package manager: %s\n' "$manager" >&2; return 1 ;;
+        *) cc_error "Unsupported package manager: $manager"; return 1 ;;
     esac
 }
 
@@ -195,7 +195,7 @@ _cc_pkg_autoremove() {
         yum) _cc_pkg_run "$manager" autoremove -y ;;
         zypper|pacman) return 0 ;;
         pkg) _cc_pkg_run "$manager" autoremove -y ;;
-        *) printf '[CC ERROR] Unsupported package manager: %s\n' "$manager" >&2; return 1 ;;
+        *) cc_error "Unsupported package manager: $manager"; return 1 ;;
     esac
 }
 
@@ -209,7 +209,7 @@ _cc_pkg_clean() {
         zypper) _cc_pkg_run "$manager" clean ;;
         pacman) _cc_pkg_run "$manager" -Sc --noconfirm ;;
         pkg) _cc_pkg_run "$manager" clean -y ;;
-        *) printf '[CC ERROR] Unsupported package manager: %s\n' "$manager" >&2; return 1 ;;
+        *) cc_error "Unsupported package manager: $manager"; return 1 ;;
     esac
 }
 

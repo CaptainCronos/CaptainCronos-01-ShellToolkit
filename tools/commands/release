@@ -166,13 +166,11 @@ release_check() {
     fi
 
     echo
-    printf '%-16s ' "Overall Status:"
     if [ "$failed" -eq 0 ]; then
-        cc_pass
+        cc_summary_status "Overall Status:" PASS
     else
-        cc_fail
+        cc_summary_status "Overall Status:" FAIL
     fi
-    printf '\n'
 
     [ "$failed" -eq 0 ]
 }

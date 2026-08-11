@@ -34,58 +34,84 @@ cc_load_version() {
 }
 
 cc_color_enabled() {
-    [ -t 1 ] && [ -z "${NO_COLOR:-}" ]
+    local fd="${1:-1}" mode="${CC_COLOR_MODE:-auto}"
+    [ -z "${NO_COLOR+x}" ] || return 1
+    [ "${TERM:-}" != dumb ] || return 1
+    case "$mode" in
+        always) return 0 ;;
+        never) return 1 ;;
+        auto) [ -t "$fd" ] ;;
+        *) return 1 ;;
+    esac
 }
 
 cc_color() {
-    local code="$1"
-    if cc_color_enabled; then
-        printf '\033[%sm' "$code"
+    local code="$1" fd="${2:-1}"
+    if cc_color_enabled "$fd"; then
+        printf '\033[%sm' "$code" >&"$fd"
     fi
 }
 
-cc_color_reset() { cc_color 0; }
-cc_color_pass() { cc_color '1;32'; }
-cc_color_warn() { cc_color '1;33'; }
-cc_color_fail() { cc_color '1;31'; }
-cc_color_info() { cc_color '1;36'; }
-cc_color_note() { cc_color '1;37'; }
+cc_color_reset() { cc_color 0 "${1:-1}"; }
+cc_color_pass() { cc_color '1;32' "${1:-1}"; }
+cc_color_warn() { cc_color '1;33' "${1:-1}"; }
+cc_color_fail() { cc_color '1;31' "${1:-1}"; }
+cc_color_info() { cc_color '1;36' "${1:-1}"; }
 
-cc_status_word() {
-    local status="$1"
+cc_status_word_fd() {
+    local fd="$1" status="$2"
     case "$status" in
         PASS|OK|SUCCESS)
-            cc_color_pass; printf '%s' "$status"; cc_color_reset
+            cc_color_pass "$fd"; printf '%s' "$status" >&"$fd"; cc_color_reset "$fd"
             ;;
         WARN|WARNING)
-            cc_color_warn; printf '%s' "$status"; cc_color_reset
+            cc_color_warn "$fd"; printf '%s' "$status" >&"$fd"; cc_color_reset "$fd"
             ;;
         FAIL|FAILED|ERROR|INCOMPATIBLE)
-            cc_color_fail; printf '%s' "$status"; cc_color_reset
-            ;;
-        INFO)
-            cc_color_info; printf '%s' "$status"; cc_color_reset
+            cc_color_fail "$fd"; printf '%s' "$status" >&"$fd"; cc_color_reset "$fd"
             ;;
         SKIP)
-            cc_color_note; printf '%s' "$status"; cc_color_reset
+            cc_color_info "$fd"; printf '%s' "$status" >&"$fd"; cc_color_reset "$fd"
             ;;
         *)
-            cc_color_note; printf '%s' "$status"; cc_color_reset
+            printf '%s' "$status" >&"$fd"
             ;;
     esac
 }
 
-cc_status_line() {
-    local label="$1" status="$2" width="${CC_STATUS_WIDTH:-38}" label_len dots
+cc_status_word() {
+    cc_status_word_fd 1 "$1"
+}
+
+cc_status_cell() {
+    local status="$1" width="${2:-0}" padding
+    cc_status_word "$status"
+    padding=$((width - ${#status}))
+    [ "$padding" -gt 0 ] && printf '%*s' "$padding" ''
+}
+
+cc_status_line_fd() {
+    local fd="$1" label="$2" status="$3" width="${4:-${CC_STATUS_WIDTH:-38}}" label_len dots
     label_len=${#label}
     if [ "$label_len" -ge "$width" ]; then
-        printf '%s ' "$label"
+        printf '%s ' "$label" >&"$fd"
     else
         dots=$((width - label_len))
-        printf '%s' "$label"
-        printf '%*s' "$dots" '' | tr ' ' '.'
-        printf ' '
+        printf '%s' "$label" >&"$fd"
+        printf '%*s' "$dots" '' | tr ' ' '.' >&"$fd"
+        printf ' ' >&"$fd"
     fi
+    cc_status_word_fd "$fd" "$status"
+    printf '\n' >&"$fd"
+}
+
+cc_status_line() {
+    cc_status_line_fd 1 "$1" "$2" "${3:-${CC_STATUS_WIDTH:-38}}"
+}
+
+cc_summary_status() {
+    local label="${1:-Overall Status:}" status="$2" width="${3:-16}"
+    printf '%-*s' "$width" "$label"
     cc_status_word "$status"
     printf '\n'
 }
@@ -97,11 +123,7 @@ cc_info_word() { cc_status_word INFO; }
 
 cc_banner() {
     cc_load_version
-    if cc_color_enabled; then
-        cc_color_info; echo "Captain Cronos Shell Toolkit"; cc_color_reset
-    else
-        echo "Captain Cronos Shell Toolkit"
-    fi
+    echo "Captain Cronos Shell Toolkit"
     echo "Version : ${TOOLKIT_VERSION:-unknown}"
     echo "Codename: ${TOOLKIT_CODENAME:-unknown}"
     echo
@@ -121,16 +143,16 @@ cc_log() {
 }
 
 cc_warn() {
-    if cc_color_enabled; then
-        cc_color_warn; printf '[CC WARN]'; cc_color_reset; printf ' %s\n' "$*" >&2
+    if cc_color_enabled 2; then
+        cc_color_warn 2; printf '[CC WARN]' >&2; cc_color_reset 2; printf ' %s\n' "$*" >&2
     else
         echo "[CC WARN] $*" >&2
     fi
 }
 
 cc_error() {
-    if cc_color_enabled; then
-        cc_color_fail; printf '[CC ERROR]'; cc_color_reset; printf ' %s\n' "$*" >&2
+    if cc_color_enabled 2; then
+        cc_color_fail 2; printf '[CC ERROR]' >&2; cc_color_reset 2; printf ' %s\n' "$*" >&2
     else
         echo "[CC ERROR] $*" >&2
     fi

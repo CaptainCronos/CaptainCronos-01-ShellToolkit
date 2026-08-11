@@ -79,9 +79,7 @@ verify_all() {
     if install/verify.sh >"$output" 2>&1; then
         cc_status_line "Repository verification" "PASS"
         echo
-        printf '%-16s ' "Overall Status:"
-        cc_pass
-        printf '\n'
+        cc_summary_status "Overall Status:" PASS
         return 0
     fi
 
@@ -89,9 +87,7 @@ verify_all() {
     echo
     cat "$output"
     echo
-    printf '%-16s ' "Overall Status:"
-    cc_fail
-    printf '\n'
+    cc_summary_status "Overall Status:" FAIL
     return 1
 }
 
@@ -141,9 +137,7 @@ verify_executable() {
     echo
     cc_status_line "Executable permissions" "PASS"
     echo
-    printf '%-16s ' "Overall Status:"
-    cc_pass
-    printf '\n'
+    cc_summary_status "Overall Status:" PASS
 }
 
 case "$ACTION" in

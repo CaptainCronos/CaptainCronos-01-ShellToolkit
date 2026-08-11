@@ -24,7 +24,7 @@ DEBUG=0
 PASSED=0
 FAILED=0
 RESULTS=""
-SELFTEST_TOTAL=43
+SELFTEST_TOTAL=44
 SELFTEST_TEMP=""
 
 usage() {
@@ -268,6 +268,7 @@ run_check "Common library" core check_library cc-common.sh
 run_check "Diagnostics library" diagnostics check_library cc-diagnostics.sh
 run_check "Diagnostic behavior" diagnostics bash "$PROJECT_ROOT/tests/diagnostics.sh"
 run_check "Progress behavior" diagnostics bash "$PROJECT_ROOT/tests/progress.sh"
+run_check "Presentation behavior" presentation bash "$PROJECT_ROOT/tests/presentation.sh"
 run_check "Context library" core check_library cc-context.sh
 run_check "Config library" configuration check_library cc-config.sh
 run_check "Semantic dependencies" dependencies bash "$PROJECT_ROOT/tests/dependencies.sh"
@@ -328,15 +329,8 @@ else
     printf '%-14s %s\n' "Tests Passed:" "$PASSED"
     printf '%-14s %s\n' "Tests Failed:" "$FAILED"
     echo
-    if [ "$FAILED" -eq 0 ]; then
-        printf '%-16s ' "Overall Status:"
-        cc_pass
-        printf '\n'
-    else
-        printf '%-16s ' "Overall Status:"
-        cc_fail
-        printf '\n'
-    fi
+    if [ "$FAILED" -eq 0 ]; then status=PASS; else status=FAIL; fi
+    cc_summary_status "Overall Status:" "$status"
 fi
 
 [ "$FAILED" -eq 0 ]

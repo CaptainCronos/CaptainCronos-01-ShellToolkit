@@ -46,6 +46,23 @@ Important libraries:
 - `cc-assets.sh` — local asset database helpers
 - `cc-prompt-engine.sh` — internal prompt template discovery, rendering, and formatting helpers
 
+### Terminal Presentation Contract
+
+Commands retain semantic state as plain PASS, WARN, FAIL, SKIP, or INFO values.
+`cc-results.sh` aggregates those values without inspecting display text, and
+`cc-common.sh` renders them through shared status-word, dotted-row, summary, and
+diagnostic helpers. `cc-diagnostics.sh` uses the same renderer for completed
+progress rows. Exit status remains authoritative; neither commands nor tests
+derive results from ANSI sequences.
+
+Color is semantic rather than decorative: PASS is green, WARN yellow, FAIL and
+ERROR red, SKIP cyan, and INFO or ordinary data use the terminal default.
+Automatic color requires the destination stream to be a TTY. `NO_COLOR`,
+`TERM=dumb`, or `CC_COLOR_MODE=never` suppress it; `CC_COLOR_MODE=always` is a
+focused rendering/test override. Generated documents, reports, pipes, and files
+therefore remain uncolored in normal operation. Tables remain tables, while
+primary semantic cells may use the shared status-word renderer.
+
 ### Configuration
 User configuration is stored under:
 

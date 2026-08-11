@@ -24,7 +24,7 @@ fi
 _cc_service_validate_scope() {
     case "$1" in
         system|user) return 0 ;;
-        *) printf '[CC ERROR] Invalid service scope: %s\n' "$1" >&2; return 2 ;;
+        *) cc_error "Invalid service scope: $1"; return 2 ;;
     esac
 }
 

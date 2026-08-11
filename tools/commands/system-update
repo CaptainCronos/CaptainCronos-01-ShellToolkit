@@ -52,7 +52,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         --dry-run)
             if [ -n "$MODE_SET" ] && [ "$MODE_SET" != dry-run ]; then
-                echo "Choose exactly one of --dry-run or --apply." >&2
+                cc_error "Choose exactly one of --dry-run or --apply."
                 exit 2
             fi
             MODE="dry-run"
@@ -61,7 +61,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         --apply)
             if [ -n "$MODE_SET" ] && [ "$MODE_SET" != apply ]; then
-                echo "Choose exactly one of --dry-run or --apply." >&2
+                cc_error "Choose exactly one of --dry-run or --apply."
                 exit 2
             fi
             MODE="apply"
@@ -69,7 +69,7 @@ while [ "$#" -gt 0 ]; do
             shift
             ;;
         *)
-            echo "Unknown option: $1" >&2
+            cc_error "Unknown option: $1"
             usage >&2
             exit 2
             ;;
@@ -78,7 +78,7 @@ done
 
 if [ "$MODE" = apply ]; then
     if ! : > "$LOG"; then
-        echo "Unable to initialize update log: $LOG" >&2
+        cc_error "Unable to initialize update log: $LOG"
         exit 1
     fi
 fi
@@ -103,7 +103,10 @@ run_log() {
 
 record_failure() {
     FAILED=$((FAILED + 1))
-    say "ERROR: $1"
+    if [ "$MODE" = apply ]; then
+        printf '[CC ERROR] %s\n' "$1" >> "$LOG"
+    fi
+    cc_error "$1"
 }
 
 cc_banner
@@ -146,19 +149,21 @@ say "CLI Safe Boot/GRUB refresh: deferred; routine system update does not modify
 say
 if [ -f "$HOME/myenv/bin/activate" ]; then
     say "Developer Python environment detected: $HOME/myenv"
-    say "INFO: system-update does not update Python virtualenv packages automatically."
+    say "[CC] system-update does not update Python virtualenv packages automatically."
 fi
 if [ "$MODE" = apply ]; then
     cc_dev_update_report all 0 | tee -a "$LOG" || record_failure "Developer package-manager reporting failed."
 else
     cc_dev_update_report all 0 || record_failure "Developer package-manager reporting failed."
 fi
-say "INFO: developer package updates require: cc update dev --apply"
+say "[CC] Developer package updates require: cc update dev --apply"
 
 if [ "$FAILED" -gt 0 ]; then
     say "System update completed with $FAILED failure(s)."
+    cc_summary_status "Overall Status:" FAIL
 else
     say "System update complete (${TOOLKIT_VERSION:-unknown})."
+    cc_summary_status "Overall Status:" PASS
 fi
 
 if [ -f /var/run/reboot-required ]; then

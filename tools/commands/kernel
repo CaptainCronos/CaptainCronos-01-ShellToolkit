@@ -260,13 +260,16 @@ kernel_health() {
     echo
     echo "Kernel Boot Health"
     echo "------------------"
-    printf '%-18s %s\n' "Overall:" "$severity"
+    printf '%-18s ' "Overall:"
+    cc_status_word "$severity"
+    printf '\n'
     printf '%-18s %s\n' "Boot path:" "$(_cc_kernel_boot_dir)"
     printf '%-18s %s\n' "Bootloader:" "$(_cc_kernel_bootloader_environment)"
     echo
     while IFS=$'\t' read -r finding code message; do
         [ -n "$finding" ] || continue
-        printf '%-6s %-34s %s\n' "$finding" "$code" "$message"
+        cc_status_cell "$finding" 6
+        printf ' %-34s %s\n' "$code" "$message"
     done < <(_cc_kernel_snapshot_findings)
     [ "$severity" != FAIL ]
 }

@@ -218,15 +218,14 @@ print_report() {
 
 print_overall_status() {
     echo
-    printf '%-16s ' "Overall Status:"
     if [ "$FAILURES" -gt 0 ]; then
-        cc_fail
+        overall=FAIL
     elif [ "$WARNINGS" -gt 0 ]; then
-        cc_warning
+        overall=WARN
     else
-        cc_pass
+        overall=PASS
     fi
-    printf '\n'
+    cc_summary_status "Overall Status:" "$overall"
 }
 
 cc_banner

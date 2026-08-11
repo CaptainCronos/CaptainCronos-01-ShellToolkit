@@ -11,6 +11,13 @@
 # Purpose     : Shared host-scoped asset inventory helper functions.
 # ==============================================================================
 
+if ! declare -F cc_error >/dev/null 2>&1; then
+    _cc_assets_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    # shellcheck disable=SC1091
+    source "$_cc_assets_lib_dir/cc-common.sh"
+    unset _cc_assets_lib_dir
+fi
+
 cc_assets_version() {
     if command -v cc_version >/dev/null 2>&1; then
         cc_version
@@ -69,7 +76,7 @@ cc_asset_type_valid() {
 cc_asset_dir() {
     local type="$1"
     if ! cc_asset_type_valid "$type"; then
-        printf '[CC ERROR] Unknown asset type: %s\n' "$type" >&2
+        cc_error "Unknown asset type: $type"
         return 2
     fi
     echo "$(cc_assets_root)/$type"
@@ -78,7 +85,7 @@ cc_asset_dir() {
 cc_asset_history_dir() {
     local type="$1"
     if ! cc_asset_type_valid "$type"; then
-        printf '[CC ERROR] Unknown asset type: %s\n' "$type" >&2
+        cc_error "Unknown asset type: $type"
         return 2
     fi
     echo "$(cc_assets_root)/.history/$type"
