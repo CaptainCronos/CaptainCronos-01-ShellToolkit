@@ -5,136 +5,34 @@
 # ------------------------------------------------------------------------------
 # Script      : kernel-cleanup
 # Version     : 1.0.0-alpha1
-# Category    : Storage
-# Requires    : bash pkg-manager uname awk
+# Category    : Maintenance
+# Requires    : bash uname find sort awk df
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Review and optionally purge obsolete kernel packages safely.
+# Purpose     : Compatibility entry point for safe kernel cleanup review.
 # ==============================================================================
 
 set -euo pipefail
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
-source "$PROJECT_ROOT/lib/cc-common.sh"
-source "$PROJECT_ROOT/lib/cc-packages.sh"
 
-DRY_RUN=1
-KEEP_COUNT="${KEEP_COUNT:-2}"
-LOG="${LOG:-$HOME/kernel-cleanup.log}"
-
-usage() {
-    echo "Usage: cc kernel-cleanup [--dry-run|--apply]"
-    echo
-    echo "Safely reviews obsolete kernel packages. Default is --dry-run."
-    echo "Keeps the running kernel and the newest ${KEEP_COUNT} additional installed kernels."
-    echo
-    echo "Environment: KEEP_COUNT=3 cc kernel-cleanup --dry-run"
-}
-
-case "${1:---dry-run}" in
+case "${1:-}" in
     --help|-h)
-        usage
+        cat <<'EOF_HELP'
+Usage: cc kernel-cleanup [--dry-run|--apply]
+
+Compatibility entry point for `cc kernel cleanup`.
+Defaults to --dry-run and keeps the running kernel plus KEEP_COUNT newest
+additional installed kernels (default: 2).
+
+Environment: KEEP_COUNT=3 cc kernel-cleanup --dry-run
+EOF_HELP
         exit 0
         ;;
     --version)
         echo "1.0.0-alpha1"
         exit 0
         ;;
-    --dry-run)
-        DRY_RUN=1
-        ;;
-    --apply)
-        DRY_RUN=0
-        ;;
-    *)
-        usage
-        exit 1
-        ;;
 esac
 
-have(){ command -v "$1" >/dev/null 2>&1; }
-log(){ echo "$*" | tee -a "$LOG" ; }
-run_pkg_log() {
-    "$@" 2>&1 | tee -a "$LOG"
-    return "${PIPESTATUS[0]}"
-}
-
-: > "$LOG"
-
-running="$(uname -r)"
-mapfile -t kernels < <(
-    find /boot -maxdepth 1 -type f -name 'vmlinuz-*' -printf '%f\n' 2>/dev/null |
-        sed 's/^vmlinuz-//' | grep -Ev '\.safe$' | sort -V
-)
-
-cc_banner
-log "Kernel cleanup review"
-log "Running kernel: $running"
-log "Keep newest additional kernels: $KEEP_COUNT"
-log "Dry run: $DRY_RUN"
-log "Log: $LOG"
-log ""
-
-if [ "${#kernels[@]}" -eq 0 ]; then
-    log "No kernels found under /boot."
-    exit 0
-fi
-
-log "Installed kernels:"
-printf '  %s\n' "${kernels[@]}" | tee -a "$LOG"
-log ""
-
-keep=()
-keep+=("$running")
-for k in $(printf '%s\n' "${kernels[@]}" | grep -vxF "$running" | tail -n "$KEEP_COUNT"); do
-    keep+=("$k")
-done
-
-log "Protected kernels:"
-printf '  %s\n' "${keep[@]}" | sort -V | uniq | tee -a "$LOG"
-log ""
-
-purge_kernels=()
-for k in "${kernels[@]}"; do
-    protected=0
-    for p in "${keep[@]}"; do
-        if [ "$k" = "$p" ]; then
-            protected=1
-            break
-        fi
-    done
-    [ "$protected" -eq 0 ] && purge_kernels+=("$k")
-done
-
-if [ "${#purge_kernels[@]}" -eq 0 ]; then
-    log "No obsolete kernels selected for purge."
-    exit 0
-fi
-
-packages=()
-for k in "${purge_kernels[@]}"; do
-    while read -r pkg; do
-        [ -n "$pkg" ] && packages+=("$pkg")
-    done < <(_cc_pkg_find_removable_matching "$k")
-done
-
-if [ "${#packages[@]}" -eq 0 ]; then
-    log "Obsolete kernel files found, but no matching package database entries were selected."
-    exit 0
-fi
-
-log "Candidate purge packages:"
-printf '  %s\n' "${packages[@]}" | sort -u | tee -a "$LOG"
-log ""
-
-if [ "$DRY_RUN" -eq 1 ]; then
-    log "DRY RUN only. To purge candidates, run: cc kernel-cleanup --apply"
-    exit 0
-fi
-
-log "Purging obsolete kernel packages..."
-CC_PKG_RUNNER=run_pkg_log _cc_pkg_purge "${packages[@]}"
-CC_PKG_RUNNER=run_pkg_log _cc_pkg_autoremove
-CC_PKG_RUNNER=run_pkg_log _cc_pkg_clean
-sudo update-grub 2>&1 | tee -a "$LOG"
-log "Kernel cleanup complete."
+bash "$PROJECT_ROOT/tools/commands/kernel" cleanup "$@"

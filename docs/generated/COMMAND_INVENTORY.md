@@ -1,6 +1,6 @@
 # Captain Cronos Command Inventory
 
-Generated: Sun Aug  9 11:00:09 EDT 2026
+Generated: Tue Aug 11 05:24:07 EDT 2026
 
 | Command | Version | Purpose |
 |---|---|---|
@@ -28,7 +28,8 @@ Generated: Sun Aug  9 11:00:09 EDT 2026
 | cc helpme-refresh | 1.3.0-alpha1 | Replace installed helpme with canonical framework help. |
 | cc init | 1.1.0-alpha1 | Initialize a Captain Cronos host identity and local environment. |
 | cc install | 2.3.0-alpha1 | Install the active toolkit launcher into ~/bin. |
-| cc kernel-cleanup | 1.0.0-alpha1 | Review and optionally purge obsolete kernel packages safely. |
+| cc kernel | 1.0.0-alpha1 | Inspect and safely manage installed kernels. |
+| cc kernel-cleanup | 1.0.0-alpha1 | Compatibility entry point for safe kernel cleanup review. |
 | cc monthly-health | 2.0.0-alpha1 | Generate a monthly host health and maintenance report. |
 | cc monthly-health-timer | reads VERSION | Retire or inspect the standalone monthly health user timer. |
 | cc platform | 1.0.0-alpha1 | Show detected operating platform and host capabilities. |

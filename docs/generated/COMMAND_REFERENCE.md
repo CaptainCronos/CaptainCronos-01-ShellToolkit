@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Sun Aug  9 11:00:09 EDT 2026
+Generated: Tue Aug 11 05:24:07 EDT 2026
 
 ## cc about
 
@@ -124,6 +124,7 @@ Usage:
   cc deps core
   cc deps docs
   cc deps storage
+  cc deps kernel
   cc deps optional
 
 Shows dependency status for toolkit commands and dependency groups.
@@ -384,13 +385,45 @@ Notes:
   remains available as install/install.sh.
 ~~~
 
+## cc kernel
+
+~~~text
+Usage:
+  cc kernel [help]
+  cc kernel status
+  cc kernel list
+  cc kernel running
+  cc kernel cleanup [--dry-run|--apply]
+  cc kernel deps
+
+Actions:
+  status   Show running/newest state, counts, reboot state, and /boot usage.
+  list     List installed kernels with RUNNING, PROTECTED, and CANDIDATE states.
+  running  Show the running release and matching installed packages.
+  cleanup  Review obsolete kernel packages; defaults to --dry-run.
+  deps     Show required and optional kernel-management capabilities.
+
+Safety:
+  Cleanup always protects the running kernel and KEEP_COUNT newest additional
+  kernels (default: 2). Package removal requires an explicit --apply.
+
+Compatibility:
+  cc kernel-cleanup [--dry-run|--apply] remains available.
+
+Examples:
+  cc kernel status
+  KEEP_COUNT=3 cc kernel list
+  cc kernel cleanup --dry-run
+~~~
+
 ## cc kernel-cleanup
 
 ~~~text
 Usage: cc kernel-cleanup [--dry-run|--apply]
 
-Safely reviews obsolete kernel packages. Default is --dry-run.
-Keeps the running kernel and the newest 2 additional installed kernels.
+Compatibility entry point for `cc kernel cleanup`.
+Defaults to --dry-run and keeps the running kernel plus KEEP_COUNT newest
+additional installed kernels (default: 2).
 
 Environment: KEEP_COUNT=3 cc kernel-cleanup --dry-run
 ~~~
@@ -685,7 +718,7 @@ Default:
 Workflow:
   1. toolkit-update       Pull latest toolkit changes and reinstall command files.
   2. system-update        Run managed OS/app update workflow.
-  3. kernel-cleanup       Review obsolete kernels. Applies only with --apply.
+  3. kernel cleanup       Review obsolete kernels. Applies only with --apply.
   4. dev-update           Optional developer maintenance when explicitly enabled.
   5. verify               Verify repository structure and Bash syntax.
   6. doctor               Run toolkit health checks.
@@ -697,7 +730,7 @@ Notes:
   Use cc system-update for package/app updates only.
   Use cc update dev --dry-run before applying developer package updates.
   Set DEV_UPDATES=yes in cc config to include developer updates in cc update --apply.
-  Use cc kernel-cleanup separately before trusting automated cleanup.
+  Use cc kernel cleanup separately before trusting automated cleanup.
 ~~~
 
 ## cc verify

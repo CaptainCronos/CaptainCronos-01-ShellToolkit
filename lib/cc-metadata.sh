@@ -42,7 +42,8 @@ cc_infer_category() {
         release|baseline|defaults) echo "Engineering" ;;
         repo|repos|gitflow|status) echo "Repository" ;;
         verify|doctor) echo "Diagnostics" ;;
-        drives|smart|kernel-cleanup) echo "Storage" ;;
+        drives|smart) echo "Storage" ;;
+        kernel|kernel-cleanup) echo "Maintenance" ;;
         dev-update|system-update|update|monthly-health|monthly-health-timer) echo "Maintenance" ;;
         *) echo "General" ;;
     esac

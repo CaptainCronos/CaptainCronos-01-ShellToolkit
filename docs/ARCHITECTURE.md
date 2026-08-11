@@ -35,6 +35,7 @@ Important libraries:
 - `cc-config.sh` — toolkit configuration helpers
 - `cc-programs.sh` — configured command-line capability resolution
 - `cc-packages.sh` — semantic, platform-aware system package operations
+- `cc-kernel.sh` — kernel discovery, ordering, classification, ownership, and reboot-state inspection
 - `cc-network.sh` — semantic, platform-aware network-state inspection
 - `cc-services.sh` — scoped service lifecycle, timer, and system-log operations
 - `cc-http.sh` — semantic file downloads and HTTP/API requests
@@ -71,6 +72,26 @@ Maintenance updates are split into three surfaces:
 `cc system-update` owns system and desktop/app updates. It detects and reports developer ecosystem package managers, but does not update them. This protects project toolchains, global CLIs, language-specific package state, and user development environments from broad workstation maintenance runs.
 
 On Debian-family systems, toolkit automation uses the configured `apt-get` interface for package operations, `apt-cache` for repository queries, and `dpkg` for the installed-package database. Interactive administrators may still use `apt` directly at a terminal. Other supported platform families retain their native package-manager syntax behind `lib/cc-packages.sh`.
+
+### Kernel Management Architecture
+
+`lib/cc-kernel.sh` is the single kernel inspection and classification layer.
+On Linux it combines versioned `/boot/vmlinuz-*` artifacts with exact installed
+`linux-image-*` package releases, then orders releases with GNU `sort -V` under
+the C locale. The running release is always protected, followed by the newest
+`KEEP_COUNT` additional releases. List and cleanup commands consume the same
+protected and candidate sets.
+
+Cleanup mutation is currently supported only for the Debian-family package
+adapter. A version is eligible only when exactly one installed image package is
+identified and, when its boot artifact exists, exactly one matching package
+owner is reported. Ambiguous or missing ownership retains the kernel. Purge,
+autoremove, and clean operations remain behind `lib/cc-packages.sh`.
+
+Debian kernel packages run bootloader maintenance through package lifecycle
+hooks, so kernel cleanup does not invoke `update-grub` directly. Non-Linux hosts
+can report the running kernel but return reduced/unsupported state for Linux
+inventory and cleanup operations.
 
 `cc dev-update` owns developer ecosystem reporting and explicit mutation. It defaults to dry-run/reporting. Mutating developer updates require `--apply`; only package managers with a conservative global update path are applied. Normal `cc update --apply` includes developer updates only when `DEV_UPDATES=yes` is set in toolkit config.
 

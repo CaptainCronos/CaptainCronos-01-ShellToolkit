@@ -227,6 +227,18 @@ cc verify executable
 
 Status: **Maintenance / Future**
 
+### Kernel Management Foundation
+
+Status: **Complete**
+
+- Shared kernel discovery and conservative package ownership classification.
+- `cc kernel` status, list, running, cleanup, and dependency actions.
+- Backward-compatible `cc kernel-cleanup` entry point.
+- Fixture-based safety validation with a mocked mutation path.
+
+Next phase: add broader native package-family adapters and boot-artifact health
+inspection before considering any bootloader configuration features.
+
 Completed in active development:
 
 - Internal Prompt Engine foundation for future `cc prompt` workflows.

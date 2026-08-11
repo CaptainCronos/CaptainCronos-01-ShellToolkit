@@ -119,6 +119,21 @@ cc drive-burnin
 cc asset
 ```
 
+Kernel management is available through one safety-first namespace:
+
+```bash
+cc kernel status
+cc kernel list
+cc kernel running
+cc kernel cleanup --dry-run
+cc kernel deps
+```
+
+`cc kernel cleanup` defaults to dry-run, always protects the running kernel,
+and protects the newest `KEEP_COUNT` additional kernels. The legacy
+`cc kernel-cleanup` command remains a compatibility entry point to the same
+implementation. Package removal requires an explicit `--apply`.
+
 Commands live under `tools/commands/`, where each command is a standalone script discovered by the `cc` dispatcher.
 
 Preferred external executables are defined centrally in `config/programs.conf`

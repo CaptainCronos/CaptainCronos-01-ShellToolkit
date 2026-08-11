@@ -1,0 +1,267 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : kernel
+# Version     : 1.0.0-alpha1
+# Category    : Maintenance
+# Requires    : bash uname find sort awk df
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect and safely manage installed kernels.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-deps.sh"
+source "$PROJECT_ROOT/lib/cc-kernel.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc kernel [help]
+  cc kernel status
+  cc kernel list
+  cc kernel running
+  cc kernel cleanup [--dry-run|--apply]
+  cc kernel deps
+
+Actions:
+  status   Show running/newest state, counts, reboot state, and /boot usage.
+  list     List installed kernels with RUNNING, PROTECTED, and CANDIDATE states.
+  running  Show the running release and matching installed packages.
+  cleanup  Review obsolete kernel packages; defaults to --dry-run.
+  deps     Show required and optional kernel-management capabilities.
+
+Safety:
+  Cleanup always protects the running kernel and KEEP_COUNT newest additional
+  kernels (default: 2). Package removal requires an explicit --apply.
+
+Compatibility:
+  cc kernel-cleanup [--dry-run|--apply] remains available.
+
+Examples:
+  cc kernel status
+  KEEP_COUNT=3 cc kernel list
+  cc kernel cleanup --dry-run
+EOF_HELP
+}
+
+kernel_keep_count() {
+    local count="${KEEP_COUNT:-2}"
+    _cc_kernel_validate_keep_count "$count" || {
+        cc_error "KEEP_COUNT must be a non-negative integer: $count"
+        return 2
+    }
+    printf '%s\n' "$count"
+}
+
+kernel_require_linux() {
+    _cc_kernel_supported && return 0
+    cc_error "Kernel inspection beyond the running release is unsupported on $(_cc_kernel_os)."
+    return 3
+}
+
+kernel_status() {
+    local running newest reboot_state boot_usage keep_count platform_support running_newest=unknown
+    local -a kernels=() protected=() candidates=()
+    running="$(_cc_kernel_running 2>/dev/null || printf unknown)"
+    keep_count="$(kernel_keep_count)" || return
+    mapfile -t kernels < <(_cc_kernel_list)
+    newest="$(_cc_kernel_newest 2>/dev/null || true)"
+    mapfile -t protected < <(_cc_kernel_protected "$keep_count" 2>/dev/null || true)
+    if _cc_kernel_supported; then
+        mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count" 2>/dev/null || true)
+    fi
+    [ -z "$newest" ] && newest=unknown
+    if [ "$running" != unknown ] && [ "$newest" != unknown ]; then
+        if [ "$running" = "$newest" ]; then running_newest=yes; else running_newest=no; fi
+    fi
+    reboot_state="$(_cc_kernel_reboot_state)"
+    boot_usage="$(_cc_kernel_boot_usage)"
+    if _cc_kernel_supported; then
+        platform_support="Linux inspection"
+        _cc_kernel_cleanup_supported && platform_support+="; cleanup supported"
+    else
+        platform_support="$(_cc_kernel_os); running-release inspection only"
+    fi
+
+    cc_banner
+    echo
+    echo "Kernel Status"
+    echo "-------------"
+    printf '%-24s %s\n' "Platform support:" "$platform_support"
+    printf '%-24s %s\n' "Running kernel:" "$running"
+    printf '%-24s %s\n' "Newest installed:" "$newest"
+    printf '%-24s %s\n' "Installed count:" "${#kernels[@]}"
+    printf '%-24s %s\n' "Running is newest:" "$running_newest"
+    printf '%-24s %s\n' "Protected count:" "${#protected[@]}"
+    printf '%-24s %s\n' "Cleanup candidates:" "${#candidates[@]}"
+    printf '%-24s %s\n' "Reboot state:" "$reboot_state"
+    printf '%-24s %s\n' "/boot usage:" "${boot_usage:-unavailable}"
+}
+
+kernel_list() {
+    local keep_count kernel state
+    local -a kernels=() protected=() candidates=()
+    keep_count="$(kernel_keep_count)" || return
+    mapfile -t kernels < <(_cc_kernel_list)
+    mapfile -t protected < <(_cc_kernel_protected "$keep_count")
+    if _cc_kernel_supported; then
+        mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count")
+    fi
+
+    cc_banner
+    echo
+    echo "Installed Kernels"
+    echo "-----------------"
+    printf '%-36s %s\n' "Release" "State"
+    printf '%-36s %s\n' "-------" "-----"
+    for kernel in "${kernels[@]}"; do
+        state=""
+        if _cc_kernel_is_running "$kernel"; then state=RUNNING; fi
+        if _cc_kernel_in_list "$kernel" "${protected[@]}"; then
+            state="${state:+$state,}PROTECTED"
+        fi
+        if _cc_kernel_in_list "$kernel" "${candidates[@]}"; then
+            state="${state:+$state,}CANDIDATE"
+        fi
+        [ -n "$state" ] || state=INSTALLED
+        printf '%-36s %s\n' "$kernel" "$state"
+    done
+}
+
+kernel_running() {
+    local running package
+    local -a packages=()
+    running="$(_cc_kernel_running)" || {
+        cc_error "Unable to determine the running kernel."
+        return 1
+    }
+    mapfile -t packages < <(_cc_kernel_companion_packages_for_version "$running" 2>/dev/null || true)
+
+    cc_banner
+    echo
+    echo "Running Kernel"
+    echo "--------------"
+    printf '%-18s %s\n' "Release:" "$running"
+    printf '%-18s %s\n' "OS:" "$(_cc_kernel_os)"
+    if [ "${#packages[@]}" -eq 0 ]; then
+        printf '%-18s %s\n' "Packages:" "not determinable"
+    else
+        printf '%-18s %s\n' "Packages:" "${packages[0]}"
+        for package in "${packages[@]:1}"; do
+            printf '%-18s %s\n' "" "$package"
+        done
+    fi
+}
+
+kernel_cleanup_log() {
+    if [ "${KERNEL_APPLY:-0}" -eq 1 ]; then
+        printf '%s\n' "$*" | tee -a "$KERNEL_LOG"
+    else
+        printf '%s\n' "$*"
+    fi
+}
+
+kernel_cleanup_runner() {
+    "$@" 2>&1 | tee -a "$KERNEL_LOG"
+    return "${PIPESTATUS[0]}"
+}
+
+kernel_cleanup() {
+    local option="${1:---dry-run}" keep_count running newest version
+    local -a kernels=() protected=() candidates=() packages=() mapped=() skipped=()
+    case "$option" in
+        --help|-h) usage; return 0 ;;
+        --dry-run) KERNEL_APPLY=0 ;;
+        --apply) KERNEL_APPLY=1 ;;
+        *) cc_error "Unknown kernel cleanup option: $option"; usage; return 2 ;;
+    esac
+    [ "$#" -le 1 ] || { cc_error "Kernel cleanup accepts one option."; usage; return 2; }
+    kernel_require_linux || return
+    _cc_kernel_cleanup_supported || {
+        cc_error "Kernel cleanup is not supported by package manager: $(_cc_pkg_family 2>/dev/null || printf unknown)"
+        return 3
+    }
+    keep_count="$(kernel_keep_count)" || return
+    running="$(_cc_kernel_running)" || return 1
+    mapfile -t kernels < <(_cc_kernel_list)
+    newest="$(_cc_kernel_newest 2>/dev/null || true)"
+    mapfile -t protected < <(_cc_kernel_protected "$keep_count")
+    mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count")
+
+    # Complete and validate the immutable package plan before any operation.
+    for version in "${candidates[@]}"; do
+        if [ "$version" = "$running" ]; then
+            cc_error "Safety invariant violation: running kernel entered candidate plan."
+            return 5
+        fi
+        mapped=()
+        mapfile -t mapped < <(_cc_kernel_packages_for_version "$version" 2>/dev/null || true)
+        if [ "${#mapped[@]}" -eq 0 ]; then
+            skipped+=("$version")
+        else
+            packages+=("${mapped[@]}")
+        fi
+    done
+    if [ "${#packages[@]}" -gt 0 ]; then
+        mapfile -t packages < <(printf '%s\n' "${packages[@]}" | sort -u)
+    fi
+
+    KERNEL_LOG="${LOG:-$HOME/kernel-cleanup.log}"
+    if [ "$KERNEL_APPLY" -eq 1 ]; then
+        : >> "$KERNEL_LOG"
+    fi
+    kernel_cleanup_log "Kernel cleanup review"
+    kernel_cleanup_log "Running kernel: $running"
+    kernel_cleanup_log "Newest installed kernel: ${newest:-unknown}"
+    kernel_cleanup_log "Keep newest additional kernels: $keep_count"
+    kernel_cleanup_log "Mode: $([ "$KERNEL_APPLY" -eq 1 ] && printf APPLY || printf 'DRY RUN')"
+    kernel_cleanup_log "Installed kernels: ${#kernels[@]}"
+    kernel_cleanup_log "Protected kernels: ${#protected[@]}"
+    kernel_cleanup_log "Cleanup candidates: ${#candidates[@]}"
+
+    if [ "${#candidates[@]}" -eq 0 ]; then
+        kernel_cleanup_log "No obsolete kernels selected for purge."
+        return 0
+    fi
+    printf 'Candidate kernels:\n'
+    printf '  %s\n' "${candidates[@]}"
+    if [ "${#skipped[@]}" -gt 0 ]; then
+        printf 'Retained: package ownership was missing or ambiguous:\n'
+        printf '  %s\n' "${skipped[@]}"
+    fi
+    if [ "${#packages[@]}" -eq 0 ]; then
+        kernel_cleanup_log "No confidently owned kernel packages were selected."
+        return 0
+    fi
+    printf 'Candidate purge packages:\n'
+    printf '  %s\n' "${packages[@]}"
+
+    if [ "$KERNEL_APPLY" -eq 0 ]; then
+        kernel_cleanup_log "DRY RUN only. To purge candidates, run: cc kernel cleanup --apply"
+        return 0
+    fi
+
+    kernel_cleanup_log "Purging obsolete kernel packages..."
+    CC_PKG_RUNNER=kernel_cleanup_runner _cc_pkg_purge "${packages[@]}"
+    CC_PKG_RUNNER=kernel_cleanup_runner _cc_pkg_autoremove
+    CC_PKG_RUNNER=kernel_cleanup_runner _cc_pkg_clean
+    kernel_cleanup_log "Bootloader refresh: $(_cc_kernel_refresh_bootloader)"
+    kernel_cleanup_log "Kernel cleanup complete."
+}
+
+case "${1:-help}" in
+    --help|-h|help|"") usage ;;
+    --version) cc_version ;;
+    status) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_status ;;
+    list) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_list ;;
+    running) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_running ;;
+    cleanup) shift; kernel_cleanup "$@" ;;
+    deps|dependencies) shift; bash "$PROJECT_ROOT/tools/cc" deps kernel "$@" ;;
+    *) cc_error "Unknown kernel action: $1"; echo; usage; exit 1 ;;
+esac

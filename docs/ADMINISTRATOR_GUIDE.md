@@ -109,6 +109,19 @@ replace a processor.
 3. `cc asset inventory drives`
 4. `cc drive-burnin` (framework)
 
+## Kernel Workflow
+
+Use `cc kernel status`, `cc kernel list`, and `cc kernel running` for read-only
+inspection. `cc kernel cleanup` is also read-only by default and prints the
+candidate package plan. Only `cc kernel cleanup --apply` permits package
+mutation. Set `KEEP_COUNT` to a non-negative integer to protect that many newest
+non-running kernels in addition to the running kernel.
+
+Cleanup is enabled only on supported Debian-family package systems. Package
+ownership must be unambiguous; otherwise the release is retained. A reboot
+marker and a newer installed kernel are reported as distinct states. The legacy
+`cc kernel-cleanup` form remains supported.
+
 ## Documentation
 - `cc docs inventory`
 - `cc docs build --apply`

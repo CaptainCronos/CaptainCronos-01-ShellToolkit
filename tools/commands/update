@@ -40,7 +40,7 @@ Default:
 Workflow:
   1. toolkit-update       Pull latest toolkit changes and reinstall command files.
   2. system-update        Run managed OS/app update workflow.
-  3. kernel-cleanup       Review obsolete kernels. Applies only with --apply.
+  3. kernel cleanup       Review obsolete kernels. Applies only with --apply.
   4. dev-update           Optional developer maintenance when explicitly enabled.
   5. verify               Verify repository structure and Bash syntax.
   6. doctor               Run toolkit health checks.
@@ -52,7 +52,7 @@ Notes:
   Use cc system-update for package/app updates only.
   Use cc update dev --dry-run before applying developer package updates.
   Set DEV_UPDATES=yes in cc config to include developer updates in cc update --apply.
-  Use cc kernel-cleanup separately before trusting automated cleanup.
+  Use cc kernel cleanup separately before trusting automated cleanup.
 EOF_HELP
 }
 
@@ -148,9 +148,9 @@ fi
 
 if [ "$RUN_KERNEL" -eq 1 ]; then
     if [ "$MODE" = "apply" ]; then
-        run_cc kernel-cleanup --apply
+        run_cc kernel cleanup --apply
     else
-        run_cc kernel-cleanup --dry-run
+        run_cc kernel cleanup --dry-run
     fi
 fi
 

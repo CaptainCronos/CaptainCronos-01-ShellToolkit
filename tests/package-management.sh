@@ -19,6 +19,7 @@ if _cc_pkg_is_installed cc-package-that-does-not-exist; then
     fail "installed-package detection accepted a missing package"
 fi
 _cc_pkg_is_available bash || fail "package availability query did not find bash"
+printf '%s\n' "$(_cc_pkg_owners_of_path /usr/bin/bash)" | grep -Fxq bash || fail "package path ownership did not find bash"
 
 dry_run_output="$(CC_PKG_DRY_RUN=1 _cc_pkg_install cc-package-test)"
 printf '%s\n' "$dry_run_output" | grep -q 'sudo apt-get install -y cc-package-test' || fail "Debian dry-run command was not standardized"

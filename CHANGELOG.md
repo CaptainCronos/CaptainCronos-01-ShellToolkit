@@ -10,6 +10,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Kernel management namespace with status, list, running, cleanup, and dependency actions.
+- Shared kernel discovery, ordering, protection, candidate, package ownership, reboot-state, and platform helpers.
+- Fixture-based kernel safety tests covering dry-run and mocked apply behavior.
 - Semantic, platform-aware system package operations in `lib/cc-packages.sh`.
 - Focused package-management capability, query, dry-run, and platform tests.
 - Semantic, platform-aware network inspection in `lib/cc-network.sh`.
@@ -33,6 +36,10 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- Kernel cleanup now consumes the shared kernel library and retains `cc kernel-cleanup` as a compatibility entry point.
+- Kernel discovery now combines `/boot` artifacts with exact installed kernel-image packages.
+- Debian-family cleanup relies on package lifecycle hooks instead of invoking `update-grub` universally.
+- Dependency-group reporting now checks every declared dependency rather than only the first line.
 - Debian-family automation now resolves `apt-get`, `apt-cache`, and `dpkg` through the Program Management System.
 - System update, kernel cleanup, dependency previews, and baseline package capture now use shared package semantics.
 - Linux interface, route, listener, and connection inspection now resolves the configured `ip` and `ss` capabilities.

@@ -29,6 +29,7 @@ Usage:
   cc deps core
   cc deps docs
   cc deps storage
+  cc deps kernel
   cc deps optional
 
 Shows dependency status for toolkit commands and dependency groups.
@@ -57,7 +58,7 @@ show_group() {
 show_list() {
     local title="$1" list="$2"
     local -a dependencies=()
-    read -r -a dependencies <<< "$list"
+    mapfile -t dependencies <<< "$list"
     show_group "$title" "${dependencies[@]}"
 }
 
@@ -81,7 +82,7 @@ case "${1:-summary}" in
         echo "1.0.0-alpha1"
         exit 0
         ;;
-    summary|core|docs|storage|optional)
+    summary|core|docs|storage|kernel|optional)
         ACTION="${1:-summary}"
         ;;
     command)
@@ -115,6 +116,11 @@ case "$ACTION" in
         ;;
     storage)
         show_list "Storage dependencies" "$(cc_dep_storage_list)"
+        ;;
+    kernel)
+        show_list "Kernel dependencies" "$(cc_dep_kernel_list)"
+        echo
+        show_list "Optional kernel capabilities" "$(cc_dep_kernel_optional_list)"
         ;;
     optional)
         show_list "Optional dependencies" "$(cc_dep_optional_list)"

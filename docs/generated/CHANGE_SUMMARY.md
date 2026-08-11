@@ -1,9 +1,11 @@
 # Recent Change Summary
 
-Generated: Sun Aug  9 11:00:15 EDT 2026
+Generated: Tue Aug 11 05:24:13 EDT 2026
 
 ~~~text
-aebeeda (HEAD -> feature/debug-infrastructure, origin/main, origin/HEAD, main) Merge branch 'fix/1.3-stabilization'
+d86518f (HEAD -> feature/kernel-management, origin/main, origin/HEAD, main) Merge branch 'feature/debug-infrastructure'
+0a0a4c3 (feature/debug-infrastructure) feat(debug): add diagnostic and progress infrastructure
+aebeeda Merge branch 'fix/1.3-stabilization'
 aa63334 (fix/1.3-stabilization) fix(shell): resolve ShellCheck findings
 2cc36a0 fix(core): stabilize integrated toolkit behavior
 855ce6a fix(deps): resolve semantic capabilities generically
@@ -41,6 +43,4 @@ c0f4149 Document v1.3.0-beta1 framework completion
 57cfd3d (tag: v1.3.0-beta1) Add dotted leaders to status lines
 48ddc6f Use status color helpers in verify
 59f5a02 Use status color helpers in release checks
-49f9416 Use status color helpers in audit summary
-3d71a8b Allow doctor to run tools cc through bash
 ~~~

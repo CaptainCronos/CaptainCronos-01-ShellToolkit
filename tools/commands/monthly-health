@@ -160,7 +160,7 @@ print_updates() {
     subsection "Doctor"
     bash "$PROJECT_ROOT/tools/cc" doctor 2>&1 || true
     subsection "Kernel cleanup dry-run"
-    bash "$PROJECT_ROOT/tools/cc" kernel-cleanup --dry-run 2>&1 || true
+    bash "$PROJECT_ROOT/tools/cc" kernel cleanup --dry-run 2>&1 || true
     subsection "System update dry-run"
     bash "$PROJECT_ROOT/tools/cc" system-update --dry-run 2>&1 || true
 }

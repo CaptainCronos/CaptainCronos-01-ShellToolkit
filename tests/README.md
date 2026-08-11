@@ -1,5 +1,10 @@
 # Tests
 
+`tests/kernel.sh` uses temporary boot artifacts and mocked package/privilege
+commands to verify kernel discovery, version ordering, protection, candidate
+selection, ownership fail-safe behavior, status/list output, reboot state,
+unsupported platforms, dry-run immutability, and the explicit apply path.
+
 Focused shell tests supplement `cc selftest`:
 
 - `dependencies.sh` validates semantic capability resolution, literal executable

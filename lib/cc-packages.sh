@@ -266,3 +266,18 @@ _cc_pkg_list_installed() {
         *) return 1 ;;
     esac
 }
+
+_cc_pkg_owners_of_path() {
+    [ "$#" -eq 1 ] || return 2
+    local family database
+    family="$(_cc_pkg_family)" || return 1
+    case "$family" in
+        apt-get)
+            database="$(_cc_pkg_database_program)" || return 1
+            "$database" -S "$1" 2>/dev/null |
+                awk -F': ' 'NF >= 2 {split($1, names, ", "); for (name in names) print names[name]}' |
+                sort -u
+            ;;
+        *) return 3 ;;
+    esac
+}

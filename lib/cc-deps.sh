@@ -122,6 +122,14 @@ cc_dep_storage_list() {
     printf '%s\n' lsblk df smartctl
 }
 
+cc_dep_kernel_list() {
+    printf '%s\n' uname find sort awk df pkg-manager
+}
+
+cc_dep_kernel_optional_list() {
+    printf '%s\n' pkg-database
+}
+
 cc_dep_optional_list() {
     printf '%s\n' tree bat flatpak snap gh
 }
