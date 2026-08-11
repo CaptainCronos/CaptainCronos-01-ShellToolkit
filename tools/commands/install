@@ -25,7 +25,8 @@ cd "$TOOLKIT_ROOT"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
 
 COMMAND_VERSION="2.3.0-alpha1"
-DRY_RUN=0
+DRY_RUN=1
+MODE_SET=""
 FORCE=0
 FAILURES=0
 WARNINGS=0
@@ -36,20 +37,22 @@ TARGET_LAUNCHER="$USER_BIN/cc"
 usage() {
     cat <<'EOF_HELP'
 Usage:
-  cc install [--dry-run] [--force]
+  cc install [--dry-run|--apply] [--force]
 
 Installs or updates the active Shell Toolkit launcher at:
   ~/bin/cc
 
 Options:
   --dry-run    Show what would be installed without changing files.
+  --apply      Install or update the launcher.
   --force      Reinstall even when ~/bin/cc already matches the source.
   --help, -h   Show this help.
   --version    Show command and toolkit version.
 
 Notes:
+  Dry-run is the default. Launcher mutation requires --apply.
   This command installs only the cc launcher. The full shell-file installer
-  remains available as install/install.sh.
+  remains available as install/install.sh --apply.
 EOF_HELP
 }
 
@@ -72,7 +75,21 @@ record_fail() {
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --dry-run)
+            if [ -n "$MODE_SET" ] && [ "$MODE_SET" != dry-run ]; then
+                cc_error "Choose exactly one of --dry-run or --apply."
+                exit 2
+            fi
             DRY_RUN=1
+            MODE_SET="dry-run"
+            shift
+            ;;
+        --apply)
+            if [ -n "$MODE_SET" ] && [ "$MODE_SET" != apply ]; then
+                cc_error "Choose exactly one of --dry-run or --apply."
+                exit 2
+            fi
+            DRY_RUN=0
+            MODE_SET="apply"
             shift
             ;;
         --force)

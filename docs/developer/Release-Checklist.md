@@ -66,7 +66,7 @@ Confirm:
 Optional live install test:
 
 ```bash
-install/install.sh
+install/install.sh --apply
 source ~/.bashrc
 cc version
 cc doctor

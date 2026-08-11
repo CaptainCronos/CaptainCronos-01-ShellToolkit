@@ -23,8 +23,8 @@ lib/cc-context.sh
   v
 tools/commands/
   |
-  +-- install -> install active launcher into ~/bin/cc
-  +-- update  -> install/update.sh
+  +-- install -> preview/apply active launcher installation into ~/bin/cc
+  +-- update  -> orchestrate explicitly-modeled toolkit/system/kernel maintenance
   +-- verify  -> install/verify.sh
   +-- doctor  -> health checks
   +-- version -> VERSION
@@ -218,14 +218,16 @@ Only installed copies should receive executable permissions. Repository files sh
 The canonical user-level launcher deployment is:
 
 ```bash
-cc install
+cc install --apply
 ```
 
 The full shell-file installer remains available for explicit maintenance through:
 
 ```bash
-install/install.sh
+install/install.sh --apply
 ```
+
+Both commands default to zero-write preview when `--apply` is omitted.
 
 ---
 

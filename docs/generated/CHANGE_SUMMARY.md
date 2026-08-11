@@ -1,9 +1,10 @@
 # Recent Change Summary
 
-Generated: Tue Aug 11 07:30:36 EDT 2026
+Generated: Tue Aug 11 08:39:28 EDT 2026
 
 ~~~text
-07082ce (HEAD -> feature/kernel-health-integration, origin/main, origin/HEAD, main) feat(kernel): add platform capability inspection
+62cf55a (HEAD -> feature/rc-safety-contracts, origin/main, origin/HEAD, main) feat(health): integrate kernel diagnostics
+07082ce feat(kernel): add platform capability inspection
 e61dcfe feat(kernel): add boot artifact health inspection
 78f9a68 feat(kernel): add kernel management namespace
 d86518f Merge branch 'feature/debug-infrastructure'
@@ -42,5 +43,4 @@ a71a770 Run toolkit update script through bash
 eb00c36 Add v1.3.0-beta1 changelog entry
 1de9a3e Update roadmap for v1.3.0-beta1
 c0f4149 Document v1.3.0-beta1 framework completion
-68616d9 Bump version to v1.3.0-beta1
 ~~~

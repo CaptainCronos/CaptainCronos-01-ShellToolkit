@@ -23,6 +23,11 @@ or mutation paths in either consumer.
 
 Focused shell tests supplement `cc selftest`:
 
+- `safety-contracts.sh` validates default-safe and explicit-apply behavior for
+  launcher/full installation, toolkit update, system update, the complete update
+  orchestrator, and monthly-health previews. Mutation paths run only through
+  disposable homes and mocked Git/package/Snap/Flatpak/privilege interfaces;
+  routine GRUB and remote browser archive mutation are asserted unreachable.
 - `dependencies.sh` validates semantic capability resolution, literal executable
   hints, and the `system-update` package-manager dependency regression.
 - `package-management.sh` validates semantic package operations.

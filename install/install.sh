@@ -22,7 +22,8 @@ INSTALL_VERSION="2.2.0-alpha1"
 BACKUP_ROOT="$HOME/.captaincronos/backups"
 BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)"
 USER_BIN="$HOME/bin"
-DRY_RUN="no"
+DRY_RUN="yes"
+MODE_SET=""
 SKIP_BACKUP="no"
 SKIP_BASELINE="no"
 SKIP_DEPS="no"
@@ -35,10 +36,11 @@ Captain Cronos Shell Toolkit Installer
 ======================================
 
 Usage:
-  install/install.sh [options]
+  install/install.sh [--dry-run|--apply] [options]
 
 Options:
   --dry-run          Show what would be done without copying files.
+  --apply            Back up and install shell files and the command launcher.
   --no-backup        Do not create timestamped backups before installing.
   --no-baseline      Do not create baseline files if baseline appears empty.
   --no-deps          Skip dependency gate. Use only for recovery/testing.
@@ -58,13 +60,31 @@ What it does:
   8. Installs the cc command front-end into ~/bin.
   9. Verifies installed files.
  10. Prints a final install report.
+
+Default:
+  Dry-run. No backup, baseline, directory, or destination file is created unless
+  --apply is explicitly supplied.
 EOF_HELP
 }
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --dry-run)
+            if [ -n "$MODE_SET" ] && [ "$MODE_SET" != dry-run ]; then
+                cc_error "Choose exactly one of --dry-run or --apply."
+                exit 2
+            fi
             DRY_RUN="yes"
+            MODE_SET="dry-run"
+            shift
+            ;;
+        --apply)
+            if [ -n "$MODE_SET" ] && [ "$MODE_SET" != apply ]; then
+                cc_error "Choose exactly one of --dry-run or --apply."
+                exit 2
+            fi
+            DRY_RUN="no"
+            MODE_SET="apply"
             shift
             ;;
         --no-backup)
@@ -127,7 +147,9 @@ backup_file() {
         return 0
     fi
 
-    if [ -f "$src" ]; then
+    if [ -f "$src" ] && [ "$DRY_RUN" = "yes" ]; then
+        cc_log "DRY RUN: would back up $src -> $BACKUP_DIR/$(basename "$src")"
+    elif [ -f "$src" ]; then
         mkdir -p "$BACKUP_DIR"
         cp -f "$src" "$BACKUP_DIR/$(basename "$src")"
         cc_log "Backed up: $src"

@@ -150,7 +150,7 @@ else
     WARNINGS=$((WARNINGS + 1))
     cc_status_line "Installed command" "WARN"
     cc_warn "Installed command missing or not executable: $HOME/bin/cc"
-    cc_warn "Run: install/install.sh"
+    cc_warn "Run: install/install.sh --apply"
 fi
 
 echo

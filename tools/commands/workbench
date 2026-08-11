@@ -141,7 +141,7 @@ prepare_workbench() {
     if [ "$APPLY" -eq 0 ]; then
         cc_log "DRY RUN: would prepare live USB workbench environment."
         cc_log "Would create/update: $REPO_DIR"
-        cc_log "Would run: cc install --no-baseline"
+        cc_log "Would run: install/install.sh --apply --no-baseline"
         cc_log "Would run: cc init --apply --host-id $HOST_ID --role workbench --profile workbench"
         cc_log "Re-run with: cc workbench prepare --apply"
         exit 0
@@ -160,7 +160,7 @@ prepare_workbench() {
     cd "$REPO_DIR"
 
     cc_log "Installing toolkit for workbench session."
-    bash install/install.sh --no-baseline
+    bash install/install.sh --apply --no-baseline
 
     cc_log "Initializing workbench host identity."
     bash tools/cc init --apply --host-id "$HOST_ID" --role workbench --profile workbench

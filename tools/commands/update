@@ -20,6 +20,7 @@ source "$PROJECT_ROOT/lib/cc-config.sh"
 source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
 
 MODE="dry-run"
+MODE_SET=""
 RUN_TOOLKIT=1
 RUN_SYSTEM=1
 RUN_KERNEL=1
@@ -38,7 +39,7 @@ Default:
   cc update runs in --dry-run mode.
 
 Workflow:
-  1. toolkit-update       Pull latest toolkit changes and reinstall command files.
+  1. toolkit-update       Preview or apply toolkit pull and shell-file installation.
   2. system-update        Run managed OS/app update workflow.
   3. kernel cleanup       Review obsolete kernels. Applies only with --apply.
   4. dev-update           Optional developer maintenance when explicitly enabled.
@@ -48,8 +49,9 @@ Workflow:
   8. status               Show repository status.
 
 Notes:
-  Use cc toolkit-update for the old direct toolkit pull/reinstall behavior.
-  Use cc system-update for package/app updates only.
+  All mutation-capable stages receive an explicit --apply from this command.
+  Use cc toolkit-update --dry-run to preview toolkit maintenance only.
+  Use cc system-update --dry-run to preview package/app updates only.
   Use cc update dev --dry-run before applying developer package updates.
   Set DEV_UPDATES=yes in cc config to include developer updates in cc update --apply.
   Use cc kernel cleanup separately before trusting automated cleanup.
@@ -83,11 +85,21 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --dry-run)
+            if [ -n "$MODE_SET" ] && [ "$MODE_SET" != dry-run ]; then
+                cc_error "Choose exactly one of --dry-run or --apply."
+                exit 2
+            fi
             MODE="dry-run"
+            MODE_SET="dry-run"
             shift
             ;;
         --apply)
+            if [ -n "$MODE_SET" ] && [ "$MODE_SET" != apply ]; then
+                cc_error "Choose exactly one of --dry-run or --apply."
+                exit 2
+            fi
             MODE="apply"
+            MODE_SET="apply"
             shift
             ;;
         --toolkit-only)
@@ -132,15 +144,15 @@ echo "Maintenance mode: $MODE"
 
 if [ "$RUN_TOOLKIT" -eq 1 ]; then
     if [ "$MODE" = "apply" ]; then
-        run_cc toolkit-update
+        run_cc toolkit-update --apply
     else
-        run_cc toolkit-update --dry-run || true
+        run_cc toolkit-update --dry-run
     fi
 fi
 
 if [ "$RUN_SYSTEM" -eq 1 ]; then
     if [ "$MODE" = "apply" ]; then
-        run_cc system-update
+        run_cc system-update --apply
     else
         run_cc system-update --dry-run
     fi

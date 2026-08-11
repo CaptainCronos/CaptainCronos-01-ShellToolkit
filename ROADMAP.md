@@ -6,6 +6,18 @@ Current version line: **v1.3.0-beta1 — Blackbeard**
 
 The Shell Toolkit has moved from a personal Bash collection into an engineered, installable toolkit with versioning, verification, baseline capture, defaults, storage workflows, asset history, shared libraries, and a GitHub-backed development workflow.
 
+## v1.3 RC Stabilization — Safety Contracts
+
+Status: **Implemented; pending RC integration**
+
+Mutation-capable install and maintenance commands now default to zero-write
+preview and require explicit `--apply`. Toolkit preview does not fetch or modify
+Git refs, installer preview does not create backups, and system preview does not
+create an update log. Routine system updating no longer rewrites custom GRUB
+configuration or installs remote browser archives; those capabilities are
+deferred rather than expanded during RC stabilization. Focused disposable-home
+and mocked-adapter tests cover the complete call chain.
+
 ## Package Management Standardization
 
 Status: **Complete**

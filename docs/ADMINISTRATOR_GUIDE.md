@@ -51,9 +51,31 @@ cc repos publish --apply
 `cc repos publish` is the strict publishing path for completed work. With `--apply`, each detected repository must have a clean working tree, must be on `main`, and must have an `origin` remote before the command runs `git push origin main`. Repositories that do not meet those checks are skipped, and failures do not stop the remaining repositories from being processed.
 
 ## Update Operations
-`cc system-update` is the OS and desktop application update path. It keeps system package operations, snap, flatpak, direct desktop app refreshes, and the CLI Safe Boot refresh separate from developer ecosystem package managers. On Debian-family systems, Captain Cronos automation resolves `apt-get`, `apt-cache`, and `dpkg` through the Program Management System; `apt` remains suitable for direct interactive terminal use.
+`cc update`, `cc toolkit-update`, and `cc system-update` default to zero-write
+preview mode. Persistent package, Git, backup, or installed-file changes require
+an explicit `--apply`; unknown options are rejected. Toolkit preview inspects
+only local Git state because fetching would modify repository metadata.
+
+`cc system-update` is the OS and packaged desktop application update path. It
+applies semantic system package operations plus detected Snap and Flatpak updates
+only with `--apply`. On Debian-family systems, Captain Cronos automation resolves
+`apt-get`, `apt-cache`, and `dpkg` through the Program Management System; `apt`
+remains suitable for direct interactive terminal use.
+
+Automatic Firefox/Thunderbird tar archive replacement and CLI Safe Boot/GRUB
+rewrites are deferred for the v1.3 RC. Routine system update never performs
+those operations, including during `--apply`.
 
 Developer package managers are intentionally report-only during normal system updates because they can change project build tools, language runtimes, global CLIs, user environments, or workstation-specific workflows. Normal `cc system-update` reports npm, pipx, pip, cargo, go, and gem as installed or not installed, shows whether update application is enabled, and prints the dry-run command to review.
+
+Use the maintenance previews before applying changes:
+
+```bash
+cc update --dry-run
+cc toolkit-update --dry-run
+cc system-update --dry-run
+cc update --apply
+```
 
 Use explicit developer update commands when you want that surface:
 

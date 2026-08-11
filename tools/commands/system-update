@@ -6,9 +6,9 @@
 # Script      : system-update
 # Version     : 1.0.0-alpha1
 # Category    : Maintenance
-# Requires    : bash pkg-manager flatpak snap
+# Requires    : bash pkg-manager
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Run OS, desktop app, and CLI Safe Boot update workflow.
+# Purpose     : Safely preview or apply operating-system and packaged-app updates.
 # ==============================================================================
 
 set -uo pipefail
@@ -18,43 +18,82 @@ cd "$PROJECT_ROOT" || exit 1
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
 source "$PROJECT_ROOT/lib/cc-packages.sh"
-source "$PROJECT_ROOT/lib/cc-http.sh"
 
 VERSION="1.0.0-alpha1"
 LOG="${LOG:-$HOME/upgrade.log}"
-DRY_RUN=0
+MODE="dry-run"
+MODE_SET=""
+FAILED=0
 
 usage() {
-    echo "Usage: cc system-update [--dry-run]"
+    echo "Usage: cc system-update [--dry-run|--apply]"
     echo
-    echo "Runs the managed system update workflow: platform package operations, snap, flatpak, Firefox, Thunderbird, and GRUB CLI Safe Boot refresh."
+    echo "Safely previews or applies platform package, Snap, and Flatpak updates."
+    echo
+    echo "Default:"
+    echo "  Dry-run. Persistent mutation requires explicit --apply."
     echo
     echo "Notes:"
     echo "  Developer package managers are detected and reported, but not updated by system-update."
+    echo "  Automatic Firefox/Thunderbird archive replacement is deferred for v1.3 RC."
+    echo "  CLI Safe Boot/GRUB mutation is not part of routine system updates."
     echo "  This command does not purge old kernels. Review kernel cleanup separately after this workflow is stable."
 }
 
-case "${1:-}" in
-    --help|-h)
-        usage
-        exit 0
-        ;;
-    --version)
-        echo "$VERSION"
-        exit 0
-        ;;
-    --dry-run)
-        DRY_RUN=1
-        ;;
-esac
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version)
+            echo "$VERSION"
+            exit 0
+            ;;
+        --dry-run)
+            if [ -n "$MODE_SET" ] && [ "$MODE_SET" != dry-run ]; then
+                echo "Choose exactly one of --dry-run or --apply." >&2
+                exit 2
+            fi
+            MODE="dry-run"
+            MODE_SET="dry-run"
+            shift
+            ;;
+        --apply)
+            if [ -n "$MODE_SET" ] && [ "$MODE_SET" != apply ]; then
+                echo "Choose exactly one of --dry-run or --apply." >&2
+                exit 2
+            fi
+            MODE="apply"
+            MODE_SET="apply"
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
 
-: > "$LOG"
+if [ "$MODE" = apply ]; then
+    if ! : > "$LOG"; then
+        echo "Unable to initialize update log: $LOG" >&2
+        exit 1
+    fi
+fi
 
-say(){ echo -e "$*" | tee -a "$LOG" ; }
+say() {
+    if [ "$MODE" = apply ]; then
+        printf '%s\n' "$*" | tee -a "$LOG"
+    else
+        printf '%s\n' "$*"
+    fi
+}
 have(){ command -v "$1" >/dev/null 2>&1; }
 
 run_log() {
-    if [ "$DRY_RUN" -eq 1 ]; then
+    if [ "$MODE" = dry-run ]; then
         say "DRY RUN: $*"
         return 0
     fi
@@ -62,129 +101,9 @@ run_log() {
     return "${PIPESTATUS[0]}"
 }
 
-need(){ have "$1" || { say "Missing dependency: $1"; return 1; }; }
-
-extract_tar(){
-    local arc="$1" dest="$2"
-    mkdir -p "$dest"
-    case "$arc" in
-        *.tar.xz|*.txz) tar -xJf "$arc" -C "$dest" ;;
-        *.tar.gz|*.tgz) tar -xzf "$arc" -C "$dest" ;;
-        *.tar.bz2) tar -xjf "$arc" -C "$dest" ;;
-        *) echo "Unsupported archive: $arc"; return 1 ;;
-    esac
-}
-
-install_app_from_tar(){
-    local url="$1" arc="$2" expdir="$3" target="$4"
-    local binname
-    binname="$(basename "$target")"
-    say "Downloading $binname..."
-    if [ "$DRY_RUN" -eq 1 ]; then
-        CC_HTTP_DRY_RUN=1 CC_HTTP_REPORTER=say _cc_download_to "$url" "$arc" 3
-        say "DRY RUN: install $expdir -> $target"
-        return 0
-    fi
-    if ! _cc_download_to "$url" "$arc" 3 >>"$LOG" 2>&1; then
-        say "Download failed"
-        return 1
-    fi
-    extract_tar "$arc" "$PWD" || return 1
-    if pgrep -x "$binname" >/dev/null 2>&1; then
-        pkill -x "$binname" || true
-        sleep 1
-    fi
-    run_log sudo rm -rf "$target"
-    run_log sudo mv "$expdir" "$target"
-    run_log sudo ln -sf "$target/$binname" "/usr/local/bin/$binname"
-    say "Updated $binname"
-}
-
-mark_daily_update(){
-    local stamp_file="$1"
-    mkdir -p "$(dirname "$stamp_file")"
-    date +%F > "$stamp_file"
-}
-
-run_daily_update(){
-    local stamp_file="$1"
-    shift
-    local today
-    today="$(date +%F)"
-    if [ -f "$stamp_file" ] && [ "$(cat "$stamp_file" 2>/dev/null)" = "$today" ]; then
-        say "Skipping $(basename "$stamp_file" .stamp): already updated today"
-        return 0
-    fi
-    if "$@"; then
-        [ "$DRY_RUN" -eq 1 ] || mark_daily_update "$stamp_file"
-    else
-        return 1
-    fi
-}
-
-latest_boot_kernel(){
-    find /boot -maxdepth 1 -type f -name 'vmlinuz-*' -printf '%f\n' 2>/dev/null |
-        sed 's/^vmlinuz-//' | grep -Ev '\.safe$' | sort -V | tail -1
-}
-
-update_cli_safe_boot(){
-    say "Checking GRUB CLI Safe Boot entry..."
-    local kernel root_uuid grub_custom backup_stamp grub_backup_dir safe_kernel
-    if ! have update-grub; then
-        say "WARNING: update-grub not found; skipping CLI Safe Boot update."
-        return 0
-    fi
-    kernel="$(latest_boot_kernel)"
-    if [ -z "${kernel:-}" ]; then
-        say "WARNING: no /boot/vmlinuz-* kernel found; skipping CLI Safe Boot update."
-        return 0
-    fi
-    if [ ! -f "/boot/vmlinuz-${kernel}" ] || [ ! -f "/boot/initrd.img-${kernel}" ]; then
-        say "WARNING: missing kernel/initrd pair for ${kernel}; skipping CLI Safe Boot update."
-        return 0
-    fi
-    root_uuid="$(findmnt -no UUID / 2>/dev/null || true)"
-    if [ -z "${root_uuid:-}" ]; then
-        say "WARNING: could not determine root filesystem UUID; skipping CLI Safe Boot update."
-        return 0
-    fi
-    grub_custom="/etc/grub.d/40_custom"
-    backup_stamp="$(date +%Y%m%d-%H%M%S)"
-    grub_backup_dir="/root/grub-custom-backups"
-    if [ "$DRY_RUN" -eq 1 ]; then
-        say "DRY RUN: would refresh $grub_custom for kernel $kernel"
-        return 0
-    fi
-    run_log sudo mkdir -p "$grub_backup_dir"
-    if compgen -G "/etc/grub.d/40_custom.bak*" >/dev/null; then
-        # Variables expand in the explicit sudo sh process.
-        # shellcheck disable=SC2016
-        run_log sudo sh -c 'for f in /etc/grub.d/40_custom.bak*; do [ -e "$f" ] && mv "$f" /root/grub-custom-backups/; done'
-    fi
-    if [ -f "$grub_custom" ]; then
-        run_log sudo cp -a "$grub_custom" "$grub_backup_dir/40_custom.${backup_stamp}"
-    fi
-    sudo tee "$grub_custom" >/dev/null <<GRUBEOF
-#!/bin/sh
-exec tail -n +3 \$0
-
-menuentry "Ubuntu CLI Safe Boot" {
-    linux /boot/vmlinuz-${kernel} root=UUID=${root_uuid} ro systemd.unit=multi-user.target nomodeset
-    initrd /boot/initrd.img-${kernel}
-}
-GRUBEOF
-    run_log sudo chmod 755 "$grub_custom"
-    run_log sudo update-grub
-    safe_kernel="$(grep -A5 "Ubuntu CLI Safe Boot" /boot/grub/grub.cfg 2>/dev/null | awk '/^[[:space:]]*linux[[:space:]]/ {for (i=1; i<=NF; i++) if ($i ~ /^\/boot\/vmlinuz-/) {sub(/^\/boot\/vmlinuz-/, "", $i); print $i; exit}}' || true)"
-    say "Current kernel : $(uname -r)"
-    say "Newest kernel  : ${kernel}"
-    say "Safe boot uses : ${safe_kernel:-unavailable}"
-    if [ "$safe_kernel" = "$kernel" ]; then
-        say "Safe boot status: MATCH"
-    else
-        say "Safe boot status: MISMATCH"
-        say "WARNING: CLI Safe Boot entry was written but could not be verified in grub.cfg."
-    fi
+record_failure() {
+    FAILED=$((FAILED + 1))
+    say "ERROR: $1"
 }
 
 cc_banner
@@ -193,46 +112,59 @@ say "Starting system update (${VERSION})..."
 say
 say "System Package Managers"
 say "-----------------------"
-CC_PKG_DRY_RUN="$DRY_RUN" CC_PKG_RUNNER=run_log CC_PKG_REPORTER=say _cc_pkg_update || exit 1
-CC_PKG_DRY_RUN="$DRY_RUN" CC_PKG_RUNNER=run_log CC_PKG_REPORTER=say _cc_pkg_upgrade || true
-update_cli_safe_boot || true
+if [ "$MODE" = dry-run ]; then
+    package_dry_run=1
+else
+    package_dry_run=0
+fi
+CC_PKG_DRY_RUN="$package_dry_run" CC_PKG_RUNNER=run_log CC_PKG_REPORTER=say _cc_pkg_update || record_failure "Package index update failed."
+CC_PKG_DRY_RUN="$package_dry_run" CC_PKG_RUNNER=run_log CC_PKG_REPORTER=say _cc_pkg_upgrade || record_failure "Package upgrade failed."
 
 say
 say "Desktop/App Package Managers"
 say "----------------------------"
 if have snap; then
-    run_log sudo snap refresh || true
+    run_log sudo snap refresh || record_failure "Snap refresh failed."
+else
+    say "Snap: not installed; skipping."
 fi
 
 if have flatpak; then
-    run_log flatpak update -y || true
-    run_log flatpak uninstall --unused -y || true
+    run_log flatpak update -y || record_failure "Flatpak update failed."
+    run_log flatpak uninstall --unused -y || record_failure "Flatpak unused-package cleanup failed."
+else
+    say "Flatpak: not installed; skipping."
 fi
 
-_cc_download_available || { say "Missing download capability: $(cc_program_get download)"; exit 1; }
-need tar || exit 1
-
-TMP_DIR="$(mktemp -d)"
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/my_upgrade"
-trap 'rm -rf "$TMP_DIR"' EXIT
-cd "$TMP_DIR" || exit 1
-
-run_daily_update "$STATE_DIR/firefox.stamp" install_app_from_tar "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US" "firefox.tar.xz" "firefox" "/opt/firefox" || true
-run_daily_update "$STATE_DIR/thunderbird.stamp" install_app_from_tar "https://download.mozilla.org/?product=thunderbird-latest&os=linux64&lang=en-US" "thunderbird.tar.xz" "thunderbird" "/opt/thunderbird" || true
+say
+say "Deferred RC Maintenance"
+say "-----------------------"
+say "Firefox archive replacement: deferred; no automatic download or install."
+say "Thunderbird archive replacement: deferred; no automatic download or install."
+say "CLI Safe Boot/GRUB refresh: deferred; routine system update does not modify boot configuration."
 
 say
 if [ -f "$HOME/myenv/bin/activate" ]; then
     say "Developer Python environment detected: $HOME/myenv"
     say "INFO: system-update does not update Python virtualenv packages automatically."
 fi
-cc_dev_update_report all 0 | tee -a "$LOG"
+if [ "$MODE" = apply ]; then
+    cc_dev_update_report all 0 | tee -a "$LOG" || record_failure "Developer package-manager reporting failed."
+else
+    cc_dev_update_report all 0 || record_failure "Developer package-manager reporting failed."
+fi
 say "INFO: developer package updates require: cc update dev --apply"
 
-say "System update complete (${VERSION})."
-cd "$HOME" || true
+if [ "$FAILED" -gt 0 ]; then
+    say "System update completed with $FAILED failure(s)."
+else
+    say "System update complete (${VERSION})."
+fi
 
 if [ -f /var/run/reboot-required ]; then
     echo "reboot required"
 else
     echo "No reboot needed"
 fi
+
+[ "$FAILED" -eq 0 ]

@@ -10,6 +10,8 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Fixture-based mutation-contract coverage for installer, toolkit-update,
+  system-update, full update orchestration, and monthly-health preview paths.
 - Semantic in-memory kernel health snapshots with stable finding codes for diagnostic consumers.
 - Kernel PASS/WARN/FAIL integration in `cc doctor` and a detailed kernel section in `cc monthly-health`.
 - Kernel integration fixtures covering diagnostic propagation, maintenance advisories, reduced platforms, and consumer isolation from CLI output.
@@ -46,6 +48,15 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- `cc install`, the full installer, `cc toolkit-update`, and `cc system-update`
+  now default to zero-write preview and require explicit `--apply` for mutation.
+- Toolkit dry-run now inspects only local Git state instead of fetching remote
+  refs, and the update orchestrator propagates toolkit preview failures.
+- System-update creates its persistent log only during apply, rejects unknown or
+  conflicting mode options, and propagates mocked package/app failures nonzero.
+- Routine system updates no longer rewrite GRUB configuration or automatically
+  replace Firefox/Thunderbird from remote tar archives; both behaviors are
+  deferred for RC safety review.
 - Doctor now delegates reboot, boot artifact, platform, and kernel severity decisions to `lib/cc-kernel.sh`.
 - Monthly health now separates kernel health findings from cleanup and reboot maintenance opportunities.
 - Monthly health reuses one transient kernel snapshot and suppresses the duplicate kernel scan in its embedded doctor run.
@@ -66,13 +77,15 @@ The format follows a simple milestone-based structure until the project reaches 
 - Systemd service and journal consumers now resolve `service-manager` and `system-log` capabilities.
 - Monthly health and its optional user timer now use scoped semantic service operations.
 - File downloads now resolve `download`, while API-style GET/HEAD requests resolve `http-api`.
-- Firefox and Thunderbird archive retrieval now uses the configured download interface.
 - Program reporting now distinguishes missing programs from incompatible interfaces.
 - Asset and drive YAML processing now uses the compatible configured YAML capability.
 - Prompt and selftest JSON output now uses semantic JSON generation.
 - YAML is required by active asset workflows; JSON remains optional.
 
 ### Removed
+
+- Automatic CLI Safe Boot refresh and direct Firefox/Thunderbird archive
+  replacement from the routine system-update path.
 
 - Verbose kernel cleanup package-list output from monthly-health; semantic candidate counts remain as maintenance information.
 - Nala and Aptitude selection and fallback paths from active system package automation.

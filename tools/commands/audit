@@ -167,7 +167,7 @@ meta = {
     "roadmap": ("Documentation", "bash cat"),
     "smart": ("Storage", "bash smartctl lsblk awk sudo"),
     "status": ("Repository", "bash git"),
-    "system-update": ("Maintenance", "bash pkg-manager flatpak snap"),
+    "system-update": ("Maintenance", "bash pkg-manager"),
     "toolkit-update": ("Core", "bash git"),
     "update": ("Maintenance", "bash git"),
     "verify": ("Diagnostics", "bash find bash"),

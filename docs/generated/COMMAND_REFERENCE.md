@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Tue Aug 11 07:30:30 EDT 2026
+Generated: Tue Aug 11 08:39:22 EDT 2026
 
 ## cc about
 
@@ -369,20 +369,22 @@ Default is dry-run.
 
 ~~~text
 Usage:
-  cc install [--dry-run] [--force]
+  cc install [--dry-run|--apply] [--force]
 
 Installs or updates the active Shell Toolkit launcher at:
   ~/bin/cc
 
 Options:
   --dry-run    Show what would be installed without changing files.
+  --apply      Install or update the launcher.
   --force      Reinstall even when ~/bin/cc already matches the source.
   --help, -h   Show this help.
   --version    Show command and toolkit version.
 
 Notes:
+  Dry-run is the default. Launcher mutation requires --apply.
   This command installs only the cc launcher. The full shell-file installer
-  remains available as install/install.sh.
+  remains available as install/install.sh --apply.
 ~~~
 
 ## cc kernel
@@ -698,21 +700,33 @@ Examples:
 ## cc system-update
 
 ~~~text
-Usage: cc system-update [--dry-run]
+Usage: cc system-update [--dry-run|--apply]
 
-Runs the managed system update workflow: platform package operations, snap, flatpak, Firefox, Thunderbird, and GRUB CLI Safe Boot refresh.
+Safely previews or applies platform package, Snap, and Flatpak updates.
+
+Default:
+  Dry-run. Persistent mutation requires explicit --apply.
 
 Notes:
   Developer package managers are detected and reported, but not updated by system-update.
+  Automatic Firefox/Thunderbird archive replacement is deferred for v1.3 RC.
+  CLI Safe Boot/GRUB mutation is not part of routine system updates.
   This command does not purge old kernels. Review kernel cleanup separately after this workflow is stable.
 ~~~
 
 ## cc toolkit-update
 
 ~~~text
-Usage: cc toolkit-update [install/update.sh options]
+Usage:
+  cc toolkit-update [--dry-run|--apply]
 
-Pulls latest toolkit changes and runs the toolkit update workflow.
+Default:
+  Dry-run. Reports the local repository state and planned installation without
+  fetching, pulling, changing Git refs, creating backups, or installing files.
+
+Options:
+  --dry-run  Preview toolkit update and installation.
+  --apply    Pull origin/main and run the full installer with explicit apply.
 ~~~
 
 ## cc update
@@ -727,7 +741,7 @@ Default:
   cc update runs in --dry-run mode.
 
 Workflow:
-  1. toolkit-update       Pull latest toolkit changes and reinstall command files.
+  1. toolkit-update       Preview or apply toolkit pull and shell-file installation.
   2. system-update        Run managed OS/app update workflow.
   3. kernel cleanup       Review obsolete kernels. Applies only with --apply.
   4. dev-update           Optional developer maintenance when explicitly enabled.
@@ -737,8 +751,9 @@ Workflow:
   8. status               Show repository status.
 
 Notes:
-  Use cc toolkit-update for the old direct toolkit pull/reinstall behavior.
-  Use cc system-update for package/app updates only.
+  All mutation-capable stages receive an explicit --apply from this command.
+  Use cc toolkit-update --dry-run to preview toolkit maintenance only.
+  Use cc system-update --dry-run to preview package/app updates only.
   Use cc update dev --dry-run before applying developer package updates.
   Set DEV_UPDATES=yes in cc config to include developer updates in cc update --apply.
   Use cc kernel cleanup separately before trusting automated cleanup.

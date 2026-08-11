@@ -1,6 +1,6 @@
 # Captain Cronos Command Inventory
 
-Generated: Tue Aug 11 07:30:30 EDT 2026
+Generated: Tue Aug 11 08:39:22 EDT 2026
 
 | Command | Version | Purpose |
 |---|---|---|
@@ -45,7 +45,7 @@ Generated: Tue Aug 11 07:30:30 EDT 2026
 | cc smart | reads VERSION | Summarize SMART health for installed storage devices. |
 | cc status | reads VERSION | Show repository status summary. |
 | cc storage | 1.0.0-alpha1 | Namespace wrapper for storage inventory, SMART, testing, reports, and qualification. |
-| cc system-update | 1.0.0-alpha1 | Run OS, desktop app, and CLI Safe Boot update workflow. |
+| cc system-update | 1.0.0-alpha1 | Safely preview or apply operating-system and packaged-app updates. |
 | cc toolkit-update | reads VERSION | Pull latest toolkit changes and reinstall local command files. |
 | cc update | 2.0.0-alpha1 | Run managed toolkit, system, and optional developer maintenance. |
 | cc verify | reads VERSION | Verify repository structure, Bash syntax, and command permissions. |

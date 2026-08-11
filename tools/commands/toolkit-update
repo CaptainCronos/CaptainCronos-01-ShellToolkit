@@ -19,9 +19,18 @@ source "$PROJECT_ROOT/lib/cc-common.sh"
 
 case "${1:-}" in
     --help|-h)
-        echo "Usage: cc toolkit-update [install/update.sh options]"
-        echo
-        echo "Pulls latest toolkit changes and runs the toolkit update workflow."
+        cat <<'EOF_HELP'
+Usage:
+  cc toolkit-update [--dry-run|--apply]
+
+Default:
+  Dry-run. Reports the local repository state and planned installation without
+  fetching, pulling, changing Git refs, creating backups, or installing files.
+
+Options:
+  --dry-run  Preview toolkit update and installation.
+  --apply    Pull origin/main and run the full installer with explicit apply.
+EOF_HELP
         exit 0
         ;;
     --version)

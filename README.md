@@ -39,7 +39,7 @@ install/install.sh --dry-run
 Install:
 
 ```bash
-install/install.sh
+install/install.sh --apply
 source ~/.bashrc
 ```
 
@@ -75,7 +75,7 @@ cc framework verify
 cc audit --strict
 cc release check
 cc docs lint
-cc install
+cc install --dry-run
 cc update
 cc update dev --dry-run
 cc baseline
@@ -277,19 +277,21 @@ This prevents confusion between factory defaults, project defaults, and user-mod
 The installer is the supported entry point for deploying the toolkit.
 
 ```bash
-install/install.sh
+install/install.sh --apply
 ```
 
 It performs verification, optional baseline capture, backups, shell file installation, command front-end installation, and post-install validation.
+The installer defaults to a zero-write preview. Backups and installed-file
+changes require explicit `--apply`.
 
 Useful options:
 
 ```bash
 install/install.sh --dry-run
-install/install.sh --no-backup
-install/install.sh --no-baseline
-install/install.sh --no-bashrc
-install/install.sh --no-commands
+install/install.sh --apply --no-backup
+install/install.sh --apply --no-baseline
+install/install.sh --apply --no-bashrc
+install/install.sh --apply --no-commands
 install/install.sh --version
 ```
 

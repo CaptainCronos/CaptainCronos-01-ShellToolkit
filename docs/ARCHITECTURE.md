@@ -66,10 +66,37 @@ dependency contract without teaching the dispatcher executable mappings.
 Maintenance updates are split into three surfaces:
 
 - System package operations: semantic update, upgrade, install, removal, query, and database interfaces resolved through the platform and Program Management layers.
-- Desktop/app package managers: snap, flatpak, and direct desktop app refreshes already managed by `cc system-update`.
+- Desktop/app package managers: detected Snap and Flatpak interfaces managed by `cc system-update`.
 - Developer ecosystem package managers: npm, pipx, pip, cargo, go, and gem.
 
-`cc system-update` owns system and desktop/app updates. It detects and reports developer ecosystem package managers, but does not update them. This protects project toolchains, global CLIs, language-specific package state, and user development environments from broad workstation maintenance runs.
+`cc system-update` owns system and packaged desktop/app updates. It detects and
+reports developer ecosystem package managers, but does not update them. Direct
+Firefox/Thunderbird archive replacement and CLI Safe Boot/GRUB rewriting are
+deferred for the v1.3 RC and are unreachable from routine update. This protects
+project toolchains, global CLIs, language-specific package state, browser
+installations, and boot configuration from broad workstation maintenance runs.
+
+### Mutation Contract
+
+Mutation-capable maintenance and installation commands default to inspection or
+preview. `--dry-run` is zero-write, `--apply` is the only authorization for
+persistent changes, unknown options fail nonzero, and child commands receive the
+parent's explicit mode. In particular:
+
+```text
+cc update --apply
+  +-- cc toolkit-update --apply
+  |     +-- install/update.sh --apply
+  |           +-- install/install.sh --apply
+  +-- cc system-update --apply
+  +-- cc kernel cleanup --apply
+```
+
+Dry toolkit preview uses existing local branch, HEAD, remote configuration, and
+upstream refs only. It does not fetch. Installer preview reports source,
+destination, mode, and planned backups without creating them. System-update
+logging is persistent only during explicit apply. Monthly-health invokes the
+same system-update dry-run contract for update readiness.
 
 On Debian-family systems, toolkit automation uses the configured `apt-get` interface for package operations, `apt-cache` for repository queries, and `dpkg` for the installed-package database. Interactive administrators may still use `apt` directly at a terminal. Other supported platform families retain their native package-manager syntax behind `lib/cc-packages.sh`.
 

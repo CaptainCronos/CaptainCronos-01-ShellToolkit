@@ -105,22 +105,26 @@ Status targets:
 
 ### Installation Framework
 
-Canonical installation entrypoint:
+Canonical launcher installation entrypoint:
 
 - cc install
 
+Full shell-file installation entrypoint:
+
+- install/install.sh
+
 Required behavior:
 
-- Dependency gate runs before file changes.
-- Repository verification runs before install.
-- Shell syntax is checked before install.
-- Existing shell files are backed up before replacement.
-- cc launcher is installed into ~/bin.
+- Both entrypoints default to zero-write preview and require `--apply`.
+- The full installer runs its dependency gate and repository verification before changes.
+- Shell syntax is checked before installation.
+- The full installer backs up existing shell files before replacement.
+- The launcher is installed into ~/bin only with explicit apply.
 - PATH guidance is provided.
 
 Status targets:
 
-- Install is first-time enrollment path.
+- Full install is the first-time shell enrollment path; `cc install` is launcher-only.
 - Update is recurring maintenance path.
 - Install supports recovery/testing bypasses where appropriate.
 
