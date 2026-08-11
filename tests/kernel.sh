@@ -62,12 +62,12 @@ protected_text="$(_cc_kernel_protected 2)"
 assert_contains "$protected_text" 6.8.0-10-generic 'old running kernel was not protected'
 assert_contains "$protected_text" 6.8.0-40-generic 'KEEP_COUNT omitted a recent kernel'
 assert_contains "$protected_text" 6.8.0-50-generic 'KEEP_COUNT omitted newest kernel'
-candidates="$(_cc_kernel_cleanup_candidates 2)"
-if printf '%s\n' "$candidates" | grep -Fxq 6.8.0-10-generic; then
+candidate_text="$(_cc_kernel_cleanup_candidates 2)"
+if printf '%s\n' "$candidate_text" | grep -Fxq 6.8.0-10-generic; then
     fail 'running kernel entered cleanup candidates'
 fi
-assert_contains "$candidates" 6.8.0-20-generic 'expected old candidate missing'
-assert_contains "$candidates" 6.8.0-30-generic 'expected old candidate missing'
+assert_contains "$candidate_text" 6.8.0-20-generic 'expected old candidate missing'
+assert_contains "$candidate_text" 6.8.0-30-generic 'expected old candidate missing'
 
 [ -z "$(_cc_kernel_cleanup_candidates 4)" ] || fail 'zero-candidate condition changed'
 

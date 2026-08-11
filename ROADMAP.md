@@ -236,8 +236,21 @@ Status: **Complete**
 - Backward-compatible `cc kernel-cleanup` entry point.
 - Fixture-based safety validation with a mocked mutation path.
 
-Next phase: add broader native package-family adapters and boot-artifact health
-inspection before considering any bootloader configuration features.
+This foundation enables read-only boot-artifact health inspection without
+changing cleanup policy.
+
+### Kernel Boot Artifact Health
+
+Status: **Complete**
+
+- Filesystem-aware `/boot` capacity and actual allocation reporting.
+- Independent EFI mount and utilization inspection.
+- Package, ownership, kernel, initramfs, map, and config correlation.
+- Conservative artifact states and PASS/WARN/FAIL health reporting.
+- Symlink-safe, filesystem-boundary-preserving fixture validation.
+
+Next phase: broaden native package-family correlation and add read-only
+initramfs implementation/capability reporting before proposing any mutation.
 
 Completed in active development:
 

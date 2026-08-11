@@ -112,7 +112,9 @@ replace a processor.
 ## Kernel Workflow
 
 Use `cc kernel status`, `cc kernel list`, and `cc kernel running` for read-only
-inspection. `cc kernel cleanup` is also read-only by default and prints the
+inspection. Use `cc kernel artifacts` for detailed package, ownership, kernel,
+initramfs, map, and config correlation; use `cc kernel health` for a concise
+PASS/WARN/FAIL assessment. `cc kernel cleanup` is also read-only by default and prints the
 candidate package plan. Only `cc kernel cleanup --apply` permits package
 mutation. Set `KEEP_COUNT` to a non-negative integer to protect that many newest
 non-running kernels in addition to the running kernel.
@@ -121,6 +123,19 @@ Cleanup is enabled only on supported Debian-family package systems. Package
 ownership must be unambiguous; otherwise the release is retained. A reboot
 marker and a newer installed kernel are reported as distinct states. The legacy
 `cc kernel-cleanup` form remains supported.
+
+Status distinguishes the boot path from its backing filesystem. “Boot
+filesystem usage” is capacity utilization of the filesystem containing `/boot`;
+“/boot artifacts” is the allocated space actually consumed below the boot path
+without crossing into a separately mounted EFI filesystem. EFI source, type,
+size, used, available, and utilization are reported independently when a known
+EFI path is mounted.
+
+Artifact states are `MATCHED`, `MISSING`, `UNMATCHED`, `PARTIAL`, or `UNKNOWN`.
+Treat every state other than `MATCHED` as a prompt for inspection, not deletion.
+Health warnings include correlation issues, pending reboot state, and boot or
+EFI filesystems at least 90 percent utilized. Only boot-path inspection failure
+or a missing/unsafe running kernel image produces a health failure.
 
 ## Documentation
 - `cc docs inventory`

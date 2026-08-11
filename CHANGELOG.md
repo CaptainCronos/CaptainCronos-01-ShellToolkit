@@ -10,6 +10,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Read-only `cc kernel artifacts` package/artifact correlation and `cc kernel health` diagnostics.
+- Filesystem-aware `/boot` consumption, EFI capacity, and bootloader-environment inspection.
+- Fixture coverage for mount boundaries, artifact consistency, health severity, unusual filenames, and symlink safety.
 - Kernel management namespace with status, list, running, cleanup, and dependency actions.
 - Shared kernel discovery, ordering, protection, candidate, package ownership, reboot-state, and platform helpers.
 - Fixture-based kernel safety tests covering dry-run and mocked apply behavior.
@@ -36,6 +39,8 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- Kernel status now distinguishes the filesystem containing `/boot`, actual `/boot` directory consumption, and EFI filesystem utilization.
+- Kernel discovery now uses NUL-delimited filenames and rejects releases that cannot be represented safely.
 - Kernel cleanup now consumes the shared kernel library and retains `cc kernel-cleanup` as a compatibility entry point.
 - Kernel discovery now combines `/boot` artifacts with exact installed kernel-image packages.
 - Debian-family cleanup relies on package lifecycle hooks instead of invoking `update-grub` universally.

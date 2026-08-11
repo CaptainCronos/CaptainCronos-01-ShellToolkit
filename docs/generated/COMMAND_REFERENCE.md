@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Tue Aug 11 05:24:07 EDT 2026
+Generated: Tue Aug 11 06:30:13 EDT 2026
 
 ## cc about
 
@@ -393,13 +393,17 @@ Usage:
   cc kernel status
   cc kernel list
   cc kernel running
+  cc kernel artifacts
+  cc kernel health
   cc kernel cleanup [--dry-run|--apply]
   cc kernel deps
 
 Actions:
-  status   Show running/newest state, counts, reboot state, and /boot usage.
+  status   Show kernel state plus distinct /boot, backing filesystem, and EFI usage.
   list     List installed kernels with RUNNING, PROTECTED, and CANDIDATE states.
   running  Show the running release and matching installed packages.
+  artifacts  Correlate packages with kernel, initramfs, map, and config artifacts.
+  health   Evaluate kernel/package/artifact consistency without changing the host.
   cleanup  Review obsolete kernel packages; defaults to --dry-run.
   deps     Show required and optional kernel-management capabilities.
 
@@ -412,6 +416,8 @@ Compatibility:
 
 Examples:
   cc kernel status
+  cc kernel artifacts
+  cc kernel health
   KEEP_COUNT=3 cc kernel list
   cc kernel cleanup --dry-run
 ~~~

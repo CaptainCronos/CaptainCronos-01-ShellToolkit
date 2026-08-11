@@ -6,7 +6,7 @@
 # Script      : kernel
 # Version     : 1.0.0-alpha1
 # Category    : Maintenance
-# Requires    : bash uname find sort awk df
+# Requires    : bash uname find sort awk
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Inspect and safely manage installed kernels.
 # ==============================================================================
@@ -26,13 +26,17 @@ Usage:
   cc kernel status
   cc kernel list
   cc kernel running
+  cc kernel artifacts
+  cc kernel health
   cc kernel cleanup [--dry-run|--apply]
   cc kernel deps
 
 Actions:
-  status   Show running/newest state, counts, reboot state, and /boot usage.
+  status   Show kernel state plus distinct /boot, backing filesystem, and EFI usage.
   list     List installed kernels with RUNNING, PROTECTED, and CANDIDATE states.
   running  Show the running release and matching installed packages.
+  artifacts  Correlate packages with kernel, initramfs, map, and config artifacts.
+  health   Evaluate kernel/package/artifact consistency without changing the host.
   cleanup  Review obsolete kernel packages; defaults to --dry-run.
   deps     Show required and optional kernel-management capabilities.
 
@@ -45,6 +49,8 @@ Compatibility:
 
 Examples:
   cc kernel status
+  cc kernel artifacts
+  cc kernel health
   KEEP_COUNT=3 cc kernel list
   cc kernel cleanup --dry-run
 EOF_HELP
@@ -66,7 +72,9 @@ kernel_require_linux() {
 }
 
 kernel_status() {
-    local running newest reboot_state boot_usage keep_count platform_support running_newest=unknown
+    local running newest reboot_state keep_count platform_support running_newest=unknown
+    local boot_dir boot_source boot_mount boot_use boot_bytes boot_human
+    local efi_path efi_source efi_type efi_size efi_used efi_avail efi_use
     local -a kernels=() protected=() candidates=()
     running="$(_cc_kernel_running 2>/dev/null || printf unknown)"
     keep_count="$(kernel_keep_count)" || return
@@ -81,7 +89,13 @@ kernel_status() {
         if [ "$running" = "$newest" ]; then running_newest=yes; else running_newest=no; fi
     fi
     reboot_state="$(_cc_kernel_reboot_state)"
-    boot_usage="$(_cc_kernel_boot_usage)"
+    boot_dir="$(_cc_kernel_boot_dir)"
+    boot_source="$(_cc_kernel_boot_filesystem_field SOURCE 2>/dev/null || printf unknown)"
+    boot_mount="$(_cc_kernel_boot_filesystem_field TARGET 2>/dev/null || printf unknown)"
+    boot_use="$(_cc_kernel_boot_filesystem_field USE% 2>/dev/null || printf unknown)"
+    boot_bytes="$(_cc_kernel_boot_usage_bytes 2>/dev/null || true)"
+    if [ -n "$boot_bytes" ]; then boot_human="$(_cc_kernel_human_bytes "$boot_bytes")"; else boot_human=unavailable; fi
+    efi_path="$(_cc_kernel_efi_path 2>/dev/null || true)"
     if _cc_kernel_supported; then
         platform_support="Linux inspection"
         _cc_kernel_cleanup_supported && platform_support+="; cleanup supported"
@@ -101,18 +115,33 @@ kernel_status() {
     printf '%-24s %s\n' "Protected count:" "${#protected[@]}"
     printf '%-24s %s\n' "Cleanup candidates:" "${#candidates[@]}"
     printf '%-24s %s\n' "Reboot state:" "$reboot_state"
-    printf '%-24s %s\n' "/boot usage:" "${boot_usage:-unavailable}"
+    printf '%-24s %s\n' "Boot path:" "$boot_dir"
+    printf '%-24s %s\n' "Boot filesystem:" "$boot_source"
+    printf '%-24s %s\n' "Boot filesystem mount:" "$boot_mount"
+    printf '%-24s %s\n' "Boot filesystem usage:" "$boot_use"
+    printf '%-24s %s\n' "/boot artifacts:" "$boot_human"
+    if [ -n "$efi_path" ]; then
+        efi_source="$(_cc_kernel_efi_filesystem_field SOURCE 2>/dev/null || printf unknown)"
+        efi_type="$(_cc_kernel_efi_filesystem_field FSTYPE 2>/dev/null || printf unknown)"
+        efi_size="$(_cc_kernel_efi_filesystem_field SIZE 2>/dev/null || printf unknown)"
+        efi_used="$(_cc_kernel_efi_filesystem_field USED 2>/dev/null || printf unknown)"
+        efi_avail="$(_cc_kernel_efi_filesystem_field AVAIL 2>/dev/null || printf unknown)"
+        efi_use="$(_cc_kernel_efi_filesystem_field USE% 2>/dev/null || printf unknown)"
+        printf '%-24s %s mounted at %s\n' "EFI filesystem:" "$efi_source" "$efi_path"
+        printf '%-24s %s\n' "EFI filesystem type:" "$efi_type"
+        printf '%-24s %s (%s used, %s available)\n' "EFI size:" "$efi_size" "$efi_used" "$efi_avail"
+        printf '%-24s %s\n' "EFI usage:" "$efi_use"
+    else
+        printf '%-24s %s\n' "EFI filesystem:" "not mounted at a known path"
+    fi
+    printf '%-24s %s\n' "Bootloader environment:" "$(_cc_kernel_bootloader_environment)"
 }
 
 kernel_list() {
     local keep_count kernel state
-    local -a kernels=() protected=() candidates=()
+    local -a kernels=()
     keep_count="$(kernel_keep_count)" || return
     mapfile -t kernels < <(_cc_kernel_list)
-    mapfile -t protected < <(_cc_kernel_protected "$keep_count")
-    if _cc_kernel_supported; then
-        mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count")
-    fi
 
     cc_banner
     echo
@@ -121,17 +150,61 @@ kernel_list() {
     printf '%-36s %s\n' "Release" "State"
     printf '%-36s %s\n' "-------" "-----"
     for kernel in "${kernels[@]}"; do
-        state=""
-        if _cc_kernel_is_running "$kernel"; then state=RUNNING; fi
-        if _cc_kernel_in_list "$kernel" "${protected[@]}"; then
-            state="${state:+$state,}PROTECTED"
-        fi
-        if _cc_kernel_in_list "$kernel" "${candidates[@]}"; then
-            state="${state:+$state,}CANDIDATE"
-        fi
-        [ -n "$state" ] || state=INSTALLED
+        state="$(_cc_kernel_classification "$kernel" "$keep_count")"
+        [ "$state" = UNCLASSIFIED ] && state=INSTALLED
         printf '%-36s %s\n' "$kernel" "$state"
     done
+}
+
+kernel_artifacts() {
+    local keep_count release kernel initramfs system_map config package ownership state classification bytes size
+    kernel_require_linux || return
+    keep_count="$(kernel_keep_count)" || return
+    cc_banner
+    echo
+    echo "Kernel Boot Artifacts"
+    echo "---------------------"
+    printf '%-28s %-6s %-9s %-10s %-6s %-9s %-10s %-10s %-24s %s\n' \
+        "Release" "Kernel" "Initramfs" "System.map" "Config" "Package" "Ownership" "Health" "Classification" "Size"
+    printf '%-28s %-6s %-9s %-10s %-6s %-9s %-10s %-10s %-24s %s\n' \
+        "-------" "------" "---------" "----------" "------" "-------" "---------" "------" "--------------" "----"
+    while IFS= read -r release; do
+        [ -n "$release" ] || continue
+        kernel="$(_cc_kernel_artifact_presence kernel "$release")"
+        initramfs="$(_cc_kernel_artifact_presence initramfs "$release")"
+        system_map="$(_cc_kernel_artifact_presence system-map "$release")"
+        config="$(_cc_kernel_artifact_presence config "$release")"
+        package="$(_cc_kernel_package_state "$release")"
+        ownership="$(_cc_kernel_artifact_ownership "$release")"
+        state="$(_cc_kernel_artifact_state "$release")"
+        classification="$(_cc_kernel_classification "$release" "$keep_count")"
+        bytes="$(_cc_kernel_artifact_size_bytes "$release" 2>/dev/null || true)"
+        if [ -n "$bytes" ]; then size="$(_cc_kernel_human_bytes "$bytes")"; else size=unavailable; fi
+        printf '%-28s %-6s %-9s %-10s %-6s %-9s %-10s %-10s %-24s %s\n' \
+            "$release" "$kernel" "$initramfs" "$system_map" "$config" "$package" "$ownership" "$state" "$classification" "$size"
+    done < <(_cc_kernel_artifact_releases)
+    echo
+    echo "States: MATCHED, MISSING, UNMATCHED, PARTIAL, UNKNOWN"
+    echo "UNMATCHED does not mean safe to delete. No artifact is modified."
+}
+
+kernel_health() {
+    local keep_count severity finding message
+    keep_count="$(kernel_keep_count)" || return
+    severity="$(_cc_kernel_health_severity "$keep_count")"
+    cc_banner
+    echo
+    echo "Kernel Boot Health"
+    echo "------------------"
+    printf '%-18s %s\n' "Overall:" "$severity"
+    printf '%-18s %s\n' "Boot path:" "$(_cc_kernel_boot_dir)"
+    printf '%-18s %s\n' "Bootloader:" "$(_cc_kernel_bootloader_environment)"
+    echo
+    while IFS=$'\t' read -r finding message; do
+        [ -n "$finding" ] || continue
+        printf '%-6s %s\n' "$finding" "$message"
+    done < <(_cc_kernel_health_findings "$keep_count")
+    [ "$severity" != FAIL ]
 }
 
 kernel_running() {
@@ -261,6 +334,8 @@ case "${1:-help}" in
     status) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_status ;;
     list) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_list ;;
     running) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_running ;;
+    artifacts) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_artifacts ;;
+    health) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_health ;;
     cleanup) shift; kernel_cleanup "$@" ;;
     deps|dependencies) shift; bash "$PROJECT_ROOT/tools/cc" deps kernel "$@" ;;
     *) cc_error "Unknown kernel action: $1"; echo; usage; exit 1 ;;

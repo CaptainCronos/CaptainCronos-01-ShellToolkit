@@ -5,6 +5,11 @@ commands to verify kernel discovery, version ordering, protection, candidate
 selection, ownership fail-safe behavior, status/list output, reboot state,
 unsupported platforms, dry-run immutability, and the explicit apply path.
 
+`tests/kernel-artifacts.sh` validates root-backed and dedicated `/boot`
+filesystems, mounted and absent EFI paths, non-crossing usage, symlink safety,
+kernel/initramfs/package correlation, every artifact state, shared kernel
+classification, health severity, and command output using temporary fixtures.
+
 Focused shell tests supplement `cc selftest`:
 
 - `dependencies.sh` validates semantic capability resolution, literal executable

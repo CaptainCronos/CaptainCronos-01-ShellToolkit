@@ -6,7 +6,7 @@
 # Script      : cc-kernel.sh
 # Version     : reads VERSION
 # Category    : Core
-# Requires    : bash uname find sort awk df
+# Requires    : bash uname find sort awk
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Provide safe, reusable kernel inspection and classification.
 # ==============================================================================
@@ -45,10 +45,197 @@ _cc_kernel_boot_dir() {
     printf '%s\n' "${CC_KERNEL_BOOT_DIR:-/boot}"
 }
 
+_cc_kernel_efi_candidates() {
+    if [ -n "${CC_KERNEL_EFI_PATH:-}" ]; then
+        printf '%s\n' "$CC_KERNEL_EFI_PATH"
+    else
+        printf '%s\n' /boot/efi /efi
+    fi
+}
+
+_cc_kernel_mount_field() {
+    [ "$#" -eq 3 ] || return 2
+    local mode="$1" path="$2" field="$3" program
+    case "$field" in
+        SOURCE|FSTYPE|TARGET|SIZE|USED|AVAIL|USE%) ;;
+        *) return 2 ;;
+    esac
+    program="${CC_KERNEL_FINDMNT_PROGRAM:-findmnt}"
+    case "$mode" in
+        target) "$program" -nro "$field" --target "$path" 2>/dev/null | head -n 1 ;;
+        mountpoint) "$program" -nro "$field" --mountpoint "$path" 2>/dev/null | head -n 1 ;;
+        *) return 2 ;;
+    esac
+}
+
+_cc_kernel_boot_filesystem_field() {
+    [ "$#" -eq 1 ] || return 2
+    _cc_kernel_mount_field target "$(_cc_kernel_boot_dir)" "$1"
+}
+
+_cc_kernel_efi_path() {
+    local candidate target
+    while IFS= read -r candidate; do
+        [ -d "$candidate" ] || continue
+        target="$(_cc_kernel_mount_field mountpoint "$candidate" TARGET 2>/dev/null || true)"
+        [ "$target" = "$candidate" ] || continue
+        printf '%s\n' "$candidate"
+        return 0
+    done < <(_cc_kernel_efi_candidates)
+    return 1
+}
+
+_cc_kernel_efi_filesystem_field() {
+    [ "$#" -eq 1 ] || return 2
+    local efi_path
+    efi_path="$(_cc_kernel_efi_path)" || return 1
+    _cc_kernel_mount_field mountpoint "$efi_path" "$1"
+}
+
+_cc_kernel_boot_usage_bytes() {
+    local boot_dir blocks program
+    boot_dir="$(_cc_kernel_boot_dir)"
+    [ -d "$boot_dir" ] && [ -r "$boot_dir" ] || return 1
+    program="${CC_KERNEL_DU_PROGRAM:-du}"
+    command -v "$program" >/dev/null 2>&1 || return 1
+    blocks="$("$program" -skx -- "$boot_dir" 2>/dev/null | awk 'NR == 1 {print $1}')"
+    case "$blocks" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    printf '%s\n' "$((blocks * 1024))"
+}
+
+_cc_kernel_human_bytes() {
+    [ "$#" -eq 1 ] || return 2
+    awk -v bytes="$1" 'BEGIN {
+        split("B KiB MiB GiB TiB", unit, " ")
+        value = bytes + 0
+        idx = 1
+        while (value >= 1024 && idx < 5) {value /= 1024; idx++}
+        if (idx == 1) printf "%d %s\n", value, unit[idx]
+        else printf "%.1f %s\n", value, unit[idx]
+    }'
+}
+
 _cc_kernel_version_order() {
     # GNU sort -V matches the version syntax used by supported Linux packages.
     # LC_ALL=C keeps ordering stable across host locales.
     LC_ALL=C sort -V -u
+}
+
+_cc_kernel_artifact_name_release() {
+    [ "$#" -eq 1 ] || return 2
+    local initramfs_release
+    case "$1" in
+        vmlinuz-*) printf '%s\n' "${1#vmlinuz-}" ;;
+        initrd.img-*) printf '%s\n' "${1#initrd.img-}" ;;
+        initramfs-*)
+            initramfs_release="${1#initramfs-}"
+            printf '%s\n' "${initramfs_release%.img}"
+            ;;
+        System.map-*) printf '%s\n' "${1#System.map-}" ;;
+        config-*) printf '%s\n' "${1#config-}" ;;
+        *) return 1 ;;
+    esac
+}
+
+_cc_kernel_artifact_release_safe() {
+    [ "$#" -eq 1 ] || return 2
+    case "$1" in
+        ''|*/*|*$'\n'*|*$'\r'*|*$'\t'*|*.safe|*recovery*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+_cc_kernel_artifact_releases() {
+    local boot_dir path name release
+    _cc_kernel_supported || return 3
+    boot_dir="$(_cc_kernel_boot_dir)"
+    {
+        _cc_kernel_list
+        if [ -d "$boot_dir" ] && [ -r "$boot_dir" ]; then
+            while IFS= read -r -d '' path; do
+                name="${path##*/}"
+                release="$(_cc_kernel_artifact_name_release "$name" 2>/dev/null || true)"
+                _cc_kernel_artifact_release_safe "$release" || continue
+                printf '%s\n' "$release"
+            done < <(
+                find "$boot_dir" -xdev -maxdepth 1 \( -type f -o -type l \) \
+                    \( -name 'vmlinuz-*' -o -name 'initrd.img-*' -o -name 'initramfs-*' \
+                    -o -name 'System.map-*' -o -name 'config-*' \) -print0 2>/dev/null
+            )
+        fi
+    } | awk 'NF && !seen[$0]++' | _cc_kernel_version_order
+}
+
+_cc_kernel_artifact_path() {
+    [ "$#" -eq 2 ] || return 2
+    local type="$1" release="$2" boot_dir path
+    _cc_kernel_artifact_release_safe "$release" || return 2
+    boot_dir="$(_cc_kernel_boot_dir)"
+    case "$type" in
+        kernel) path="$boot_dir/vmlinuz-$release" ;;
+        initramfs)
+            path="$boot_dir/initrd.img-$release"
+            if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+                path="$boot_dir/initramfs-$release.img"
+            fi
+            if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+                path="$boot_dir/initramfs-$release"
+            fi
+            ;;
+        system-map) path="$boot_dir/System.map-$release" ;;
+        config) path="$boot_dir/config-$release" ;;
+        *) return 2 ;;
+    esac
+    printf '%s\n' "$path"
+}
+
+_cc_kernel_artifact_presence() {
+    [ "$#" -eq 2 ] || return 2
+    local path
+    path="$(_cc_kernel_artifact_path "$1" "$2")" || return
+    if [ -L "$path" ]; then
+        printf '%s\n' unknown
+    elif [ -f "$path" ]; then
+        printf '%s\n' yes
+    else
+        printf '%s\n' no
+    fi
+}
+
+_cc_kernel_artifact_size_bytes() {
+    [ "$#" -eq 1 ] || return 2
+    local release="$1" type path size total=0 program
+    program="${CC_KERNEL_STAT_PROGRAM:-stat}"
+    command -v "$program" >/dev/null 2>&1 || return 1
+    for type in kernel initramfs system-map config; do
+        path="$(_cc_kernel_artifact_path "$type" "$release")" || return
+        [ -f "$path" ] && [ ! -L "$path" ] || continue
+        size="$("$program" -c %s -- "$path" 2>/dev/null || true)"
+        case "$size" in
+            ''|*[!0-9]*) continue ;;
+        esac
+        total=$((total + size))
+    done
+    printf '%s\n' "$total"
+}
+
+_cc_kernel_artifact_unsafe_count() {
+    local boot_dir path name release count=0
+    boot_dir="$(_cc_kernel_boot_dir)"
+    [ -d "$boot_dir" ] || { printf '0\n'; return 0; }
+    while IFS= read -r -d '' path; do
+        name="${path##*/}"
+        release="$(_cc_kernel_artifact_name_release "$name" 2>/dev/null || true)"
+        case "$release" in *.safe|*recovery*) continue ;; esac
+        _cc_kernel_artifact_release_safe "$release" || count=$((count + 1))
+    done < <(
+        find "$boot_dir" -xdev -maxdepth 1 \( -type f -o -type l \) \
+            \( -name 'vmlinuz-*' -o -name 'initrd.img-*' -o -name 'initramfs-*' \
+            -o -name 'System.map-*' -o -name 'config-*' \) -print0 2>/dev/null
+    )
+    printf '%s\n' "$count"
 }
 
 _cc_kernel_package_releases() {
@@ -77,13 +264,11 @@ _cc_kernel_list() {
 
     {
         if [ -d "$boot_dir" ]; then
-            while IFS= read -r file; do
+            while IFS= read -r -d '' file; do
                 file="${file##*/vmlinuz-}"
-                case "$file" in
-                    ''|*.safe|*recovery*) continue ;;
-                esac
+                _cc_kernel_artifact_release_safe "$file" || continue
                 printf '%s\n' "$file"
-            done < <(find "$boot_dir" -maxdepth 1 -type f -name 'vmlinuz-*' -print 2>/dev/null)
+            done < <(find "$boot_dir" -xdev -maxdepth 1 -type f -name 'vmlinuz-*' -print0 2>/dev/null)
         fi
         _cc_kernel_package_releases
         running="$(_cc_kernel_running 2>/dev/null || true)"
@@ -195,6 +380,95 @@ _cc_kernel_packages_for_version() {
     printf '%s\n' "${packages[@]}" | awk 'NF && !seen[$0]++' | sort
 }
 
+_cc_kernel_package_state() {
+    [ "$#" -eq 1 ] || return 2
+    local -a packages=()
+    mapfile -t packages < <(_cc_kernel_primary_packages_for_version "$1")
+    case "${#packages[@]}" in
+        0) printf '%s\n' absent ;;
+        1) printf '%s\n' installed ;;
+        *) printf '%s\n' ambiguous ;;
+    esac
+}
+
+_cc_kernel_artifact_ownership() {
+    [ "$#" -eq 1 ] || return 2
+    local release="$1" path
+    local -a packages=() owners=()
+    [ "$(_cc_kernel_artifact_presence kernel "$release")" = yes ] || {
+        printf '%s\n' missing
+        return 0
+    }
+    mapfile -t packages < <(_cc_kernel_primary_packages_for_version "$release")
+    [ "${#packages[@]}" -eq 1 ] || {
+        if [ "${#packages[@]}" -gt 1 ]; then printf '%s\n' ambiguous; else printf '%s\n' unknown; fi
+        return 0
+    }
+    path="$(_cc_kernel_artifact_path kernel "$release")"
+    mapfile -t owners < <(_cc_pkg_owners_of_path "$path" 2>/dev/null || true)
+    case "${#owners[@]}" in
+        0) printf '%s\n' unknown ;;
+        1)
+            if [ "${owners[0]}" = "${packages[0]}" ]; then
+                printf '%s\n' matched
+            else
+                printf '%s\n' unmatched
+            fi
+            ;;
+        *) printf '%s\n' ambiguous ;;
+    esac
+}
+
+_cc_kernel_artifact_state() {
+    [ "$#" -eq 1 ] || return 2
+    local release="$1" kernel initramfs system_map config package ownership
+    kernel="$(_cc_kernel_artifact_presence kernel "$release")"
+    initramfs="$(_cc_kernel_artifact_presence initramfs "$release")"
+    system_map="$(_cc_kernel_artifact_presence system-map "$release")"
+    config="$(_cc_kernel_artifact_presence config "$release")"
+    package="$(_cc_kernel_package_state "$release")"
+
+    if [ "$package" = ambiguous ] || [ "$kernel" = unknown ] || [ "$initramfs" = unknown ] || \
+        [ "$system_map" = unknown ] || [ "$config" = unknown ]; then
+        printf '%s\n' UNKNOWN
+        return 0
+    fi
+    if [ "$package" = absent ]; then
+        if [ "$kernel" = yes ] || [ "$initramfs" = yes ] || [ "$system_map" = yes ] || [ "$config" = yes ]; then
+            printf '%s\n' UNMATCHED
+        else
+            printf '%s\n' UNKNOWN
+        fi
+        return 0
+    fi
+    if [ "$kernel" = no ] || [ "$initramfs" = no ]; then
+        printf '%s\n' MISSING
+        return 0
+    fi
+    ownership="$(_cc_kernel_artifact_ownership "$release")"
+    if [ "$ownership" != matched ]; then
+        printf '%s\n' UNKNOWN
+    elif [ "$system_map" = no ] || [ "$config" = no ]; then
+        printf '%s\n' PARTIAL
+    else
+        printf '%s\n' MATCHED
+    fi
+}
+
+_cc_kernel_classification() {
+    [ "$#" -ge 1 ] || return 2
+    local release="$1" keep_count="${2:-${KEEP_COUNT:-2}}" state=""
+    local -a protected=() candidates=()
+    mapfile -t protected < <(_cc_kernel_protected "$keep_count")
+    if _cc_kernel_supported; then
+        mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count")
+    fi
+    _cc_kernel_is_running "$release" && state=RUNNING
+    _cc_kernel_in_list "$release" "${protected[@]}" && state="${state:+$state,}PROTECTED"
+    _cc_kernel_in_list "$release" "${candidates[@]}" && state="${state:+$state,}CANDIDATE"
+    printf '%s\n' "${state:-UNCLASSIFIED}"
+}
+
 _cc_kernel_cleanup_packages() {
     local keep_count="${1:-${KEEP_COUNT:-2}}" version
     while IFS= read -r version; do
@@ -224,11 +498,116 @@ _cc_kernel_reboot_state() {
     fi
 }
 
-_cc_kernel_boot_usage() {
-    local boot_dir
+_cc_kernel_percent_value() {
+    [ "$#" -eq 1 ] || return 2
+    case "$1" in
+        *%) printf '%s\n' "${1%%%}" ;;
+        *) printf '%s\n' "$1" ;;
+    esac
+}
+
+_cc_kernel_bootloader_environment() {
+    local boot_dir efi_path
     boot_dir="$(_cc_kernel_boot_dir)"
-    [ -e "$boot_dir" ] || { printf '%s\n' unavailable; return 0; }
-    df -hP "$boot_dir" 2>/dev/null | awk 'NR == 2 {printf "%s used (%s of %s), %s available\n", $5, $3, $2, $4}'
+    efi_path="$(_cc_kernel_efi_path 2>/dev/null || true)"
+    if [ -d "$boot_dir/loader" ] && [ ! -L "$boot_dir/loader" ]; then
+        printf '%s\n' systemd-boot
+    elif [ -d "$boot_dir/grub" ] && [ ! -L "$boot_dir/grub" ]; then
+        printf '%s\n' grub
+    elif [ -n "$efi_path" ] && [ -d "$efi_path/EFI" ] && [ ! -L "$efi_path/EFI" ]; then
+        printf '%s\n' efi-present
+    else
+        printf '%s\n' unknown
+    fi
+}
+
+_cc_kernel_health_findings() {
+    local keep_count="${1:-${KEEP_COUNT:-2}}" boot_dir running release state severity
+    local boot_usage efi_path efi_source efi_type efi_usage unsafe_count issue_count=0 warn_threshold
+    boot_dir="$(_cc_kernel_boot_dir)"
+    warn_threshold="${CC_KERNEL_USAGE_WARN_PERCENT:-90}"
+    case "$warn_threshold" in
+        ''|*[!0-9]*) warn_threshold=90 ;;
+    esac
+    if ! _cc_kernel_supported; then
+        printf 'WARN\tDetailed boot-artifact inspection is unsupported on %s.\n' "$(_cc_kernel_os)"
+        return 0
+    fi
+    if [ ! -d "$boot_dir" ] || [ ! -r "$boot_dir" ]; then
+        printf 'FAIL\tBoot path is inaccessible: %s\n' "$boot_dir"
+        return 0
+    fi
+    if [ -z "$(_cc_kernel_boot_filesystem_field SOURCE 2>/dev/null || true)" ]; then
+        printf 'FAIL\tUnable to identify the filesystem containing %s.\n' "$boot_dir"
+        issue_count=$((issue_count + 1))
+    fi
+
+    running="$(_cc_kernel_running 2>/dev/null || true)"
+    if [ -n "$running" ] && [ "$(_cc_kernel_artifact_presence kernel "$running")" != yes ]; then
+        printf 'FAIL\tRunning kernel image is missing or unsafe: %s\n' "$running"
+        issue_count=$((issue_count + 1))
+    fi
+
+    while IFS= read -r release; do
+        [ -n "$release" ] || continue
+        state="$(_cc_kernel_artifact_state "$release")"
+        [ "$state" = MATCHED ] && continue
+        severity=WARN
+        printf '%s\t%s artifact correlation is %s.\n' "$severity" "$release" "$state"
+        issue_count=$((issue_count + 1))
+    done < <(_cc_kernel_artifact_releases)
+
+    case "$(_cc_kernel_reboot_state)" in
+        required)
+            printf 'WARN\tThe host reboot marker is present.\n'
+            issue_count=$((issue_count + 1))
+            ;;
+        newer-kernel-installed)
+            printf 'WARN\tA newer installed kernel is not currently running.\n'
+            issue_count=$((issue_count + 1))
+            ;;
+    esac
+
+    boot_usage="$(_cc_kernel_boot_filesystem_field USE% 2>/dev/null || true)"
+    boot_usage="$(_cc_kernel_percent_value "$boot_usage")"
+    if [[ "$boot_usage" =~ ^[0-9]+$ ]] && [ "$boot_usage" -ge "$warn_threshold" ]; then
+        printf 'WARN\tBoot filesystem utilization is %s%%.\n' "$boot_usage"
+        issue_count=$((issue_count + 1))
+    fi
+    efi_path="$(_cc_kernel_efi_path 2>/dev/null || true)"
+    if [ -n "$efi_path" ]; then
+        efi_source="$(_cc_kernel_efi_filesystem_field SOURCE 2>/dev/null || true)"
+        efi_type="$(_cc_kernel_efi_filesystem_field FSTYPE 2>/dev/null || true)"
+        if [ -z "$efi_source" ] || [ -z "$efi_type" ]; then
+            printf 'WARN\tEFI filesystem metadata could not be read completely.\n'
+            issue_count=$((issue_count + 1))
+        fi
+        efi_usage="$(_cc_kernel_efi_filesystem_field USE% 2>/dev/null || true)"
+        efi_usage="$(_cc_kernel_percent_value "$efi_usage")"
+        if [[ "$efi_usage" =~ ^[0-9]+$ ]] && [ "$efi_usage" -ge "$warn_threshold" ]; then
+            printf 'WARN\tEFI filesystem utilization is %s%%.\n' "$efi_usage"
+            issue_count=$((issue_count + 1))
+        fi
+    fi
+    unsafe_count="$(_cc_kernel_artifact_unsafe_count)"
+    if [ "$unsafe_count" -gt 0 ]; then
+        printf 'WARN\t%s artifact name(s) could not be safely correlated.\n' "$unsafe_count"
+        issue_count=$((issue_count + 1))
+    fi
+    if [ "$issue_count" -eq 0 ]; then
+        printf 'PASS\tKernel packages and boot artifacts are consistent.\n'
+    fi
+}
+
+_cc_kernel_health_severity() {
+    local keep_count="${1:-${KEEP_COUNT:-2}}" severity result=PASS
+    while IFS=$'\t' read -r severity _; do
+        case "$severity" in
+            FAIL) result=FAIL ;;
+            WARN) [ "$result" = FAIL ] || result=WARN ;;
+        esac
+    done < <(_cc_kernel_health_findings "$keep_count")
+    printf '%s\n' "$result"
 }
 
 _cc_kernel_cleanup_supported() {

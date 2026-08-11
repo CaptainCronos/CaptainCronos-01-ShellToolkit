@@ -93,6 +93,35 @@ hooks, so kernel cleanup does not invoke `update-grub` directly. Non-Linux hosts
 can report the running kernel but return reduced/unsupported state for Linux
 inventory and cleanup operations.
 
+Boot storage uses three independent observations. `findmnt --target` identifies
+the real filesystem and mountpoint containing `/boot`; this may be `/` rather
+than a dedicated boot mount. `du -skx` measures actual allocation beneath the
+boot path without crossing into nested filesystems or following symlink targets.
+An exact mounted-filesystem query independently reports `/boot/efi` or `/efi`
+capacity when present, so EFI contents are not charged to ordinary `/boot`
+consumption.
+
+The artifact model correlates versioned `vmlinuz-*`, `initrd.img-*` or
+`initramfs-*.img`, `System.map-*`, and `config-*` files with installed image
+packages and package ownership. Regular files are inspected by metadata only;
+versioned symlinks are `UNKNOWN` and are never followed. NUL-delimited discovery
+handles filenames safely, while releases containing control separators are
+isolated from classification.
+
+Correlation states are conservative: `MATCHED` is a complete owned set;
+`MISSING` means an installed image package lacks a kernel or initramfs artifact;
+`UNMATCHED` means artifacts have no exact installed image package; `PARTIAL`
+means non-critical map/config metadata is absent; and `UNKNOWN` covers unsafe
+symlinks, ambiguous packages, or unresolved ownership. `UNMATCHED` never implies
+safe deletion.
+
+Health is `FAIL` only for an inaccessible/unidentifiable boot path or a missing
+or unsafe running kernel image. Inconsistencies, reboot state, and boot/EFI
+filesystem utilization at or above 90 percent are `WARN`. A fully correlated
+set with no findings is `PASS`. Bootloader inspection reports only directory
+evidence for GRUB, systemd-boot, EFI presence, or an unknown environment and
+never executes boot artifacts or management utilities.
+
 `cc dev-update` owns developer ecosystem reporting and explicit mutation. It defaults to dry-run/reporting. Mutating developer updates require `--apply`; only package managers with a conservative global update path are applied. Normal `cc update --apply` includes developer updates only when `DEV_UPDATES=yes` is set in toolkit config.
 
 ### Network Inspection Architecture

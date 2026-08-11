@@ -123,11 +123,11 @@ cc_dep_storage_list() {
 }
 
 cc_dep_kernel_list() {
-    printf '%s\n' uname find sort awk df pkg-manager
+    printf '%s\n' uname find sort awk pkg-manager
 }
 
 cc_dep_kernel_optional_list() {
-    printf '%s\n' pkg-database
+    printf '%s\n' pkg-database findmnt du stat
 }
 
 cc_dep_optional_list() {
