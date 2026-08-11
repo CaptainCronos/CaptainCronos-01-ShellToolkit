@@ -242,6 +242,14 @@ Creates an archived drive report under the host report directory.
 Also creates/updates a drive asset record and appends asset history.
 ~~~
 
+## cc drives
+
+~~~text
+Usage: cc drives
+
+Shows physical block devices, filesystems, labels, UUIDs, usage, and mount points.
+~~~
+
 ## cc drive-smart
 
 ~~~text
@@ -270,14 +278,6 @@ Actions:
 Notes:
   Starting tests may require sudo.
   This command does not run destructive write/read burn-in tests.
-~~~
-
-## cc drives
-
-~~~text
-Usage: cc drives
-
-Shows physical block devices, filesystems, labels, UUIDs, usage, and mount points.
 ~~~
 
 ## cc env

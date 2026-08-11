@@ -19,9 +19,9 @@ Toolkit version: 1.3.0-beta1 (Blackbeard)
 | cc drive-inventory | 1.3.0-beta1 | Show physical drive inventory with identity and SMART basics. |
 | cc drive-qualify | 1.3.0-beta1 | Run non-destructive drive qualification workflow. |
 | cc drive-report | 1.3.0-beta1 | Save SMART reports and update drive asset records. |
+| cc drives | 1.3.0-beta1 | Show installed storage devices and mount information. |
 | cc drive-smart | 1.3.0-beta1 | Show a concise SMART summary for one storage device. |
 | cc drive-test | 1.3.0-beta1 | Start or inspect SMART self-tests for one storage device. |
-| cc drives | 1.3.0-beta1 | Show installed storage devices and mount information. |
 | cc env | 1.3.0-beta1 | Inspect and repair Captain Cronos environment and PATH health. |
 | cc framework | 1.3.0-beta1 | Show framework milestone status and 1.3 completion progress. |
 | cc gitflow | 1.3.0-beta1 | Launch the interactive Git assistant. |
