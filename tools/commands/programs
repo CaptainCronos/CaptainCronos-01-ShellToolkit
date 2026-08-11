@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : programs
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Diagnostics
 # Requires    : bash git command
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -87,7 +87,7 @@ case "$ACTION" in
         exit 0
         ;;
     --version)
-        echo "1.0.0-alpha1"
+        cc_version
         exit 0
         ;;
     list)

@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : asset
-# Version     : 1.3.0-alpha1
+# Version     : reads VERSION
 # Category    : Core
 # Requires    : bash yaml find cat mkdir grep sed date
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -56,7 +56,7 @@ EOF_HELP
 if [ "$#" -gt 0 ]; then
     case "$1" in
         --help|-h) usage; exit 0 ;;
-        --version) echo "1.3.0-alpha1"; exit 0 ;;
+        --version) cc_version; exit 0 ;;
         init|list|show|path|search|inventory|set|create|state|history|retire|export)
             ACTION="$1"
             shift

@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-inventory
-# Version     : 1.1.0-alpha1
+# Version     : reads VERSION
 # Category    : Storage
 # Requires    : bash lsblk smartctl awk grep paste
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -35,7 +35,7 @@ EOF_HELP
 if [ "$#" -gt 0 ]; then
     case "$1" in
         --help|-h) usage; exit 0 ;;
-        --version) echo "1.1.0-alpha1"; exit 0 ;;
+        --version) cc_version; exit 0 ;;
         table|csv|markdown) FORMAT="$1" ;;
         *) usage; exit 1 ;;
     esac

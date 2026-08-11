@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : cc-context.sh
-# Version     : 2.0.0-alpha1
+# Version     : reads VERSION
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Shared toolkit and repository context helpers.
 # ==============================================================================

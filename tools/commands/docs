@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : docs
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Documentation
 # Requires    : bash git find awk
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -24,7 +24,7 @@ APPLY=0
 usage() {
     cat <<'EOF_HELP'
 Usage:
-  cc docs [build|inventory|reference|changelog|lint] [--apply] [--out DIR]
+  cc docs [build|inventory|reference|changelog|lint|check] [--apply] [--out DIR]
 
 Actions:
   inventory  Generate command inventory.
@@ -32,6 +32,7 @@ Actions:
   changelog  Generate recent Git history summary.
   lint       Check command headers and Bash syntax.
   build      Generate all documentation outputs.
+  check      Verify committed generated documents are current; never writes them.
 
 Options:
   --apply    Write generated files under docs/generated.
@@ -42,10 +43,10 @@ EOF_HELP
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --help|-h) usage; exit 0 ;;
-        --version) echo "1.0.0-alpha1"; exit 0 ;;
+        --version) cc_version; exit 0 ;;
         --apply) APPLY=1; shift ;;
         --out) shift; OUT_DIR="${1:-}"; [ -n "$OUT_DIR" ] || { usage; exit 1; }; shift ;;
-        build|inventory|reference|changelog|lint) ACTION="$1"; shift ;;
+        build|inventory|reference|changelog|lint|check) ACTION="$1"; shift ;;
         *) usage; exit 1 ;;
     esac
 done
@@ -69,8 +70,11 @@ write_output() {
     local name="$1"
     shift
     if [ "$APPLY" -eq 1 ]; then
+        local temporary
         mkdir -p "$OUT_DIR"
-        "$@" > "$OUT_DIR/$name"
+        temporary="$(mktemp "$OUT_DIR/.${name}.XXXXXX")" || return 1
+        if ! "$@" > "$temporary"; then rm -f "$temporary"; return 1; fi
+        mv "$temporary" "$OUT_DIR/$name"
         cc_log "Generated: $OUT_DIR/$name"
     else
         "$@"
@@ -79,16 +83,17 @@ write_output() {
 
 generate_inventory() {
     local cmd file version purpose
+    cc_load_version
     echo "# Captain Cronos Command Inventory"
     echo
-    echo "Generated: $(date)"
+    echo "Toolkit version: ${TOOLKIT_VERSION:-unknown} (${TOOLKIT_CODENAME:-unknown})"
     echo
     echo "| Command | Version | Purpose |"
     echo "|---|---|---|"
     while read -r cmd; do
         [ -n "$cmd" ] || continue
         file="$PROJECT_ROOT/tools/commands/$cmd"
-        version="$(script_field "$file" "Version")"
+        version="${TOOLKIT_VERSION:-unknown}"
         purpose="$(script_field "$file" "Purpose")"
         [ -n "$version" ] || version="unknown"
         [ -n "$purpose" ] || purpose="unknown"
@@ -100,7 +105,8 @@ generate_reference() {
     local cmd first=1
     echo "# Captain Cronos Command Reference"
     echo
-    echo "Generated: $(date)"
+    cc_load_version
+    echo "Toolkit version: ${TOOLKIT_VERSION:-unknown} (${TOOLKIT_CODENAME:-unknown})"
     echo
     while read -r cmd; do
         [ -n "$cmd" ] || continue
@@ -119,18 +125,16 @@ generate_reference() {
 generate_changelog() {
     echo "# Recent Change Summary"
     echo
-    echo "Generated: $(date)"
+    echo "Generated from the canonical CHANGELOG.md release-history authority."
     echo
-    echo "~~~text"
-    git log --oneline --decorate -n 40
-    echo "~~~"
+    cat "$PROJECT_ROOT/CHANGELOG.md"
 }
 
 generate_lint() {
     local cmd file issues=0
     echo "# Documentation Lint Report"
     echo
-    echo "Generated: $(date)"
+    echo "Source: tools/commands metadata and Bash syntax"
     echo
     while read -r cmd; do
         [ -n "$cmd" ] || continue
@@ -142,17 +146,44 @@ generate_lint() {
     done < <(command_list)
     echo
     echo "Issues: $issues"
+    [ "$issues" -eq 0 ]
 }
 
 generate_index() {
     echo "# Generated Documentation Index"
     echo
-    echo "Generated: $(date)"
+    echo "Source: cc docs build --apply"
     echo
     echo "- COMMAND_INVENTORY.md"
     echo "- COMMAND_REFERENCE.md"
     echo "- CHANGE_SUMMARY.md"
     echo "- DOCS_LINT.md"
+}
+
+generate_all_into() {
+    local destination="$1"
+    mkdir -p "$destination"
+    generate_inventory >"$destination/COMMAND_INVENTORY.md"
+    generate_reference >"$destination/COMMAND_REFERENCE.md"
+    generate_changelog >"$destination/CHANGE_SUMMARY.md"
+    generate_lint >"$destination/DOCS_LINT.md"
+    generate_index >"$destination/README.md"
+}
+
+check_freshness() {
+    local temporary name stale=0
+    temporary="$(mktemp -d "${TMPDIR:-/tmp}/cc-docs-check.XXXXXX")" || return 1
+    trap 'rm -rf "$temporary"' RETURN
+    generate_all_into "$temporary" || return 1
+    for name in COMMAND_INVENTORY.md COMMAND_REFERENCE.md CHANGE_SUMMARY.md DOCS_LINT.md README.md; do
+        if [ ! -f "$OUT_DIR/$name" ] || ! cmp -s "$temporary/$name" "$OUT_DIR/$name"; then
+            cc_status_line "Generated $name" "FAIL"
+            stale=1
+        else
+            cc_status_line "Generated $name" "PASS"
+        fi
+    done
+    [ "$stale" -eq 0 ]
 }
 
 cc_banner
@@ -172,5 +203,9 @@ case "$ACTION" in
         write_output CHANGE_SUMMARY.md generate_changelog
         write_output DOCS_LINT.md generate_lint
         write_output README.md generate_index
+        ;;
+    check)
+        [ "$APPLY" -eq 0 ] || { cc_error "cc docs check is read-only; omit --apply."; exit 2; }
+        check_freshness
         ;;
 esac

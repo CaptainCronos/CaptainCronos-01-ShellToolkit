@@ -840,6 +840,7 @@ _cc_git_starter_structure() {
 
 _cc_git_stage_menu() {
     local choice files
+    local -a file_args=()
 
     echo
     echo "Stage Options"
@@ -862,8 +863,8 @@ _cc_git_stage_menu() {
                 echo "No files entered."
                 return 1
             fi
-            # shellcheck disable=SC2086
-            git add $files
+            read -r -a file_args <<< "$files"
+            git add -- "${file_args[@]}"
             ;;
         3)
             git reset

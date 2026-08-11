@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Tue Aug 11 08:39:22 EDT 2026
+Toolkit version: 1.3.0-beta1 (Blackbeard)
 
 ## cc about
 
@@ -159,7 +159,7 @@ Notes:
 
 ~~~text
 Usage:
-  cc docs [build|inventory|reference|changelog|lint] [--apply] [--out DIR]
+  cc docs [build|inventory|reference|changelog|lint|check] [--apply] [--out DIR]
 
 Actions:
   inventory  Generate command inventory.
@@ -167,6 +167,7 @@ Actions:
   changelog  Generate recent Git history summary.
   lint       Check command headers and Bash syntax.
   build      Generate all documentation outputs.
+  check      Verify committed generated documents are current; never writes them.
 
 Options:
   --apply    Write generated files under docs/generated.
@@ -609,7 +610,7 @@ Examples:
 Usage:
   cc roadmap [markdown]
 
-Shows the project roadmap from docs/ROADMAP.md.
+Shows the canonical project roadmap from ROADMAP.md.
 ~~~
 
 ## cc selftest

@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : system-update
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Maintenance
 # Requires    : bash pkg-manager
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -19,7 +19,7 @@ source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
 source "$PROJECT_ROOT/lib/cc-packages.sh"
 
-VERSION="1.0.0-alpha1"
+cc_load_version
 LOG="${LOG:-$HOME/upgrade.log}"
 MODE="dry-run"
 MODE_SET=""
@@ -47,7 +47,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "$VERSION"
+            cc_version
             exit 0
             ;;
         --dry-run)
@@ -107,7 +107,7 @@ record_failure() {
 }
 
 cc_banner
-say "Starting system update (${VERSION})..."
+say "Starting system update (${TOOLKIT_VERSION:-unknown})..."
 
 say
 say "System Package Managers"
@@ -158,7 +158,7 @@ say "INFO: developer package updates require: cc update dev --apply"
 if [ "$FAILED" -gt 0 ]; then
     say "System update completed with $FAILED failure(s)."
 else
-    say "System update complete (${VERSION})."
+    say "System update complete (${TOOLKIT_VERSION:-unknown})."
 fi
 
 if [ -f /var/run/reboot-required ]; then

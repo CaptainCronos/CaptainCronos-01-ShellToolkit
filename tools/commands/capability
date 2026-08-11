@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : capability
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Diagnostics
 # Requires    : bash awk grep command
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -36,7 +36,7 @@ NAME="${2:-}"
 
 case "$ACTION" in
     --help|-h) usage; exit 0 ;;
-    --version) echo "1.0.0-alpha1"; exit 0 ;;
+    --version) cc_version; exit 0 ;;
     list) ;;
     check) [ -n "$NAME" ] || { usage; exit 1; } ;;
     *) usage; exit 1 ;;

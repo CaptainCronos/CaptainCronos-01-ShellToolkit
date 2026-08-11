@@ -51,6 +51,7 @@ echo "Working tree"
 echo "------------"
 if [ -n "$(git -C "$REPO_ROOT" status --short)" ]; then
     git -C "$REPO_ROOT" status --short
+    [ "${CC_SEMANTIC_RESULT:-0}" != 1 ] || exit 10
 else
     echo "clean"
 fi

@@ -6,9 +6,9 @@ Current version line: **v1.3.0-beta1 — Blackbeard**
 
 The Shell Toolkit has moved from a personal Bash collection into an engineered, installable toolkit with versioning, verification, baseline capture, defaults, storage workflows, asset history, shared libraries, and a GitHub-backed development workflow.
 
-## v1.3 RC Stabilization — Safety Contracts
+## v1.3 RC Stabilization — Diagnostic Integrity and Release State
 
-Status: **Implemented; pending RC integration**
+Status: **In progress**
 
 Mutation-capable install and maintenance commands now default to zero-write
 preview and require explicit `--apply`. Toolkit preview does not fetch or modify
@@ -186,7 +186,7 @@ This remains a future framework improvement and is not required for the `v1.3.0-
 
 ### Phase 2.5 — Self-Documentation
 
-Status: **In Progress / Continuing**
+Status: **Complete for v1.3 RC**
 
 Completed:
 
@@ -194,10 +194,9 @@ Completed:
 - Documentation lint.
 - Registry load checks.
 
-Remaining:
-
-- Generate future `docs/user/Commands.md` automatically.
-- Keep `helpme`, docs, and command index synchronized through generation.
+Generated command inventory and reference documents are derived from command
+metadata/help by `cc docs build --apply`; `cc docs check` rejects stale committed
+outputs without rewriting them.
 
 ---
 

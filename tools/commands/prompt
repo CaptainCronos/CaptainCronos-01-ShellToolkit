@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : prompt
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Prompt
 # Requires    : bash awk find sort
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -25,7 +25,6 @@ source "$TOOLKIT_ROOT/lib/cc-common.sh"
 source "$TOOLKIT_ROOT/lib/cc-prompt-engine.sh"
 cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
-COMMAND_VERSION="1.0.0-alpha1"
 
 declare -a TEMPLATE_IDS=()
 declare -a TEMPLATE_TITLES=()
@@ -525,7 +524,7 @@ case "${1:-}" in
         exit 0
         ;;
     --version)
-        echo "prompt $COMMAND_VERSION"
+        cc_version
         cc_version
         exit 0
         ;;

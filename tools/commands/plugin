@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : plugin
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Core
 # Requires    : bash find
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -41,7 +41,7 @@ if [ "$#" -gt 0 ]; then
             exit 0
             ;;
         --version)
-            echo "1.0.0-alpha1"
+            cc_version
             exit 0
             ;;
         list|status|info)

@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : about
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Core
 # Requires    : bash
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -32,7 +32,7 @@ case "${1:-}" in
         exit 0
         ;;
     --version)
-        echo "1.0.0-alpha1"
+        cc_version
         exit 0
         ;;
 esac

@@ -18,7 +18,6 @@ source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-deps.sh"
 source "$PROJECT_ROOT/lib/cc-packages.sh"
 
-INSTALL_VERSION="2.2.0-alpha1"
 BACKUP_ROOT="$HOME/.captaincronos/backups"
 BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)"
 USER_BIN="$HOME/bin"
@@ -112,7 +111,6 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "install.sh $INSTALL_VERSION"
             cc_version
             exit 0
             ;;
@@ -285,7 +283,7 @@ print_report() {
     printf '%-18s %s\n' "Project root:" "$PROJECT_ROOT"
     printf '%-18s %s\n' "Toolkit:" "${TOOLKIT_VERSION:-unknown}"
     printf '%-18s %s\n' "Codename:" "${TOOLKIT_CODENAME:-unknown}"
-    printf '%-18s %s\n' "Installer:" "$INSTALL_VERSION"
+    printf '%-18s %s\n' "Installer role:" "full shell/toolkit installer"
     printf '%-18s %s\n' "Dependency gate:" "$([ "$SKIP_DEPS" = "yes" ] && echo "skipped" || echo "passed")"
     printf '%-18s %s\n' "Backup dir:" "$([ "$SKIP_BACKUP" = "yes" ] && echo "skipped" || echo "$BACKUP_DIR")"
     printf '%-18s %s\n' "Dry run:" "$DRY_RUN"
@@ -305,7 +303,7 @@ print_report() {
 cc_load_version
 cc_banner
 
-cc_log "Starting installer v$INSTALL_VERSION"
+cc_log "Starting full shell/toolkit installer for ${TOOLKIT_VERSION:-unknown}"
 
 verify_dependencies
 

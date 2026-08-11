@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : workbench
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Storage
 # Requires    : bash git awk grep command hostname
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -51,7 +51,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "1.0.0-alpha1"
+            cc_version
             exit 0
             ;;
         prepare|status)

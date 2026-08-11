@@ -1,6 +1,6 @@
 # Generated Documentation Index
 
-Generated: Tue Aug 11 08:39:28 EDT 2026
+Source: cc docs build --apply
 
 - COMMAND_INVENTORY.md
 - COMMAND_REFERENCE.md

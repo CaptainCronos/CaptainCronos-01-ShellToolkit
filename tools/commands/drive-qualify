@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-qualify
-# Version     : 1.1.0-alpha1
+# Version     : reads VERSION
 # Category    : Storage
 # Requires    : bash yaml smartctl awk grep date mkdir tee
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -51,7 +51,7 @@ EOF_HELP
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --help|-h) usage; exit 0 ;;
-        --version) echo "1.1.0-alpha1"; exit 0 ;;
+        --version) cc_version; exit 0 ;;
         start|status|complete) MODE="$1"; shift ;;
         --long) START_LONG="yes"; shift ;;
         *) DEVICE="$1"; shift ;;

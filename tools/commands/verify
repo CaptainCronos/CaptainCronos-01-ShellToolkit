@@ -68,14 +68,16 @@ while [ "$#" -gt 0 ]; do
 done
 
 verify_all() {
+    local output
+    output="$(mktemp "${TMPDIR:-/tmp}/cc-verify.XXXXXX")" || return 1
+    trap 'rm -f "$output"' RETURN
     cc_banner
     echo
     echo "Repository Verification"
     echo "-----------------------"
 
-    if install/verify.sh >/tmp/cc-verify.out 2>&1; then
+    if install/verify.sh >"$output" 2>&1; then
         cc_status_line "Repository verification" "PASS"
-        rm -f /tmp/cc-verify.out
         echo
         printf '%-16s ' "Overall Status:"
         cc_pass
@@ -85,8 +87,7 @@ verify_all() {
 
     cc_status_line "Repository verification" "FAIL"
     echo
-    cat /tmp/cc-verify.out
-    rm -f /tmp/cc-verify.out
+    cat "$output"
     echo
     printf '%-16s ' "Overall Status:"
     cc_fail

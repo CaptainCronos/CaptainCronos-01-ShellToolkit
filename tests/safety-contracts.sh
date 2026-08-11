@@ -239,9 +239,14 @@ mkdir -p "$monthly_home"
 rm -f "$TRACE_FILE" "$monthly_home/upgrade.log"
 # Expanded by the child Bash process using its positional parameter.
 # shellcheck disable=SC2016
+monthly_rc=0
 env "${common_env[@]}" HOME="$monthly_home" LOG="$monthly_home/upgrade.log" \
     bash -c 'source "$1/tools/commands/monthly-health"; print_updates' bash "$PROJECT_ROOT" >/dev/null \
-    || fail "monthly-health update preview failed"
+    || monthly_rc=$?
+case "$monthly_rc" in
+    0|10) ;;
+    *) fail "monthly-health update preview failed" ;;
+esac
 [ ! -e "$TRACE_FILE" ] || fail "monthly-health update preview invoked mutation"
 [ ! -e "$monthly_home/upgrade.log" ] || fail "monthly-health update preview created an update log"
 

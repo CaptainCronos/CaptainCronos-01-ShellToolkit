@@ -1,8 +1,6 @@
 project:
   name: Captain Cronos Shell Toolkit
   repository: CaptainCronos-01-ShellToolkit
-  status: alpha
-
 version:
   source: VERSION
 

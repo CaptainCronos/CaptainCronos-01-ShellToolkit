@@ -5,8 +5,14 @@ This guide is the primary operational reference for installing, configuring, mai
 
 ## Installation
 - Clone the repository.
-- Run `cc install`.
+- For first-time shell enrollment, preview and run `install/install.sh`.
+- Use `cc install` for launcher-only installation or repair.
 - Verify with `cc version` and `cc doctor`.
+
+`cc toolkit-update` is the recurring toolkit maintenance interface. It delegates
+to the internal `install/update.sh` path, which updates Git only during explicit
+apply and then invokes the full `install/install.sh` installer. `manifest.yml`
+is metadata only in v1.3; it does not drive installation.
 
 ## Configuration
 Use `cc config` to review and modify toolkit settings.

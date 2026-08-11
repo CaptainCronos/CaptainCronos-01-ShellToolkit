@@ -10,6 +10,10 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Shared PASS/WARN/FAIL/SKIP result aggregation for maintenance and reports.
+- Read-only generated-document freshness and consolidated RC release gates.
+- Focused RC integrity fixtures for stage aggregation, report privacy,
+  redaction, incomplete sections, version state, and documentation freshness.
 - Fixture-based mutation-contract coverage for installer, toolkit-update,
   system-update, full update orchestration, and monthly-health preview paths.
 - Semantic in-memory kernel health snapshots with stable finding codes for diagnostic consumers.
@@ -48,6 +52,15 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- `cc update` now continues safe diagnostics, reports every requested or skipped
+  stage truthfully, and exits nonzero when any stage fails.
+- Monthly-health reports are staged atomically at mode 0600, redact identity and
+  credential-bearing content, expose incomplete sections, and aggregate an
+  honest overall result.
+- `VERSION` is the sole user-facing toolkit version/codename authority; legacy
+  command and installer alpha labels are no longer presented as public versions.
+- Root `ROADMAP.md`, `CHANGELOG.md`, command metadata, and generated-document
+  ownership are explicit, with stale roadmap duplication removed.
 - `cc install`, the full installer, `cc toolkit-update`, and `cc system-update`
   now default to zero-write preview and require explicit `--apply` for mutation.
 - Toolkit dry-run now inspects only local Git state instead of fetching remote

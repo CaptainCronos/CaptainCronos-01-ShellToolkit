@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : kernel-cleanup
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Maintenance
 # Requires    : bash uname find sort awk
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -15,6 +15,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
 
 case "${1:-}" in
     --help|-h)
@@ -30,7 +31,7 @@ EOF_HELP
         exit 0
         ;;
     --version)
-        echo "1.0.0-alpha1"
+        cc_version
         exit 0
         ;;
 esac

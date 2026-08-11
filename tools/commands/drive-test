@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : drive-test
-# Version     : 1.1.0-alpha1
+# Version     : reads VERSION
 # Category    : Storage
 # Requires    : bash smartctl awk grep
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -44,7 +44,7 @@ EOF_HELP
 
 case "${1:-}" in
     --help|-h) usage; exit 0 ;;
-    --version) echo "1.1.0-alpha1"; exit 0 ;;
+    --version) cc_version; exit 0 ;;
     status|short|long|abort)
         ACTION="$1"
         shift

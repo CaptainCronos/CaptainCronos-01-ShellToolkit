@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : audit
-# Version     : 1.2.0-alpha1
+# Version     : reads VERSION
 # Category    : Engineering
 # Requires    : bash awk grep find python3 chmod
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -62,7 +62,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "1.2.0-alpha1"
+            cc_version
             exit 0
             ;;
         --strict)

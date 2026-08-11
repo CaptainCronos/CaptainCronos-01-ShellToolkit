@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : doctor
-# Version     : 2.1.0-alpha1
+# Version     : reads VERSION
 # Category    : Diagnostics
 # Requires    : bash git awk df smartctl uname find sort
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -205,7 +205,12 @@ else
 fi
 printf '\n'
 
-[ "$FAILURES" -eq 0 ]
+if [ "$FAILURES" -gt 0 ]; then
+    return 1
+elif [ "$WARNINGS" -gt 0 ] && [ "${CC_SEMANTIC_RESULT:-0}" = 1 ]; then
+    return 10
+fi
+return 0
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

@@ -143,13 +143,17 @@ assert_contains "$monthly_output" '/boot artifact allocation:   420.0 MiB' 'mont
 assert_contains "$monthly_output" 'Matched:                     4' 'monthly health omitted artifact counts'
 
 kernel_fixture WARN required 0 $'WARN\tREBOOT_REQUIRED\tThe host reboot marker is present.'
-monthly_output="$(print_kernel_health)"
+monthly_rc=0
+monthly_output="$(print_kernel_health)" || monthly_rc=$?
+[ "$monthly_rc" -eq 10 ] || fail 'monthly kernel WARN did not return semantic WARN'
 assert_contains "$monthly_output" 'Overall health:              WARN' 'monthly health omitted WARN severity'
 assert_contains "$monthly_output" 'reboot recommended' 'monthly health omitted reboot maintenance advisory'
 assert_contains "$monthly_output" REBOOT_REQUIRED 'monthly health omitted WARN findings'
 
 kernel_fixture FAIL not-required 0 $'FAIL\tBOOT_PATH_INACCESSIBLE\tBoot path is inaccessible.'
-monthly_output="$(print_kernel_health)"
+monthly_rc=0
+monthly_output="$(print_kernel_health)" || monthly_rc=$?
+[ "$monthly_rc" -eq 1 ] || fail 'monthly kernel FAIL did not return failure'
 assert_contains "$monthly_output" 'Overall health:              FAIL' 'monthly health omitted FAIL severity'
 assert_contains "$monthly_output" BOOT_PATH_INACCESSIBLE 'monthly health omitted FAIL findings'
 
@@ -157,7 +161,9 @@ kernel_fixture WARN unknown 0 $'WARN\tREDUCED_INSPECTION\tDetailed boot-artifact
 TEST_KERNEL_SNAPSHOT[os]=FreeBSD
 TEST_KERNEL_SNAPSHOT[distribution_family]='not-applicable'
 TEST_KERNEL_SNAPSHOT[artifact_matched]=unavailable
-monthly_output="$(print_kernel_health)"
+monthly_rc=0
+monthly_output="$(print_kernel_health)" || monthly_rc=$?
+[ "$monthly_rc" -eq 10 ] || fail 'reduced monthly kernel inspection did not return WARN'
 assert_contains "$monthly_output" 'OS:                          FreeBSD' 'monthly health omitted reduced platform'
 assert_contains "$monthly_output" 'Matched:                     unavailable' 'monthly health faked Linux artifact counts'
 

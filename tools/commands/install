@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : install
-# Version     : 2.3.0-alpha1
+# Version     : reads VERSION
 # Category    : Core
 # Requires    : bash install cmp
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -24,7 +24,6 @@ export TOOLKIT_ROOT CURRENT_REPO PROJECT_ROOT
 cd "$TOOLKIT_ROOT"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
 
-COMMAND_VERSION="2.3.0-alpha1"
 DRY_RUN=1
 MODE_SET=""
 FORCE=0
@@ -101,7 +100,6 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "install $COMMAND_VERSION"
             cc_version
             exit 0
             ;;

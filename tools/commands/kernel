@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : kernel
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Maintenance
 # Requires    : bash uname find sort awk
 # Repository  : CaptainCronos-01-ShellToolkit

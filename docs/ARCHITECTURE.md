@@ -98,6 +98,13 @@ destination, mode, and planned backups without creating them. System-update
 logging is persistent only during explicit apply. Monthly-health invokes the
 same system-update dry-run contract for update readiness.
 
+Monthly-health records every significant subsystem as PASS, WARN, FAIL, or
+SKIP. FAIL takes precedence over WARN, WARN over PASS, and SKIP remains visible
+without failing the command. Any FAIL makes the command exit nonzero. Persistent
+reports and their staging files are private (0600), and report output is
+redacted for user/home/repository identity, credential-bearing URLs, HTTP
+authorization/cookie fields, and common inline secret assignments.
+
 On Debian-family systems, toolkit automation uses the configured `apt-get` interface for package operations, `apt-cache` for repository queries, and `dpkg` for the installed-package database. Interactive administrators may still use `apt` directly at a terminal. Other supported platform families retain their native package-manager syntax behind `lib/cc-packages.sh`.
 
 ### Kernel Management Architecture
@@ -354,8 +361,30 @@ Manual documentation lives under:
 docs/
 ```
 
+### Documentation Ownership
+
+The repository `VERSION` file is the sole toolkit version and codename authority.
+Root `ROADMAP.md` is the roadmap authority. `CHANGELOG.md` is the release-history
+authority. Command headers and the command registry are the metadata authority
+for command discovery; `cc docs build --apply` derives the command inventory and
+reference under `docs/generated/`. Generated documents are build artifacts and
+must not be hand-maintained as competing sources.
+
+`docs/ARCHITECTURE.md` owns architecture, `docs/ADMINISTRATOR_GUIDE.md` owns
+administrator procedures, and `docs/RELEASE_1.3_CHECKLIST.md` owns the 1.3
+release checklist.
+
+Installation ownership is deliberately split: `cc install` is the normal
+launcher-only interface; `install/install.sh` is the full shell/toolkit
+installer; `cc toolkit-update` delegates to `install/update.sh`, which performs
+the Git update and then calls the full installer. The two scripts under
+`install/` are implementation paths, not additional public command namespaces.
+
 ### Release Workflow
-`cc release check` validates the repository, scripts, documentation lint, and working tree before release activity.
+`cc release check` is read-only and validates version state, repository checks,
+strict audit, documentation lint and freshness, Bash syntax, ShellCheck policy,
+secure temporary-file policy, release-document consistency, and the working
+tree before release activity.
 
 ## Design Rules
 

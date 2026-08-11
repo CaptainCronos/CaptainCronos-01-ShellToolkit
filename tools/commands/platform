@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : platform
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Diagnostics
 # Requires    : bash uname hostname awk grep command
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -31,7 +31,7 @@ EOF_HELP
 ACTION="${1:-summary}"
 case "$ACTION" in
     --help|-h) usage; exit 0 ;;
-    --version) echo "1.0.0-alpha1"; exit 0 ;;
+    --version) cc_version; exit 0 ;;
     summary|capabilities) ;;
     *) usage; exit 1 ;;
 esac

@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : dev-update
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Maintenance
 # Requires    : bash
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -18,7 +18,7 @@ cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
 
-VERSION="1.0.0-alpha1"
+cc_load_version
 MODE="dry-run"
 TARGET="all"
 APPLY=0
@@ -55,7 +55,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "$VERSION"
+            cc_version
             exit 0
             ;;
         --dry-run)

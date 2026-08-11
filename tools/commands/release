@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : release
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Engineering
 # Requires    : bash git
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -35,7 +35,7 @@ EOF_HELP
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --help|-h) usage; exit 0 ;;
-        --version) echo "1.0.0-alpha1"; exit 0 ;;
+        --version) cc_version; exit 0 ;;
         # Retained for CLI compatibility; the first-stage release engine is observational.
         --apply) shift ;;
         plan|check) ACTION="$1"; shift ;;
@@ -60,21 +60,65 @@ release_plan() {
 }
 
 run_release_gate() {
-    local label="$1"
+    local label="$1" output rc
     shift
-
-    if "$@" >/tmp/cc-release-check.out 2>&1; then
+    output="$(mktemp "$RELEASE_TEMP/gate.XXXXXX")" || return 1
+    if "$@" >"$output" 2>&1; then
         cc_status_line "$label" "PASS"
         return 0
+    else
+        rc=$?
     fi
-
     cc_status_line "$label" "FAIL"
-    cat /tmp/cc-release-check.out
-    return 1
+    cat "$output"
+    return "$rc"
+}
+
+release_version_consistent() {
+    local version codename
+    cc_load_version
+    version="${TOOLKIT_VERSION:-}"
+    codename="${TOOLKIT_CODENAME:-}"
+    [ -n "$version" ] && [ -n "$codename" ] || return 1
+    grep -Fq "v$version" "$PROJECT_ROOT/README.md" || return 1
+    grep -Fq "v$version" "$PROJECT_ROOT/ROADMAP.md" || return 1
+    grep -Fq "v$version" "$PROJECT_ROOT/CHANGELOG.md" || return 1
+    ! rg -n '^[[:space:]]*status:[[:space:]]*(alpha|beta|rc)' "$PROJECT_ROOT/manifest.yml"
+}
+
+release_docs_consistent() {
+    grep -Fq 'Root `ROADMAP.md` is the roadmap authority.' "$PROJECT_ROOT/docs/ARCHITECTURE.md" &&
+    grep -Fq '`CHANGELOG.md` is the release-history' "$PROJECT_ROOT/docs/ARCHITECTURE.md" &&
+    ! rg -n 'Before tagging 1\.3\.0-alpha1|docs/ROADMAP\.md' \
+        "$PROJECT_ROOT/docs/RELEASE_1.3_CHECKLIST.md" "$PROJECT_ROOT/tools/commands/roadmap"
+}
+
+release_bash_syntax() {
+    local file
+    while IFS= read -r file; do bash -n "$file" || return 1; done < <(
+        git ls-files '*.sh' 'tools/cc' 'tools/commands/*' | sort
+    )
+}
+
+release_shellcheck() {
+    local files=()
+    command -v shellcheck >/dev/null 2>&1 || return 20
+    mapfile -t files < <(git ls-files '*.sh' 'tools/cc' 'tools/commands/*' | sort)
+    shellcheck -x --severity=warning "${files[@]}"
+}
+
+release_temp_safety() {
+    local pattern
+    pattern='/tmp/'"cc-[A-Za-z0-9_.-]+"
+    ! rg -n "$pattern" "$PROJECT_ROOT/tools" "$PROJECT_ROOT/install" "$PROJECT_ROOT/lib" "$PROJECT_ROOT/tests" \
+        --glob '!*fixtures*'
 }
 
 release_check() {
-    local failed=0
+    local failed=0 shellcheck_rc=0 branch
+    RELEASE_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/cc-release-check.XXXXXX")" || return 1
+    chmod 700 "$RELEASE_TEMP"
+    trap 'rm -rf "$RELEASE_TEMP"' RETURN
 
     cc_banner
     echo
@@ -84,9 +128,34 @@ release_check() {
     bash "$PROJECT_ROOT/tools/cc" version
     echo
 
+    run_release_gate "Version and maturity consistency" release_version_consistent || failed=$((failed + 1))
     run_release_gate "Repository verify" bash "$PROJECT_ROOT/tools/cc" verify || failed=$((failed + 1))
-    run_release_gate "Doctor" bash "$PROJECT_ROOT/tools/cc" doctor || failed=$((failed + 1))
+    run_release_gate "Strict command audit" bash "$PROJECT_ROOT/tools/cc" audit --strict || failed=$((failed + 1))
     run_release_gate "Documentation lint" bash "$PROJECT_ROOT/tools/cc" docs lint || failed=$((failed + 1))
+    run_release_gate "Generated documentation freshness" bash "$PROJECT_ROOT/tools/cc" docs check || failed=$((failed + 1))
+    run_release_gate "RC diagnostic-integrity fixtures" env CC_RC_SKIP_RELEASE_FIXTURES=1 bash "$PROJECT_ROOT/tests/rc-integrity.sh" || failed=$((failed + 1))
+    run_release_gate "Bash syntax" release_bash_syntax || failed=$((failed + 1))
+    run_release_gate "Secure temporary-file policy" release_temp_safety || failed=$((failed + 1))
+    run_release_gate "Release documentation consistency" release_docs_consistent || failed=$((failed + 1))
+
+    if release_shellcheck >"$RELEASE_TEMP/shellcheck" 2>&1; then
+        cc_status_line "ShellCheck" "PASS"
+    else
+        shellcheck_rc=$?
+        if [ "$shellcheck_rc" -eq 20 ]; then
+            cc_status_line "ShellCheck (optional tool unavailable)" "WARN"
+        else
+            cc_status_line "ShellCheck" "FAIL"
+            cat "$RELEASE_TEMP/shellcheck"
+            failed=$((failed + 1))
+        fi
+    fi
+
+    branch="$(git branch --show-current)"
+    case "$branch" in
+        main|release/*) cc_status_line "Release branch ($branch)" "PASS" ;;
+        *) cc_status_line "Development branch ($branch)" "WARN" ;;
+    esac
 
     if [ -n "$(git status --short)" ]; then
         cc_status_line "Working tree clean" "FAIL"
@@ -96,7 +165,6 @@ release_check() {
         cc_status_line "Working tree clean" "PASS"
     fi
 
-    rm -f /tmp/cc-release-check.out
     echo
     printf '%-16s ' "Overall Status:"
     if [ "$failed" -eq 0 ]; then
@@ -109,7 +177,9 @@ release_check() {
     [ "$failed" -eq 0 ]
 }
 
-case "$ACTION" in
-    plan) release_plan ;;
-    check) release_check ;;
-esac
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    case "$ACTION" in
+        plan) release_plan ;;
+        check) release_check ;;
+    esac
+fi

@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : update
-# Version     : 2.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Maintenance
 # Requires    : bash git
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -18,6 +18,7 @@ cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-config.sh"
 source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
+source "$PROJECT_ROOT/lib/cc-results.sh"
 
 MODE="dry-run"
 MODE_SET=""
@@ -81,7 +82,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "2.0.0-alpha1"
+            cc_version
             exit 0
             ;;
         --dry-run)
@@ -116,7 +117,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         *)
             usage
-            exit 1
+            exit 2
             ;;
     esac
 done
@@ -128,8 +129,19 @@ run_cc() {
     echo "============================================================"
     echo "cc $name $*"
     echo "============================================================"
-    bash "$PROJECT_ROOT/tools/cc" "$name" "$@"
+    CC_SEMANTIC_RESULT=1 "${CC_UPDATE_RUNNER:-bash}" "$PROJECT_ROOT/tools/cc" "$name" "$@"
 }
+
+run_stage() {
+    local label="$1" rc state
+    shift
+    if "$@"; then rc=0; else rc=$?; fi
+    state="$(cc_result_from_rc "$rc")"
+    cc_result_record "$label" "$state"
+    return 0
+}
+
+skip_stage() { cc_result_record "$1" SKIP; }
 
 run_dev_update() {
     if [ "$MODE" = "apply" ]; then
@@ -141,46 +153,59 @@ run_dev_update() {
 
 cc_banner
 echo "Maintenance mode: $MODE"
+cc_result_reset
 
 if [ "$RUN_TOOLKIT" -eq 1 ]; then
     if [ "$MODE" = "apply" ]; then
-        run_cc toolkit-update --apply
+        run_stage "Toolkit update" run_cc toolkit-update --apply
     else
-        run_cc toolkit-update --dry-run
+        run_stage "Toolkit update" run_cc toolkit-update --dry-run
     fi
-fi
+else skip_stage "Toolkit update"; fi
 
 if [ "$RUN_SYSTEM" -eq 1 ]; then
     if [ "$MODE" = "apply" ]; then
-        run_cc system-update --apply
+        run_stage "System update" run_cc system-update --apply
     else
-        run_cc system-update --dry-run
+        run_stage "System update" run_cc system-update --dry-run
     fi
-fi
+else skip_stage "System update"; fi
 
 if [ "$RUN_KERNEL" -eq 1 ]; then
     if [ "$MODE" = "apply" ]; then
-        run_cc kernel cleanup --apply
+        run_stage "Kernel cleanup" run_cc kernel cleanup --apply
     else
-        run_cc kernel cleanup --dry-run
+        run_stage "Kernel cleanup" run_cc kernel cleanup --dry-run
     fi
-fi
+else skip_stage "Kernel cleanup"; fi
 
 if [ "$RUN_DEV" -eq 1 ]; then
-    run_dev_update
+    run_stage "Developer updates" run_dev_update
 elif [ "$RUN_TOOLKIT" -eq 1 ] && [ "$RUN_SYSTEM" -eq 1 ] && [ "$RUN_KERNEL" -eq 1 ]; then
     if cc_dev_update_truthy "$(cc_config_get DEV_UPDATES no)"; then
-        run_dev_update
+        run_stage "Developer updates" run_dev_update
+    else
+        skip_stage "Developer updates"
     fi
+else
+    skip_stage "Developer updates"
 fi
 
 if [ "$RUN_HEALTH" -eq 1 ]; then
-    run_cc verify
-    run_cc doctor
-    run_cc drives
-    run_cc smart
-    run_cc status
+    run_stage "Repository verify" run_cc verify
+    run_stage "Doctor" run_cc doctor
+    run_stage "Storage inventory" run_cc drives
+    run_stage "SMART" run_cc smart
+    run_stage "Repository status" run_cc status
+else
+    skip_stage "Repository verify"
+    skip_stage "Doctor"
+    skip_stage "Storage inventory"
+    skip_stage "SMART"
+    skip_stage "Repository status"
 fi
 
 echo
-echo "Maintenance workflow complete."
+echo "Maintenance workflow result: $(cc_result_overall)"
+printf 'PASS=%s WARN=%s FAIL=%s SKIP=%s\n' "$CC_RESULT_PASS" "$CC_RESULT_WARN" "$CC_RESULT_FAIL" "$CC_RESULT_SKIP"
+cc_result_exit_status

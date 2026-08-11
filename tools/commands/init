@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : init
-# Version     : 1.1.0-alpha1
+# Version     : reads VERSION
 # Category    : Core
 # Requires    : bash hostname mkdir install grep awk uname command
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -60,7 +60,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         --version)
-            echo "1.1.0-alpha1"
+            cc_version
             exit 0
             ;;
         --apply)

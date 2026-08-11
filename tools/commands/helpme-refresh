@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : helpme-refresh
-# Version     : 1.3.0-alpha1
+# Version     : reads VERSION
 # Category    : Documentation
 # Requires    : bash python3
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -32,7 +32,7 @@ EOF_HELP
         exit 0
         ;;
     --version)
-        echo "1.3.0-alpha1"
+        cc_version
         exit 0
         ;;
     --dry-run)

@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : framework
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Core
 # Requires    : bash awk grep find
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -32,7 +32,7 @@ EOF_HELP
 ACTION="${1:-status}"
 case "$ACTION" in
     --help|-h) usage; exit 0 ;;
-    --version) echo "1.0.0-alpha1"; exit 0 ;;
+    --version) cc_version; exit 0 ;;
     status|checklist|verify) ;;
     *) usage; exit 1 ;;
 esac
@@ -96,23 +96,25 @@ show_checklist() {
 }
 
 run_gate() {
-    local label="$1"
+    local label="$1" output
     shift
-
-    if "$@" >/tmp/cc-framework-verify.out 2>&1; then
+    output="$(mktemp "$FRAMEWORK_TEMP/gate.XXXXXX")" || return 1
+    if "$@" >"$output" 2>&1; then
         cc_status_line "$label" "PASS"
         return 0
     fi
 
     cc_status_line "$label" "FAIL"
     echo
-    cat /tmp/cc-framework-verify.out
+    cat "$output"
     echo
     return 1
 }
 
 show_verify() {
     local failed=0
+    FRAMEWORK_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/cc-framework-verify.XXXXXX")" || return 1
+    trap 'rm -rf "$FRAMEWORK_TEMP"' RETURN
 
     cc_banner
     echo
@@ -125,7 +127,6 @@ show_verify() {
     run_gate "cc verify executable" bash "$PROJECT_ROOT/tools/cc" verify executable || failed=$((failed + 1))
     run_gate "cc release check" bash "$PROJECT_ROOT/tools/cc" release check || failed=$((failed + 1))
 
-    rm -f /tmp/cc-framework-verify.out
     echo
     printf '%-16s ' "Overall Status:"
     if [ "$failed" -eq 0 ]; then

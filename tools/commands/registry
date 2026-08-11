@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : registry
-# Version     : 1.0.1-alpha1
+# Version     : reads VERSION
 # Category    : Documentation
 # Requires    : bash
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -36,7 +36,7 @@ if [ "$#" -gt 0 ]; then
             exit 0
             ;;
         --version)
-            echo "1.0.1-alpha1"
+            cc_version
             exit 0
             ;;
         table|tsv|markdown)

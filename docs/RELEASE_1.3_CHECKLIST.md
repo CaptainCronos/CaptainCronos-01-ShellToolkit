@@ -152,12 +152,13 @@ Status targets:
 
 ## Quality Gates
 
-Before tagging 1.3.0-alpha1:
+Before tagging 1.3.0-rc1:
 
 ```text
 cc selftest
 cc audit --strict
 cc docs lint
+cc docs check
 cc verify executable
 cc release check
 git status --short

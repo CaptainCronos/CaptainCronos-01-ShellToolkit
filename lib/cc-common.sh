@@ -66,6 +66,9 @@ cc_status_word() {
         INFO)
             cc_color_info; printf '%s' "$status"; cc_color_reset
             ;;
+        SKIP)
+            cc_color_note; printf '%s' "$status"; cc_color_reset
+            ;;
         *)
             cc_color_note; printf '%s' "$status"; cc_color_reset
             ;;

@@ -4,7 +4,7 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : deps
-# Version     : 1.0.0-alpha1
+# Version     : reads VERSION
 # Category    : Diagnostics
 # Requires    : bash awk grep find command
 # Repository  : CaptainCronos-01-ShellToolkit
@@ -79,7 +79,7 @@ case "${1:-summary}" in
         exit 0
         ;;
     --version)
-        echo "1.0.0-alpha1"
+        cc_version
         exit 0
         ;;
     summary|core|docs|storage|kernel|optional)
