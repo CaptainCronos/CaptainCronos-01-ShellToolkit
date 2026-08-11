@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : doctor
-# Version     : 2.0.0-alpha1
+# Version     : 2.1.0-alpha1
 # Category    : Diagnostics
-# Requires    : bash git awk df smartctl
+# Requires    : bash git awk df smartctl uname find sort
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Run repository, installation, and host health checks.
 # ==============================================================================
@@ -22,6 +22,7 @@ fi
 cd "$TOOLKIT_ROOT"
 source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
+source "$TOOLKIT_ROOT/lib/cc-kernel.sh"
 cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 FULL=0
@@ -31,23 +32,9 @@ FAILURES=0
 usage() {
     echo "Usage: cc doctor [--full]"
     echo
-    echo "Runs repository, command syntax, installation, and basic host health checks."
+    echo "Runs repository, installation, semantic kernel, and basic host health checks."
     echo "Use --full to include storage inventory and SMART summary."
 }
-
-case "${1:-}" in
-    --help|-h)
-        usage
-        exit 0
-        ;;
-    --version)
-        cc_version
-        exit 0
-        ;;
-    --full)
-        FULL=1
-        ;;
-esac
 
 run_cc() {
     local cmd="$1"
@@ -60,6 +47,63 @@ run_cc() {
         cc_warn "tools/cc not readable; skipping cc $cmd"
     fi
 }
+
+doctor_kernel_check() {
+    local status severity code message
+    cc_log "Checking kernel health..."
+    if ! _cc_kernel_snapshot_capture "${KEEP_COUNT:-2}"; then
+        WARNINGS=$((WARNINGS + 1))
+        cc_status_line "Kernel health" "WARN"
+        cc_warn "Kernel inspection could not produce a semantic snapshot."
+        return 0
+    fi
+
+    status="$(_cc_kernel_snapshot_get health_status)"
+    case "$status" in
+        FAIL) FAILURES=$((FAILURES + 1)) ;;
+        WARN) WARNINGS=$((WARNINGS + 1)) ;;
+        PASS) ;;
+        *)
+            status=WARN
+            WARNINGS=$((WARNINGS + 1))
+            ;;
+    esac
+    cc_status_line "Kernel health" "$status"
+    printf '%-18s %s\n' "Running kernel:" "$(_cc_kernel_snapshot_get running)"
+    printf '%-18s %s / %s / %s / EFI runtime %s\n' \
+        "Kernel platform:" \
+        "$(_cc_kernel_snapshot_get distribution_family)" \
+        "$(_cc_kernel_snapshot_get initramfs_provider)" \
+        "$(_cc_kernel_snapshot_get bootloader)" \
+        "$(_cc_kernel_snapshot_get efi_runtime_state)"
+    while IFS=$'\t' read -r severity code message; do
+        case "$severity" in
+            FAIL) cc_error "Kernel [$code]: $message" ;;
+            WARN) cc_warn "Kernel [$code]: $message" ;;
+        esac
+    done < <(_cc_kernel_snapshot_findings)
+    return 0
+}
+
+doctor_main() {
+    FULL=0
+    WARNINGS=0
+    FAILURES=0
+    case "${1:-}" in
+        --help|-h)
+            usage
+            return 0
+            ;;
+        --version)
+            cc_version
+            return 0
+            ;;
+        --full)
+            FULL=1
+            ;;
+        "") ;;
+        *) usage; return 2 ;;
+    esac
 
 cc_banner
 
@@ -116,12 +160,8 @@ printf '%-18s %s\n' "Kernel:" "$(uname -r 2>/dev/null || echo unknown)"
 printf '%-18s %s\n' "Uptime:" "$(uptime -p 2>/dev/null || echo unknown)"
 printf '%-18s %s\n' "Load:" "$(awk '{print $1" "$2" "$3}' /proc/loadavg 2>/dev/null || echo unknown)"
 
-if [ -f /var/run/reboot-required ]; then
-    WARNINGS=$((WARNINGS + 1))
-    cc_status_line "Reboot marker" "WARN"
-    cc_warn "Reboot required."
-else
-    cc_status_line "Reboot marker" "PASS"
+if [ "${CC_DOCTOR_SKIP_KERNEL:-0}" != 1 ]; then
+    doctor_kernel_check
 fi
 
 cc_log "Checking disk pressure..."
@@ -166,3 +206,8 @@ fi
 printf '\n'
 
 [ "$FAILURES" -eq 0 ]
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    doctor_main "$@"
+fi

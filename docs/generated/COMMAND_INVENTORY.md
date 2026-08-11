@@ -1,6 +1,6 @@
 # Captain Cronos Command Inventory
 
-Generated: Tue Aug 11 06:58:59 EDT 2026
+Generated: Tue Aug 11 07:30:30 EDT 2026
 
 | Command | Version | Purpose |
 |---|---|---|
@@ -14,7 +14,7 @@ Generated: Tue Aug 11 06:58:59 EDT 2026
 | cc deps | 1.0.0-alpha1 | Show dependency status for toolkit commands and profiles. |
 | cc dev-update | 1.0.0-alpha1 | Report and explicitly update developer package managers. |
 | cc docs | 1.0.0-alpha1 | Generate toolkit documentation and command references. |
-| cc doctor | 2.0.0-alpha1 | Run repository, installation, and host health checks. |
+| cc doctor | 2.1.0-alpha1 | Run repository, installation, and host health checks. |
 | cc drive-burnin | 0.2.0-alpha1 | Framework for drive acceptance workflow. |
 | cc drive-inventory | 1.1.0-alpha1 | Show physical drive inventory with identity and SMART basics. |
 | cc drive-qualify | 1.1.0-alpha1 | Run non-destructive drive qualification workflow. |
@@ -30,7 +30,7 @@ Generated: Tue Aug 11 06:58:59 EDT 2026
 | cc install | 2.3.0-alpha1 | Install the active toolkit launcher into ~/bin. |
 | cc kernel | 1.0.0-alpha1 | Inspect and safely manage installed kernels. |
 | cc kernel-cleanup | 1.0.0-alpha1 | Compatibility entry point for safe kernel cleanup review. |
-| cc monthly-health | 2.0.0-alpha1 | Generate a monthly host health and maintenance report. |
+| cc monthly-health | 2.1.0-alpha1 | Generate a monthly host health and maintenance report. |
 | cc monthly-health-timer | reads VERSION | Retire or inspect the standalone monthly health user timer. |
 | cc platform | 1.0.0-alpha1 | Show detected operating platform and host capabilities. |
 | cc plugin | 1.0.0-alpha1 | Inspect local toolkit plugin directories. |

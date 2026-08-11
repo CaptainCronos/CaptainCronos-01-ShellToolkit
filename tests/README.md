@@ -15,6 +15,12 @@ and FreeBSD models; initramfs-tools, dracut, mkinitcpio, absent, additional, and
 ambiguous provider states; EFI filesystem/runtime separation; bootloader
 environments; support-matrix isolation; and platform/dependency output.
 
+`tests/kernel-health-integration.sh` validates semantic snapshot consumption by
+doctor and monthly-health, PASS/WARN/FAIL aggregation, reboot and newer-kernel
+advisories, cleanup-as-maintenance behavior, reduced platforms, inspection
+failure handling, stable monthly fields, and the absence of kernel CLI parsing
+or mutation paths in either consumer.
+
 Focused shell tests supplement `cc selftest`:
 
 - `dependencies.sh` validates semantic capability resolution, literal executable

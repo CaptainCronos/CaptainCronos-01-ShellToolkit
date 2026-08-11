@@ -768,59 +768,62 @@ _cc_kernel_bootloader_environment() {
 _cc_kernel_health_findings() {
     local keep_count="${1:-${KEEP_COUNT:-2}}" boot_dir running release state severity
     local boot_usage efi_path efi_source efi_type efi_usage unsafe_count issue_count=0 warn_threshold
+    local artifact_states="${2:-}"
     boot_dir="$(_cc_kernel_boot_dir)"
     warn_threshold="${CC_KERNEL_USAGE_WARN_PERCENT:-90}"
     case "$warn_threshold" in
         ''|*[!0-9]*) warn_threshold=90 ;;
     esac
     if ! _cc_kernel_supported; then
-        printf 'WARN\tDetailed boot-artifact inspection is unsupported on %s.\n' "$(_cc_kernel_os)"
+        printf 'WARN\tREDUCED_INSPECTION\tDetailed boot-artifact inspection is unsupported on %s.\n' "$(_cc_kernel_os)"
         return 0
     fi
     if [ ! -d "$boot_dir" ] || [ ! -r "$boot_dir" ]; then
-        printf 'FAIL\tBoot path is inaccessible: %s\n' "$boot_dir"
+        printf 'FAIL\tBOOT_PATH_INACCESSIBLE\tBoot path is inaccessible: %s\n' "$boot_dir"
         return 0
     fi
     if [ -z "$(_cc_kernel_boot_filesystem_field SOURCE 2>/dev/null || true)" ]; then
-        printf 'FAIL\tUnable to identify the filesystem containing %s.\n' "$boot_dir"
+        printf 'FAIL\tBOOT_FILESYSTEM_UNKNOWN\tUnable to identify the filesystem containing %s.\n' "$boot_dir"
         issue_count=$((issue_count + 1))
     fi
 
     running="$(_cc_kernel_running 2>/dev/null || true)"
     if [ -n "$running" ] && [ "$(_cc_kernel_artifact_presence kernel "$running")" != yes ]; then
-        printf 'FAIL\tRunning kernel image is missing or unsafe: %s\n' "$running"
+        printf 'FAIL\tRUNNING_KERNEL_ARTIFACT_FAILURE\tRunning kernel image is missing or unsafe: %s\n' "$running"
         issue_count=$((issue_count + 1))
     fi
 
+    if [ "$#" -lt 2 ]; then
+        artifact_states="$(_cc_kernel_artifact_states)"
+    fi
+
     if _cc_kernel_can_correlate_packages; then
-        while IFS= read -r release; do
+        while IFS=$'\t' read -r release state; do
             [ -n "$release" ] || continue
-            state="$(_cc_kernel_artifact_state "$release")"
             [ "$state" = MATCHED ] && continue
             severity=WARN
-            printf '%s\t%s artifact correlation is %s.\n' "$severity" "$release" "$state"
+            printf '%s\tARTIFACT_%s\t%s artifact correlation is %s.\n' "$severity" "$state" "$release" "$state"
             issue_count=$((issue_count + 1))
-        done < <(_cc_kernel_artifact_releases)
+        done <<< "$artifact_states"
     else
-        printf 'WARN\tPackage correlation is unsupported for the %s kernel package family.\n' "$(_cc_kernel_distribution_family)"
+        printf 'WARN\tPACKAGE_CORRELATION_UNSUPPORTED\tPackage correlation is unsupported for the %s kernel package family.\n' "$(_cc_kernel_distribution_family)"
         issue_count=$((issue_count + 1))
-        while IFS= read -r release; do
+        while IFS=$'\t' read -r release state; do
             [ -n "$release" ] || continue
-            if [ "$(_cc_kernel_artifact_presence kernel "$release")" != yes ] ||
-                [ "$(_cc_kernel_artifact_presence initramfs "$release")" != yes ]; then
-                printf 'WARN\t%s has an incomplete kernel/initramfs artifact pair.\n' "$release"
+            if [ "$state" = MISSING ]; then
+                printf 'WARN\tARTIFACT_PARTIAL\t%s has an incomplete kernel/initramfs artifact pair.\n' "$release"
                 issue_count=$((issue_count + 1))
             fi
-        done < <(_cc_kernel_artifact_releases)
+        done <<< "$artifact_states"
     fi
 
     case "$(_cc_kernel_reboot_state)" in
         required)
-            printf 'WARN\tThe host reboot marker is present.\n'
+            printf 'WARN\tREBOOT_REQUIRED\tThe host reboot marker is present.\n'
             issue_count=$((issue_count + 1))
             ;;
         newer-kernel-installed)
-            printf 'WARN\tA newer installed kernel is not currently running.\n'
+            printf 'WARN\tNEWER_KERNEL_AVAILABLE\tA newer installed kernel is not currently running.\n'
             issue_count=$((issue_count + 1))
             ;;
     esac
@@ -828,7 +831,7 @@ _cc_kernel_health_findings() {
     boot_usage="$(_cc_kernel_boot_filesystem_field USE% 2>/dev/null || true)"
     boot_usage="$(_cc_kernel_percent_value "$boot_usage")"
     if [[ "$boot_usage" =~ ^[0-9]+$ ]] && [ "$boot_usage" -ge "$warn_threshold" ]; then
-        printf 'WARN\tBoot filesystem utilization is %s%%.\n' "$boot_usage"
+        printf 'WARN\tBOOT_USAGE_HIGH\tBoot filesystem utilization is %s%%.\n' "$boot_usage"
         issue_count=$((issue_count + 1))
     fi
     efi_path="$(_cc_kernel_efi_path 2>/dev/null || true)"
@@ -836,35 +839,162 @@ _cc_kernel_health_findings() {
         efi_source="$(_cc_kernel_efi_filesystem_field SOURCE 2>/dev/null || true)"
         efi_type="$(_cc_kernel_efi_filesystem_field FSTYPE 2>/dev/null || true)"
         if [ -z "$efi_source" ] || [ -z "$efi_type" ]; then
-            printf 'WARN\tEFI filesystem metadata could not be read completely.\n'
+            printf 'WARN\tEFI_METADATA_UNKNOWN\tEFI filesystem metadata could not be read completely.\n'
             issue_count=$((issue_count + 1))
         fi
         efi_usage="$(_cc_kernel_efi_filesystem_field USE% 2>/dev/null || true)"
         efi_usage="$(_cc_kernel_percent_value "$efi_usage")"
         if [[ "$efi_usage" =~ ^[0-9]+$ ]] && [ "$efi_usage" -ge "$warn_threshold" ]; then
-            printf 'WARN\tEFI filesystem utilization is %s%%.\n' "$efi_usage"
+            printf 'WARN\tEFI_USAGE_HIGH\tEFI filesystem utilization is %s%%.\n' "$efi_usage"
             issue_count=$((issue_count + 1))
         fi
     fi
     unsafe_count="$(_cc_kernel_artifact_unsafe_count)"
     if [ "$unsafe_count" -gt 0 ]; then
-        printf 'WARN\t%s artifact name(s) could not be safely correlated.\n' "$unsafe_count"
+        printf 'WARN\tARTIFACT_UNKNOWN\t%s artifact name(s) could not be safely correlated.\n' "$unsafe_count"
         issue_count=$((issue_count + 1))
     fi
     if [ "$issue_count" -eq 0 ]; then
-        printf 'PASS\tKernel packages and boot artifacts are consistent.\n'
+        printf 'PASS\tCONSISTENT\tKernel packages and boot artifacts are consistent.\n'
     fi
 }
 
-_cc_kernel_health_severity() {
-    local keep_count="${1:-${KEEP_COUNT:-2}}" severity result=PASS
+_cc_kernel_health_status_from_findings() {
+    local severity result=PASS
     while IFS=$'\t' read -r severity _; do
         case "$severity" in
             FAIL) result=FAIL ;;
             WARN) [ "$result" = FAIL ] || result=WARN ;;
         esac
-    done < <(_cc_kernel_health_findings "$keep_count")
+    done
     printf '%s\n' "$result"
+}
+
+_cc_kernel_health_severity() {
+    local keep_count="${1:-${KEEP_COUNT:-2}}"
+    _cc_kernel_health_findings "$keep_count" | _cc_kernel_health_status_from_findings
+}
+
+_cc_kernel_health_status() {
+    _cc_kernel_health_severity "${1:-${KEEP_COUNT:-2}}"
+}
+
+_cc_kernel_artifact_states() {
+    local release
+    while IFS= read -r release; do
+        [ -n "$release" ] || continue
+        printf '%s\t%s\n' "$release" "$(_cc_kernel_artifact_state "$release")"
+    done < <(_cc_kernel_artifact_releases)
+}
+
+_cc_kernel_artifact_state_counts() {
+    local artifact_states="${1:-}" release state matched=0 partial=0 unmatched=0 missing=0 unknown=0
+    if [ "$#" -lt 1 ]; then artifact_states="$(_cc_kernel_artifact_states)"; fi
+    while IFS=$'\t' read -r release state; do
+        [ -n "$release" ] || continue
+        case "$state" in
+            MATCHED) matched=$((matched + 1)) ;;
+            PARTIAL) partial=$((partial + 1)) ;;
+            UNMATCHED) unmatched=$((unmatched + 1)) ;;
+            MISSING) missing=$((missing + 1)) ;;
+            *) unknown=$((unknown + 1)) ;;
+        esac
+    done <<< "$artifact_states"
+    printf 'matched\t%s\npartial\t%s\nunmatched\t%s\nmissing\t%s\nunknown\t%s\n' \
+        "$matched" "$partial" "$unmatched" "$missing" "$unknown"
+}
+
+_cc_kernel_snapshot_capture() {
+    local keep_count="${1:-${KEEP_COUNT:-2}}" running newest running_newest=unknown
+    local artifact_states='' findings status boot_bytes boot_usage efi_usage key value
+    local -a kernels=() protected=() candidates=()
+    declare -gA _CC_KERNEL_SNAPSHOT=()
+    declare -ga _CC_KERNEL_SNAPSHOT_FINDINGS=()
+    _CC_KERNEL_SNAPSHOT=()
+    _CC_KERNEL_SNAPSHOT_FINDINGS=()
+
+    _cc_kernel_validate_keep_count "$keep_count" || return 2
+    running="$(_cc_kernel_running 2>/dev/null || printf unknown)"
+    mapfile -t kernels < <(_cc_kernel_list 2>/dev/null || true)
+    newest="$(_cc_kernel_newest 2>/dev/null || true)"
+    mapfile -t protected < <(_cc_kernel_protected "$keep_count" 2>/dev/null || true)
+    if _cc_kernel_can_cleanup; then
+        mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count" 2>/dev/null || true)
+    fi
+    [ -n "$newest" ] || newest=unknown
+    if [ "$running" != unknown ] && [ "$newest" != unknown ]; then
+        if [ "$running" = "$newest" ]; then running_newest=yes; else running_newest=no; fi
+    fi
+
+    if _cc_kernel_can_inspect_artifacts; then
+        artifact_states="$(_cc_kernel_artifact_states)"
+    fi
+    findings="$(_cc_kernel_health_findings "$keep_count" "$artifact_states")"
+    status="$(printf '%s\n' "$findings" | _cc_kernel_health_status_from_findings)"
+    while IFS= read -r value; do
+        [ -n "$value" ] && _CC_KERNEL_SNAPSHOT_FINDINGS+=("$value")
+    done <<< "$findings"
+
+    boot_bytes=''
+    boot_usage='not applicable'
+    efi_usage='not applicable'
+    if _cc_kernel_can_inspect_artifacts; then
+        boot_bytes="$(_cc_kernel_boot_usage_bytes 2>/dev/null || true)"
+        boot_usage="$(_cc_kernel_boot_filesystem_field USE% 2>/dev/null || printf unknown)"
+        efi_usage="$(_cc_kernel_efi_filesystem_field USE% 2>/dev/null || printf 'not applicable')"
+    fi
+
+    _CC_KERNEL_SNAPSHOT[health_status]="$status"
+    _CC_KERNEL_SNAPSHOT[running]="$running"
+    _CC_KERNEL_SNAPSHOT[newest]="$newest"
+    _CC_KERNEL_SNAPSHOT[running_is_newest]="$running_newest"
+    _CC_KERNEL_SNAPSHOT[reboot_state]="$(_cc_kernel_reboot_state)"
+    _CC_KERNEL_SNAPSHOT[os]="$(_cc_kernel_os)"
+    _CC_KERNEL_SNAPSHOT[distribution_family]="$(_cc_kernel_distribution_family)"
+    _CC_KERNEL_SNAPSHOT[package_model]="$(_cc_kernel_package_model)"
+    _CC_KERNEL_SNAPSHOT[initramfs_provider]="$(_cc_kernel_initramfs_provider)"
+    _CC_KERNEL_SNAPSHOT[bootloader]="$(_cc_kernel_bootloader_environment)"
+    _CC_KERNEL_SNAPSHOT[efi_filesystem_state]="$(_cc_kernel_efi_filesystem_state)"
+    _CC_KERNEL_SNAPSHOT[efi_runtime_state]="$(_cc_kernel_efi_runtime_state)"
+    _CC_KERNEL_SNAPSHOT[installed_count]="${#kernels[@]}"
+    _CC_KERNEL_SNAPSHOT[protected_count]="${#protected[@]}"
+    _CC_KERNEL_SNAPSHOT[cleanup_candidate_count]="${#candidates[@]}"
+    _CC_KERNEL_SNAPSHOT[boot_path]="$(_cc_kernel_boot_dir)"
+    _CC_KERNEL_SNAPSHOT[boot_filesystem]='not applicable'
+    _CC_KERNEL_SNAPSHOT[boot_filesystem_mount]='not applicable'
+    if _cc_kernel_can_inspect_artifacts; then
+        _CC_KERNEL_SNAPSHOT[boot_filesystem]="$(_cc_kernel_boot_filesystem_field SOURCE 2>/dev/null || printf unknown)"
+        _CC_KERNEL_SNAPSHOT[boot_filesystem_mount]="$(_cc_kernel_boot_filesystem_field TARGET 2>/dev/null || printf unknown)"
+    fi
+    _CC_KERNEL_SNAPSHOT[boot_filesystem_usage]="$boot_usage"
+    _CC_KERNEL_SNAPSHOT[boot_artifact_bytes]="${boot_bytes:-unknown}"
+    if [ -n "$boot_bytes" ]; then
+        _CC_KERNEL_SNAPSHOT[boot_artifact_usage]="$(_cc_kernel_human_bytes "$boot_bytes")"
+    else
+        _CC_KERNEL_SNAPSHOT[boot_artifact_usage]=unavailable
+    fi
+    _CC_KERNEL_SNAPSHOT[efi_usage]="$efi_usage"
+
+    if _cc_kernel_can_inspect_artifacts; then
+        while IFS=$'\t' read -r key value; do
+            _CC_KERNEL_SNAPSHOT[artifact_$key]="$value"
+        done < <(_cc_kernel_artifact_state_counts "$artifact_states")
+    else
+        for key in matched partial unmatched missing unknown; do
+            _CC_KERNEL_SNAPSHOT[artifact_$key]=unavailable
+        done
+    fi
+}
+
+_cc_kernel_snapshot_get() {
+    [ "$#" -eq 1 ] || return 2
+    [ -n "${_CC_KERNEL_SNAPSHOT[$1]+set}" ] || return 1
+    printf '%s\n' "${_CC_KERNEL_SNAPSHOT[$1]}"
+}
+
+_cc_kernel_snapshot_findings() {
+    [ "${#_CC_KERNEL_SNAPSHOT_FINDINGS[@]}" -gt 0 ] || return 0
+    printf '%s\n' "${_CC_KERNEL_SNAPSHOT_FINDINGS[@]}"
 }
 
 _cc_kernel_cleanup_supported() {

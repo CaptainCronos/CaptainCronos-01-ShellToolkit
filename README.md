@@ -150,6 +150,13 @@ bootloader and EFI runtime state, and the implemented inspection/correlation/
 cleanup capabilities. Detection of a provider never enables initramfs,
 bootloader, or kernel-install mutation.
 
+`cc doctor` consumes the shared semantic kernel snapshot and propagates kernel
+`PASS`, `WARN`, and `FAIL` without parsing command output. `cc monthly-health`
+uses the same snapshot for a stable kernel section covering platform, inventory,
+boot storage, artifact counts, findings, and maintenance advisories. Safely
+classified cleanup candidates remain routine maintenance information and do not
+change a healthy kernel or doctor result to `WARN`.
+
 Commands live under `tools/commands/`, where each command is a standalone script discovered by the `cc` dispatcher.
 
 Preferred external executables are defined centrally in `config/programs.conf`

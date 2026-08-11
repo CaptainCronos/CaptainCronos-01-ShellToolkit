@@ -1,9 +1,10 @@
 # Recent Change Summary
 
-Generated: Tue Aug 11 06:59:05 EDT 2026
+Generated: Tue Aug 11 07:30:36 EDT 2026
 
 ~~~text
-e61dcfe (HEAD -> feature/kernel-platform-capabilities, origin/main, origin/HEAD, main) feat(kernel): add boot artifact health inspection
+07082ce (HEAD -> feature/kernel-health-integration, origin/main, origin/HEAD, main) feat(kernel): add platform capability inspection
+e61dcfe feat(kernel): add boot artifact health inspection
 78f9a68 feat(kernel): add kernel management namespace
 d86518f Merge branch 'feature/debug-infrastructure'
 0a0a4c3 (feature/debug-infrastructure) feat(debug): add diagnostic and progress infrastructure
@@ -42,5 +43,4 @@ eb00c36 Add v1.3.0-beta1 changelog entry
 1de9a3e Update roadmap for v1.3.0-beta1
 c0f4149 Document v1.3.0-beta1 framework completion
 68616d9 Bump version to v1.3.0-beta1
-57cfd3d (tag: v1.3.0-beta1) Add dotted leaders to status lines
 ~~~

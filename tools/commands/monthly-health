@@ -4,9 +4,9 @@
 # Captain Cronos Shell Toolkit
 # ------------------------------------------------------------------------------
 # Script      : monthly-health
-# Version     : 2.0.0-alpha1
+# Version     : 2.1.0-alpha1
 # Category    : Maintenance
-# Requires    : bash date mkdir df uname uptime
+# Requires    : bash date mkdir df uname uptime find sort
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Generate a monthly host health and maintenance report.
 # ==============================================================================
@@ -16,6 +16,7 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-kernel.sh"
 source "$PROJECT_ROOT/lib/cc-network.sh"
 source "$PROJECT_ROOT/lib/cc-services.sh"
 
@@ -33,6 +34,8 @@ Usage:
   cc monthly-health [--stdout] [--file]
 
 Generates a host health and maintenance report.
+Kernel health, platform, boot storage, and maintenance fields come from the
+shared semantic kernel snapshot; no kernel cleanup is performed.
 
 Default output:
   ~/.captaincronos/reports/monthly-health/monthly-health-YYYYMMDD-HHMMSS.log
@@ -42,27 +45,6 @@ Environment:
   TOP_N=10 cc monthly-health --stdout
 EOF_HELP
 }
-
-case "${1:-}" in
-    --help|-h)
-        usage
-        exit 0
-        ;;
-    --version)
-        echo "2.0.0-alpha1"
-        exit 0
-        ;;
-    --stdout)
-        OUTPUT="stdout"
-        ;;
-    --file|"")
-        OUTPUT="file"
-        ;;
-    *)
-        usage
-        exit 1
-        ;;
-esac
 
 section() {
     echo
@@ -108,6 +90,75 @@ mount_check() {
     fi
 }
 
+print_kernel_health() {
+    local status severity code message candidates reboot_state maintenance
+    section "Kernel Health"
+    if ! _cc_kernel_snapshot_capture "${KEEP_COUNT:-2}"; then
+        printf '%-28s %s\n' "Overall health:" "WARN"
+        printf '%-28s %s\n' "Inspection:" "semantic snapshot unavailable"
+        return 0
+    fi
+
+    status="$(_cc_kernel_snapshot_get health_status)"
+    printf '%-28s %s\n' "Overall health:" "$status"
+    printf '%-28s %s\n' "Running kernel:" "$(_cc_kernel_snapshot_get running)"
+    printf '%-28s %s\n' "Newest installed kernel:" "$(_cc_kernel_snapshot_get newest)"
+    printf '%-28s %s\n' "Running is newest:" "$(_cc_kernel_snapshot_get running_is_newest)"
+    printf '%-28s %s\n' "Reboot state:" "$(_cc_kernel_snapshot_get reboot_state)"
+
+    subsection "Platform"
+    printf '%-28s %s\n' "OS:" "$(_cc_kernel_snapshot_get os)"
+    printf '%-28s %s\n' "Distribution family:" "$(_cc_kernel_snapshot_get distribution_family)"
+    printf '%-28s %s\n' "Kernel package model:" "$(_cc_kernel_snapshot_get package_model)"
+    printf '%-28s %s\n' "Initramfs provider:" "$(_cc_kernel_snapshot_get initramfs_provider)"
+    printf '%-28s %s\n' "Bootloader:" "$(_cc_kernel_snapshot_get bootloader)"
+    printf '%-28s %s\n' "EFI filesystem:" "$(_cc_kernel_snapshot_get efi_filesystem_state)"
+    printf '%-28s %s\n' "EFI runtime:" "$(_cc_kernel_snapshot_get efi_runtime_state)"
+
+    subsection "Kernel Inventory"
+    printf '%-28s %s\n' "Installed kernels:" "$(_cc_kernel_snapshot_get installed_count)"
+    printf '%-28s %s\n' "Protected kernels:" "$(_cc_kernel_snapshot_get protected_count)"
+    candidates="$(_cc_kernel_snapshot_get cleanup_candidate_count)"
+    printf '%-28s %s\n' "Cleanup candidates:" "$candidates"
+
+    subsection "Boot Storage"
+    printf '%-28s %s mounted at %s\n' "Boot filesystem:" \
+        "$(_cc_kernel_snapshot_get boot_filesystem)" "$(_cc_kernel_snapshot_get boot_filesystem_mount)"
+    printf '%-28s %s\n' "Boot filesystem usage:" "$(_cc_kernel_snapshot_get boot_filesystem_usage)"
+    printf '%-28s %s\n' "/boot artifact allocation:" "$(_cc_kernel_snapshot_get boot_artifact_usage)"
+    printf '%-28s %s\n' "EFI usage:" "$(_cc_kernel_snapshot_get efi_usage)"
+
+    subsection "Artifact Health"
+    printf '%-28s %s\n' "Matched:" "$(_cc_kernel_snapshot_get artifact_matched)"
+    printf '%-28s %s\n' "Partial:" "$(_cc_kernel_snapshot_get artifact_partial)"
+    printf '%-28s %s\n' "Unmatched:" "$(_cc_kernel_snapshot_get artifact_unmatched)"
+    printf '%-28s %s\n' "Missing:" "$(_cc_kernel_snapshot_get artifact_missing)"
+    printf '%-28s %s\n' "Unknown:" "$(_cc_kernel_snapshot_get artifact_unknown)"
+
+    subsection "Health Findings"
+    while IFS=$'\t' read -r severity code message; do
+        printf '%-6s %-34s %s\n' "$severity" "$code" "$message"
+    done < <(_cc_kernel_snapshot_findings)
+
+    subsection "Maintenance"
+    maintenance=none
+    if [ "$candidates" -gt 0 ]; then maintenance="old kernel cleanup available"; fi
+    reboot_state="$(_cc_kernel_snapshot_get reboot_state)"
+    case "$reboot_state" in
+        required)
+            if [ "$maintenance" = none ]; then maintenance="reboot recommended"
+            else maintenance+="; reboot recommended"
+            fi
+            ;;
+        newer-kernel-installed)
+            if [ "$maintenance" = none ]; then maintenance="newer kernel installed"
+            else maintenance+="; newer kernel installed"
+            fi
+            ;;
+    esac
+    printf '%-28s %s\n' "Maintenance advisory:" "${maintenance# }"
+}
+
 print_header() {
     section "Captain Cronos Monthly Health Report"
     printf '%-20s %s\n' "Generated:" "$(date)"
@@ -116,11 +167,6 @@ print_header() {
     printf '%-20s %s\n' "User:" "${USER:-unknown}"
     printf '%-20s %s\n' "Toolkit root:" "$PROJECT_ROOT"
     printf '%-20s %s\n' "Toolkit version:" "$(bash "$PROJECT_ROOT/tools/cc" version 2>/dev/null | awk '/Toolkit/ {print $3; exit}' || echo unknown)"
-    if [ -f /var/run/reboot-required ]; then
-        printf '%-20s %s\n' "Reboot required:" "yes"
-    else
-        printf '%-20s %s\n' "Reboot required:" "no"
-    fi
 }
 
 print_basics() {
@@ -158,9 +204,7 @@ print_updates() {
     subsection "Toolkit status"
     bash "$PROJECT_ROOT/tools/cc" status 2>&1 || true
     subsection "Doctor"
-    bash "$PROJECT_ROOT/tools/cc" doctor 2>&1 || true
-    subsection "Kernel cleanup dry-run"
-    bash "$PROJECT_ROOT/tools/cc" kernel cleanup --dry-run 2>&1 || true
+    CC_DOCTOR_SKIP_KERNEL=1 bash "$PROJECT_ROOT/tools/cc" doctor 2>&1 || true
     subsection "System update dry-run"
     bash "$PROJECT_ROOT/tools/cc" system-update --dry-run 2>&1 || true
 }
@@ -266,6 +310,7 @@ print_footer() {
 
 generate_report() {
     print_header
+    print_kernel_health
     print_basics
     print_storage
     print_updates
@@ -277,12 +322,26 @@ generate_report() {
     print_footer
 }
 
-if [ "$OUTPUT" = "stdout" ]; then
-    generate_report
-else
-    mkdir -p "$REPORT_DIR"
-    generate_report > "$REPORT_FILE"
-    ln -sfn "$REPORT_FILE" "$LATEST_LINK"
-    cc_log "Monthly health report written: $REPORT_FILE"
-    cc_log "Latest report link: $LATEST_LINK"
+monthly_health_main() {
+    case "${1:-}" in
+        --help|-h) usage; return 0 ;;
+        --version) echo "2.1.0-alpha1"; return 0 ;;
+        --stdout) OUTPUT=stdout ;;
+        --file|"") OUTPUT="file" ;;
+        *) usage; return 1 ;;
+    esac
+
+    if [ "$OUTPUT" = "stdout" ]; then
+        generate_report
+    else
+        mkdir -p "$REPORT_DIR"
+        generate_report > "$REPORT_FILE"
+        ln -sfn "$REPORT_FILE" "$LATEST_LINK"
+        cc_log "Monthly health report written: $REPORT_FILE"
+        cc_log "Latest report link: $LATEST_LINK"
+    fi
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    monthly_health_main "$@"
 fi

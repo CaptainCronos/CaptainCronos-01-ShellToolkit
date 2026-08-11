@@ -17,6 +17,22 @@ Use `cc config` to review and modify toolkit settings.
 - `cc repos status`
 - `cc release check`
 
+## Kernel Health Reporting
+
+`cc doctor` includes a concise semantic kernel check. Kernel `PASS`, `WARN`, and
+`FAIL` propagate into the existing doctor summary, while a safely classified old
+kernel cleanup candidate does not make the system unhealthy. Pending reboot or
+a newer installed kernel is a `WARN` maintenance advisory, not corruption.
+
+`cc monthly-health --stdout` provides the detailed view: running and newest
+kernels, reboot state, package/initramfs/bootloader/EFI platform information,
+installed/protected/candidate counts, boot and EFI utilization, artifact-state
+counts, coded health findings, and maintenance advisories. The report is
+read-only and never invokes kernel cleanup.
+
+On reduced or unsupported platforms, the report preserves the platform's
+semantic state rather than applying Linux artifact or package assumptions.
+
 ## Repository Publishing
 Use `cc repos status` to review repository health before batch Git operations.
 

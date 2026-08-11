@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Generated: Tue Aug 11 06:58:59 EDT 2026
+Generated: Tue Aug 11 07:30:30 EDT 2026
 
 ## cc about
 
@@ -178,7 +178,7 @@ Options:
 ~~~text
 Usage: cc doctor [--full]
 
-Runs repository, command syntax, installation, and basic host health checks.
+Runs repository, installation, semantic kernel, and basic host health checks.
 Use --full to include storage inventory and SMART summary.
 ~~~
 
@@ -444,6 +444,8 @@ Usage:
   cc monthly-health [--stdout] [--file]
 
 Generates a host health and maintenance report.
+Kernel health, platform, boot storage, and maintenance fields come from the
+shared semantic kernel snapshot; no kernel cleanup is performed.
 
 Default output:
   ~/.captaincronos/reports/monthly-health/monthly-health-YYYYMMDD-HHMMSS.log

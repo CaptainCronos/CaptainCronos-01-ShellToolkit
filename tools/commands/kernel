@@ -252,9 +252,10 @@ kernel_artifacts() {
 }
 
 kernel_health() {
-    local keep_count severity finding message
+    local keep_count severity finding code message
     keep_count="$(kernel_keep_count)" || return
-    severity="$(_cc_kernel_health_severity "$keep_count")"
+    _cc_kernel_snapshot_capture "$keep_count"
+    severity="$(_cc_kernel_snapshot_get health_status)"
     cc_banner
     echo
     echo "Kernel Boot Health"
@@ -263,10 +264,10 @@ kernel_health() {
     printf '%-18s %s\n' "Boot path:" "$(_cc_kernel_boot_dir)"
     printf '%-18s %s\n' "Bootloader:" "$(_cc_kernel_bootloader_environment)"
     echo
-    while IFS=$'\t' read -r finding message; do
+    while IFS=$'\t' read -r finding code message; do
         [ -n "$finding" ] || continue
-        printf '%-6s %s\n' "$finding" "$message"
-    done < <(_cc_kernel_health_findings "$keep_count")
+        printf '%-6s %-34s %s\n' "$finding" "$code" "$message"
+    done < <(_cc_kernel_snapshot_findings)
     [ "$severity" != FAIL ]
 }
 

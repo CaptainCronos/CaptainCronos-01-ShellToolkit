@@ -170,6 +170,33 @@ detection remains observational and Linux-scoped. Kernel installation,
 initramfs mutation, and bootloader mutation are always reported as not
 implemented.
 
+### Kernel Health Consumers
+
+The kernel library exposes a transient semantic snapshot for command-level
+consumers. A capture evaluates health findings once, records stable scalar
+fields for running/newest releases, platform, reboot state, inventory, boot
+storage, EFI, and artifact-state counts, and retains coded findings in memory
+for the current shell process. It does not create a persistent cache.
+
+Findings use `severity<TAB>code<TAB>message`. Stable codes include
+`REBOOT_REQUIRED`, `NEWER_KERNEL_AVAILABLE`, `BOOT_USAGE_HIGH`,
+`EFI_USAGE_HIGH`, `ARTIFACT_PARTIAL`, `ARTIFACT_UNMATCHED`,
+`ARTIFACT_MISSING`, `ARTIFACT_UNKNOWN`, and
+`RUNNING_KERNEL_ARTIFACT_FAILURE`. The shared status reducer preserves
+`PASS < WARN < FAIL`; commands do not derive severity from display text.
+
+`cc doctor` captures one snapshot, maps its severity into the existing doctor
+warning/failure counters, and prints only the running release, concise platform
+summary, and non-PASS reasons. `cc monthly-health` captures one snapshot for its
+richer, stable kernel section. Its embedded doctor invocation skips a second
+kernel capture. Neither consumer invokes or parses `cc kernel` commands.
+
+Cleanup candidates are deliberately absent from health severity. Monthly health
+reports them under maintenance, while doctor remains PASS when kernel health is
+PASS. Reboot-required and newer-kernel states are WARN advisories, never hard
+corruption failures. Reduced non-Linux inspection is reported semantically and
+does not enable Linux package or cleanup behavior.
+
 `cc dev-update` owns developer ecosystem reporting and explicit mutation. It defaults to dry-run/reporting. Mutating developer updates require `--apply`; only package managers with a conservative global update path are applied. Normal `cc update --apply` includes developer updates only when `DEV_UPDATES=yes` is set in toolkit config.
 
 ### Network Inspection Architecture

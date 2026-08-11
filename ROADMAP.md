@@ -262,9 +262,20 @@ Status: **Complete**
 - Independent EFI filesystem and EFI runtime states.
 - Platform-aware dependency and status reporting.
 
-Next phase: low-risk integration of kernel health and platform summaries into
-`cc doctor` and monthly-health; native non-Debian correlation remains separate
-future work and must precede any additional cleanup adapter.
+### Kernel Health Integration
+
+Status: **Complete**
+
+- Semantic kernel snapshot and stable finding-code API.
+- PASS/WARN/FAIL propagation into `cc doctor`.
+- Stable platform, inventory, storage, artifact, and maintenance fields in
+  monthly-health.
+- Cleanup candidates isolated as maintenance opportunities.
+- Fixture proof that consumers do not parse kernel CLI output or expose mutation.
+
+Recommended next kernel phase: expand read-only native artifact/package
+correlation for one non-Debian family, beginning with RPM release instances,
+before considering any additional cleanup adapter.
 
 Completed in active development:
 

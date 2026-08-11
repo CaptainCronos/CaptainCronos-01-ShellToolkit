@@ -24,7 +24,7 @@ DEBUG=0
 PASSED=0
 FAILED=0
 RESULTS=""
-SELFTEST_TOTAL=40
+SELFTEST_TOTAL=41
 SELFTEST_TEMP=""
 
 usage() {
@@ -278,6 +278,7 @@ run_check "Kernel library" kernel check_library cc-kernel.sh
 run_check "Kernel management" kernel bash "$PROJECT_ROOT/tests/kernel.sh"
 run_check "Kernel artifact health" kernel bash "$PROJECT_ROOT/tests/kernel-artifacts.sh"
 run_check "Kernel platform capabilities" kernel bash "$PROJECT_ROOT/tests/kernel-platform.sh"
+run_check "Kernel health integration" kernel bash "$PROJECT_ROOT/tests/kernel-health-integration.sh"
 run_check "Network library" network check_library cc-network.sh
 run_check "Network interfaces" network bash "$PROJECT_ROOT/tests/network.sh"
 run_check "Services library" services check_library cc-services.sh

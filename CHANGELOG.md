@@ -10,6 +10,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Semantic in-memory kernel health snapshots with stable finding codes for diagnostic consumers.
+- Kernel PASS/WARN/FAIL integration in `cc doctor` and a detailed kernel section in `cc monthly-health`.
+- Kernel integration fixtures covering diagnostic propagation, maintenance advisories, reduced platforms, and consumer isolation from CLI output.
 - Read-only `cc kernel platform` environment and operation-support reporting.
 - Debian, RPM, Arch, openSUSE, unknown-Linux, and non-Linux kernel package-family classification.
 - Evidence-based initramfs-tools, dracut, and mkinitcpio provider detection with ambiguity reporting.
@@ -43,6 +46,10 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- Doctor now delegates reboot, boot artifact, platform, and kernel severity decisions to `lib/cc-kernel.sh`.
+- Monthly health now separates kernel health findings from cleanup and reboot maintenance opportunities.
+- Monthly health reuses one transient kernel snapshot and suppresses the duplicate kernel scan in its embedded doctor run.
+- Kernel findings now include stable codes while retaining PASS/WARN/FAIL severity and human-readable messages.
 - Kernel cleanup support now requires the implemented Debian adapter, not merely an `apt-get` executable on Linux.
 - Kernel dependency reporting now distinguishes provider evidence from mutation support.
 - Non-Linux bootloader inspection no longer misidentifies a generic `/boot/loader` directory as systemd-boot.
@@ -67,6 +74,7 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Removed
 
+- Verbose kernel cleanup package-list output from monthly-health; semantic candidate counts remain as maintenance information.
 - Nala and Aptitude selection and fallback paths from active system package automation.
 - Linux `netstat` fallback and independent `ip`/`nmcli` selection from active network automation.
 - Direct `systemctl` and `journalctl` execution from higher-level toolkit commands.

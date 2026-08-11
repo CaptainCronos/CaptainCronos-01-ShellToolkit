@@ -146,4 +146,14 @@ non_linux_output="$(CC_KERNEL_OS=FreeBSD bash "$PROJECT_ROOT/tools/commands/kern
 assert_contains "$non_linux_output" 'Kernel package model:        not applicable' 'non-Linux platform output applied Linux package semantics'
 assert_contains "$non_linux_output" 'Cleanup:                     unsupported' 'non-Linux platform output enabled cleanup'
 
+CC_KERNEL_OS=FreeBSD
+_cc_kernel_boot_usage_bytes() { fail 'non-Linux snapshot attempted Linux boot usage inspection'; }
+_cc_kernel_boot_filesystem_field() { fail 'non-Linux snapshot attempted Linux filesystem inspection'; }
+_cc_kernel_efi_filesystem_field() { fail 'non-Linux snapshot attempted Linux EFI inspection'; }
+_cc_kernel_snapshot_capture 2
+[ "$(_cc_kernel_snapshot_get boot_filesystem_usage)" = 'not applicable' ] ||
+    fail 'non-Linux snapshot did not preserve reduced boot-storage semantics'
+[ "$(_cc_kernel_snapshot_get artifact_matched)" = unavailable ] ||
+    fail 'non-Linux snapshot fabricated Linux artifact counts'
+
 printf 'Kernel platform capability tests: PASS\n'
