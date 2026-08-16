@@ -60,6 +60,9 @@ cat > "$MOCK_BIN/sudo" <<'EOF_SUDO'
 printf 'sudo' >> "${CC_SAFETY_TRACE:?}"
 printf '\t%s' "$@" >> "$CC_SAFETY_TRACE"
 printf '\n' >> "$CC_SAFETY_TRACE"
+if [ "${1:-}" = snap ] && [ "${2:-}" = refresh ]; then
+    exit "${CC_MOCK_SNAP_STATUS:-0}"
+fi
 exit "${CC_MOCK_SUDO_STATUS:-0}"
 EOF_SUDO
 
@@ -132,10 +135,48 @@ if grep -Eq 'update-grub|grub.d|firefox|thunderbird|/opt/' "$TRACE_FILE"; then
 fi
 
 : > "$TRACE_FILE"
+flatpak_failure_output="$TEST_DIR/flatpak-failure.out"
 if env "${common_env[@]}" HOME="$system_home" LOG="$system_log" CC_MOCK_FLATPAK_STATUS=9 \
-    bash "$PROJECT_ROOT/tools/commands/system-update" --apply >/dev/null 2>&1; then
+    bash "$PROJECT_ROOT/tools/commands/system-update" --apply >"$flatpak_failure_output" 2>&1; then
     fail "system-update converted a mocked apply failure into success"
 fi
+
+# Snap failure is recorded as the failed domain and produces a nonzero result,
+# while the later Flatpak update and cleanup still run.
+: > "$TRACE_FILE"
+snap_failure_output="$TEST_DIR/snap-failure.out"
+if env "${common_env[@]}" HOME="$system_home" LOG="$system_log" CC_MOCK_SNAP_STATUS=19 \
+    bash "$PROJECT_ROOT/tools/commands/system-update" --apply >"$snap_failure_output" 2>&1; then
+    fail "system-update converted a mocked Snap failure into success"
+fi
+grep -Fq 'Snap refresh failed.' "$snap_failure_output" || fail "Snap failure domain was not reported"
+grep -Fq 'System update completed with 1 failure(s).' "$snap_failure_output" \
+    || fail "Snap failure count was not reported"
+grep -Fq 'Overall Status:' "$snap_failure_output" || fail "Snap failure omitted the overall result"
+grep -Fq 'FAIL' "$snap_failure_output" || fail "Snap failure incorrectly reported overall success"
+grep -Fxq $'sudo\tsnap\trefresh' "$TRACE_FILE" || fail "Snap failure fixture did not reach refresh"
+grep -Fxq $'flatpak\tupdate\t-y' "$TRACE_FILE" || fail "Snap failure skipped later Flatpak update"
+grep -Fxq $'flatpak\tuninstall\t--unused\t-y' "$TRACE_FILE" \
+    || fail "Snap failure skipped later Flatpak cleanup"
+
+# A legacy developer virtualenv is reported in both modes but is never mutated.
+mkdir -p "$system_home/myenv/bin"
+printf 'fixture environment\n' >"$system_home/myenv/bin/activate"
+: > "$TRACE_FILE"
+legacy_output="$(env "${common_env[@]}" HOME="$system_home" LOG="$system_log" \
+    bash "$PROJECT_ROOT/tools/commands/system-update" --dry-run)" \
+    || fail "legacy myenv dry-run reporting failed"
+assert_contains "$legacy_output" "Developer Python environment detected: $system_home/myenv" \
+    "legacy myenv was not detected"
+assert_contains "$legacy_output" "does not update Python virtualenv packages automatically" \
+    "legacy myenv mutation deferral was not reported"
+[ ! -s "$TRACE_FILE" ] || fail "legacy myenv dry-run invoked a mutation command"
+legacy_before="$(cat "$system_home/myenv/bin/activate")"
+env "${common_env[@]}" HOME="$system_home" LOG="$system_log" \
+    bash "$PROJECT_ROOT/tools/commands/system-update" --apply >/dev/null \
+    || fail "legacy myenv mocked apply failed"
+assert_file_content "$system_home/myenv/bin/activate" "$legacy_before" \
+    "system-update apply mutated legacy myenv"
 
 # The full installer must leave an existing fixture home byte-for-byte unchanged
 # in both default and explicit dry-run modes.
@@ -172,11 +213,15 @@ find "$install_home/.captaincronos/backups" -type f -name .bashrc -print -quit |
 
 # Launcher installation follows the same default-preview/explicit-apply contract.
 launcher_home="$TEST_DIR/launcher-home"
-mkdir -p "$launcher_home"
-env HOME="$launcher_home" PATH="$MOCK_BIN:$PATH" TOOLKIT_ROOT="$PROJECT_ROOT" CURRENT_REPO="$PROJECT_ROOT" \
+mkdir -p "$launcher_home/bin"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$launcher_home/bin/cc"
+chmod 755 "$launcher_home/bin/cc"
+launcher_path="$launcher_home/bin:$MOCK_BIN:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+env HOME="$launcher_home" PATH="$launcher_path" TOOLKIT_ROOT="$PROJECT_ROOT" CURRENT_REPO="$PROJECT_ROOT" \
     bash "$PROJECT_ROOT/tools/commands/install" >/dev/null || fail "cc install default preview failed"
-[ ! -e "$launcher_home/bin/cc" ] || fail "cc install default preview installed the launcher"
-env HOME="$launcher_home" PATH="$MOCK_BIN:$PATH" TOOLKIT_ROOT="$PROJECT_ROOT" CURRENT_REPO="$PROJECT_ROOT" \
+assert_file_content "$launcher_home/bin/cc" $'#!/usr/bin/env bash\nexit 0' \
+    "cc install default preview replaced the fixture launcher"
+env HOME="$launcher_home" PATH="$launcher_path" TOOLKIT_ROOT="$PROJECT_ROOT" CURRENT_REPO="$PROJECT_ROOT" \
     bash "$PROJECT_ROOT/tools/commands/install" --apply >/dev/null || fail "cc install apply failed"
 cmp -s "$PROJECT_ROOT/tools/cc" "$launcher_home/bin/cc" || fail "cc install apply did not install launcher"
 assert_rejected "cc install accepted an unknown option" \
@@ -238,8 +283,8 @@ monthly_home="$TEST_DIR/monthly-home"
 mkdir -p "$monthly_home"
 rm -f "$TRACE_FILE" "$monthly_home/upgrade.log"
 # Expanded by the child Bash process using its positional parameter.
-# shellcheck disable=SC2016
 monthly_rc=0
+# shellcheck disable=SC2016
 env "${common_env[@]}" HOME="$monthly_home" LOG="$monthly_home/upgrade.log" \
     bash -c 'source "$1/tools/commands/monthly-health"; print_updates' bash "$PROJECT_ROOT" >/dev/null \
     || monthly_rc=$?

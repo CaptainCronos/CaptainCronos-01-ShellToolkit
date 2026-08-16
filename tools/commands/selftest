@@ -291,6 +291,7 @@ run_check "Data library" data check_library cc-data.sh
 run_check "Structured data" data bash "$PROJECT_ROOT/tests/data.sh"
 run_check "Configuration safety" configuration bash "$PROJECT_ROOT/tests/config.sh"
 run_check "Mutation safety contracts" maintenance bash "$PROJECT_ROOT/tests/safety-contracts.sh"
+run_check "Developer update contracts" maintenance bash "$PROJECT_ROOT/tests/dev-updates.sh"
 run_check "RC diagnostic integrity" maintenance bash "$PROJECT_ROOT/tests/rc-integrity.sh"
 run_check "Storage library" storage check_library cc-storage.sh
 run_check "Storage inventory" storage bash "$PROJECT_ROOT/tests/storage.sh"

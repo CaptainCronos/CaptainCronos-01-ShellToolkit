@@ -57,6 +57,11 @@ The format follows a simple milestone-based structure until the project reaches 
 - Release integrity searches now use the declared core `grep` interface, so a
   missing optional `rg` executable cannot turn a forbidden-content check into a
   false PASS.
+- Launcher safety fixtures now resolve `cc` only through their disposable home
+  instead of inheriting a user-installed or system `cc` from the host PATH.
+- Maintenance regressions now cover developer-manager authorization boundaries,
+  supported-manager failure continuation, the full-update `DEV_UPDATES` gate,
+  and Snap failure continuation into later Flatpak work through isolated mocks.
 - PASS/WARN/FAIL/SKIP rendering, dotted status rows, summaries, progress rows,
   and diagnostic prefixes now use the shared presentation layer; ordinary
   data and generated or redirected output remain uncolored.

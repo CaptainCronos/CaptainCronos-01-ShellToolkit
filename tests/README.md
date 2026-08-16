@@ -27,7 +27,16 @@ Focused shell tests supplement `cc selftest`:
   launcher/full installation, toolkit update, system update, the complete update
   orchestrator, and monthly-health previews. Mutation paths run only through
   disposable homes and mocked Git/package/Snap/Flatpak/privilege interfaces;
-  routine GRUB and remote browser archive mutation are asserted unreachable.
+  launcher resolution is isolated from host commands, Snap failure is shown not
+  to skip later Flatpak work, legacy virtualenvs remain report-only, and routine
+  GRUB and remote browser archive mutation are asserted unreachable.
+- `dev-updates.sh` validates developer-manager detection and reporting, explicit
+  npm/pipx apply boundaries, report-only ecosystems, failure continuation,
+  absence of privilege escalation, and the `DEV_UPDATES` orchestrator gate using
+  only disposable homes and mocked manager commands.
+- `rc-integrity.sh` verifies release forbidden-content searches without
+  requiring optional ripgrep and rejects false PASS results when forbidden
+  maturity, documentation, or predictable temporary-path content is present.
 - `dependencies.sh` validates semantic capability resolution, literal executable
   hints, and the `system-update` package-manager dependency regression.
 - `package-management.sh` validates semantic package operations.
