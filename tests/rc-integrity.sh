@@ -76,6 +76,12 @@ docs_fixture="$TEST_DIR/generated"
 bash "$PROJECT_ROOT/tools/commands/docs" build --apply --out "$docs_fixture" >/dev/null
 bash "$PROJECT_ROOT/tools/commands/docs" check --out "$docs_fixture" >/dev/null \
     || fail "fresh generated documents were rejected"
+
+LC_ALL=C bash "$PROJECT_ROOT/tools/commands/docs" inventory >"$TEST_DIR/inventory-c"
+LC_ALL=en_US.utf8 bash "$PROJECT_ROOT/tools/commands/docs" inventory >"$TEST_DIR/inventory-en"
+cmp -s "$TEST_DIR/inventory-c" "$TEST_DIR/inventory-en" \
+    || fail "generated command order changed with the caller locale"
+
 printf '\nstale\n' >>"$docs_fixture/COMMAND_INVENTORY.md"
 if bash "$PROJECT_ROOT/tools/commands/docs" check --out "$docs_fixture" >/dev/null 2>&1; then
     fail "stale generated document was accepted"
