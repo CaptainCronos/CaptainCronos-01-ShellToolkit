@@ -40,7 +40,7 @@ for d in bash config install lib baseline/ubuntu-26.04 defaults/v1 docs template
     cc_require_dir "$d"
 done
 
-for f in VERSION manifest.yml config/programs.conf lib/cc-context.sh lib/cc-common.sh lib/cc-programs.sh lib/cc-packages.sh lib/cc-kernel.sh lib/cc-network.sh lib/cc-services.sh lib/cc-http.sh lib/cc-data.sh lib/cc-yaml.sh lib/cc-prompt-engine.sh bash/bashrc bash/bash_aliases bash/bash_functions install/install.sh; do
+for f in VERSION manifest.yml config/programs.conf lib/cc-context.sh lib/cc-common.sh lib/cc-programs.sh lib/cc-packages.sh lib/cc-kernel.sh lib/cc-network.sh lib/cc-services.sh lib/cc-http.sh lib/cc-data.sh lib/cc-yaml.sh lib/cc-prompt-engine.sh bash/bashrc bash/bash_aliases bash/bash_functions defaults/v1/bashrc defaults/v1/bash_aliases defaults/v1/bash_functions defaults/v1/manifest.txt install/install.sh; do
     cc_require_file "$f"
 done
 
@@ -61,6 +61,32 @@ bash -n bash/bash_functions
 bash -n install/install.sh
 bash -n tools/commands/prompt
 bash -n tools/commands/programs
+
+cmp -s bash/bashrc defaults/v1/bashrc || { cc_error "Promoted bashrc differs from authoritative source."; exit 1; }
+cmp -s bash/bash_aliases defaults/v1/bash_aliases || { cc_error "Promoted bash_aliases differs from authoritative source."; exit 1; }
+cmp -s bash/bash_functions defaults/v1/bash_functions || { cc_error "Promoted bash_functions differs from authoritative source."; exit 1; }
+
+cc_load_version
+defaults_version="$(sed -n 's/^Version: //p' defaults/v1/manifest.txt)"
+defaults_promoted="$(sed -n 's/^Promoted: //p' defaults/v1/manifest.txt)"
+[ "$defaults_version" = "${TOOLKIT_VERSION:-}" ] || {
+    cc_error "Defaults manifest version does not match VERSION."
+    exit 1
+}
+if [ -z "$defaults_promoted" ] || ! date -d "$defaults_promoted" >/dev/null 2>&1; then
+    cc_error "Defaults manifest promotion timestamp is missing or invalid."
+    exit 1
+fi
+
+manifest_entries="$(awk 'found && /^  / { print substr($0, 3) } /^Files:$/ { found=1 }' defaults/v1/manifest.txt)"
+[ "$manifest_entries" = "$(printf 'bashrc\nbash_aliases\nbash_functions')" ] || {
+    cc_error "Defaults manifest file list is incomplete, duplicated, or out of order."
+    exit 1
+}
+while IFS= read -r defaults_file; do
+    [ -n "$defaults_file" ] || continue
+    cc_require_file "defaults/v1/$defaults_file"
+done <<< "$manifest_entries"
 
 source "$TOOLKIT_ROOT/lib/cc-prompt-engine.sh"
 cc_prompt_validate_templates

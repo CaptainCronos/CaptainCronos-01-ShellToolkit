@@ -46,7 +46,7 @@ cp -f bash/bash_functions defaults/v1/bash_functions
 cat > defaults/v1/manifest.txt <<EOFDEF
 Captain Cronos Shell Toolkit Defaults
 Version: ${TOOLKIT_VERSION:-unknown}
-Promoted: $(date)
+Promoted: $(date --iso-8601=seconds)
 
 Files:
   bashrc

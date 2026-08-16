@@ -11,6 +11,16 @@ unalias functions funcs showfunc 2>/dev/null
 # EDITOR HELPERS
 # =============================
 
+_cc_shell_helper_require() {
+    local helper="$1" dependency="$2"
+
+    if ! command -v "$dependency" >/dev/null 2>&1; then
+        printf '%s: required dependency not found: %s (install it or add it to PATH).\n' \
+            "$helper" "$dependency" >&2
+        return 1
+    fi
+}
+
 # @name bf
 # @group Editors
 # @desc Edit files with Bluefish when available, otherwise nano; request root when needed.
@@ -43,35 +53,32 @@ bf() {
 # @example kedit ~/.bashrc
 kedit() {
     if [ "$#" -eq 0 ]; then
-        echo "Usage: kedit <file> [file...]"
-        return 1
+        printf 'Usage: kedit <file> [file...]\n' >&2
+        return 2
     fi
 
-    if ! command -v kitty >/dev/null 2>&1; then
-        echo "ERROR: kitty is not installed or not in PATH."
-        return 1
-    fi
+    _cc_shell_helper_require kedit kitty || return 1
+    _cc_shell_helper_require kedit nano || return 1
 
-    kitty --detach nano "$@"
+    kitty --detach nano -- "$@"
 }
 
 # @name suedit
 # @group Editors
-# @desc Edit a file as root in a new Kitty terminal window.
-# @usage suedit <file>
+# @desc Edit files as root in a new Kitty terminal window.
+# @usage suedit <file> [file...]
 # @example suedit /etc/fstab
 suedit() {
     if [ "$#" -eq 0 ]; then
-        echo "Usage: suedit <file>"
-        return 1
+        printf 'Usage: suedit <file> [file...]\n' >&2
+        return 2
     fi
 
-    if ! command -v kitty >/dev/null 2>&1; then
-        echo "ERROR: kitty is not installed or not in PATH."
-        return 1
-    fi
+    _cc_shell_helper_require suedit kitty || return 1
+    _cc_shell_helper_require suedit sudo || return 1
+    _cc_shell_helper_require suedit nano || return 1
 
-    kitty --detach bash -lc 'sudo nano "$@"' bash "$@"
+    kitty --detach bash -lc 'sudo nano -- "$@"' bash "$@"
 }
 
 # =============================
@@ -84,10 +91,13 @@ suedit() {
 # @usage sukitty
 # @example sukitty
 sukitty() {
-    if ! command -v kitty >/dev/null 2>&1; then
-        echo "ERROR: kitty is not installed or not in PATH."
-        return 1
+    if [ "$#" -ne 0 ]; then
+        printf 'Usage: sukitty\n' >&2
+        return 2
     fi
+
+    _cc_shell_helper_require sukitty kitty || return 1
+    _cc_shell_helper_require sukitty sudo || return 1
 
     kitty --detach bash -lc 'sudo -i'
 }

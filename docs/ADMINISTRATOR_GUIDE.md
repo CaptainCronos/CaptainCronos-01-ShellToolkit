@@ -23,6 +23,21 @@ Use `cc config` to review and modify toolkit settings.
 - `cc repos status`
 - `cc release check`
 
+## Interactive Shell Helpers
+
+The `cc` executable is the toolkit command dispatcher. It is not an alias for
+the separate `helpme` shell-function index; the deprecated `cc='helpme'` alias
+has been removed so it cannot shadow the dispatcher.
+
+The former `edit-in-kitty` alias is replaced by documented shell functions:
+
+- `kedit <file> [file...]` opens Nano in a detached Kitty terminal.
+- `suedit <file> [file...]` opens Nano through `sudo` in a detached Kitty terminal.
+- `sukitty` opens a detached Kitty terminal with an interactive root login shell.
+
+These functions remain discoverable through `helpme` metadata and are not
+`cc` subcommands.
+
 ## Kernel Health Reporting
 
 `cc doctor` includes a concise semantic kernel check. Kernel `PASS`, `WARN`, and
