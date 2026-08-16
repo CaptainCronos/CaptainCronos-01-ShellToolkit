@@ -32,9 +32,8 @@ Every subsystem should be reusable, metadata-driven, modular, validated, documen
 | Repository | Purpose |
 |------------|---------|
 | CaptainCronos | High-level planning and roadmaps |
-| CaptainCronos-00-Standards | Engineering standards and policies |
 | CaptainCronos-01-ShellToolkit | Primary executable toolkit |
-| CaptainCronos-02-Engineering-Manual | Canonical engineering documentation |
+| CaptainCronos-02-Engineering-Manual | Canonical engineering standards, policies, and documentation |
 | Discipline-Curriculum | Educational content |
 
 Repository health target:
