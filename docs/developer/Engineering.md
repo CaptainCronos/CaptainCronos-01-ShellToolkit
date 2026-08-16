@@ -2,6 +2,9 @@
 
 Captain Cronos Shell Toolkit follows a documentation-first engineering workflow.
 
+The Engineering Manual governs ecosystem-wide development, Git, documentation,
+and release policy. This page adds ShellToolkit-specific engineering guidance.
+
 ```text
 Plan -> Document -> Implement -> Verify -> Release
 ```
@@ -39,7 +42,8 @@ Most new functionality should be accessed through `cc` subcommands rather than c
 ## Development Rules
 
 1. Update documentation before or alongside feature work.
-2. Add or update standards when a new pattern becomes permanent.
+2. Add or update a local implementation contract when a ShellToolkit pattern
+   becomes permanent; update ecosystem policy only in the Engineering Manual.
 3. Run verification before committing.
 4. Keep migrations in `archive/migrations/` after use.
 5. Avoid changing top-level repository layout without updating the roadmap.

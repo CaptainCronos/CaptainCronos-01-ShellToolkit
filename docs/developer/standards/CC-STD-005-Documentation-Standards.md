@@ -1,12 +1,15 @@
 # CC-STD-005 — Documentation Standards
 
-Documentation is part of the project, not an afterthought.
+The Engineering Manual's `07-Standards/Markdown.md` and
+`04-Development/Documentation.md` govern ecosystem-wide Markdown and
+documentation practice. This page records ShellToolkit documentation ownership
+and generation contracts.
 
 ---
 
-## Required Documents
+## ShellToolkit Project Documents
 
-Every Captain Cronos repository should include:
+ShellToolkit maintains:
 
 ```text
 README.md
@@ -14,7 +17,7 @@ ROADMAP.md
 CHANGELOG.md
 ```
 
-Engineering repositories should also include:
+Its contributor documentation includes:
 
 ```text
 docs/developer/Architecture.md
@@ -25,19 +28,20 @@ docs/developer/Versioning.md
 
 ---
 
-## Documentation Rules
+## Project Maintenance
 
 - Document architecture before expanding it.
 - Update roadmap when project direction changes.
 - Update changelog when behavior changes.
 - Keep command usage examples current.
-- Prefer concise, practical documentation over long theory.
+- Run ShellToolkit documentation lint and freshness checks after changing
+  command metadata or generated references.
 
 ---
 
 ## Audience Split
 
-Use:
+ShellToolkit uses:
 
 ```text
 docs/user/       End-user documentation
@@ -48,4 +52,6 @@ docs/developer/  Contributor and architecture documentation
 
 ## Source of Truth
 
-Where possible, help output and command indexes should be generated from script metadata to avoid duplicated documentation.
+Command help, inventory, and reference data are generated from ShellToolkit
+command metadata. Generated files under `docs/generated/` must not be
+hand-maintained as competing sources.

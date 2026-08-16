@@ -48,6 +48,10 @@ The Engineering Manual defines:
 
 The Engineering Manual is the highest engineering authority.
 
+Repository documents may define ShellToolkit implementation contracts and
+operational requirements. They do not override the Engineering Manual on
+ecosystem-wide engineering policy.
+
 ---
 
 ## 2. Repository Context
@@ -68,6 +72,8 @@ PROJECT_CONTEXT.md defines the current state of this repository, including:
 - AI-specific repository context
 
 Treat PROJECT_CONTEXT.md as the canonical description of this repository.
+Its authority is limited to ShellToolkit architecture, behavior, interfaces,
+defaults, packaging, validation, and project state.
 
 ---
 
@@ -124,6 +130,10 @@ If documentation conflicts, follow this order of precedence:
 2. PROJECT_CONTEXT.md
 3. Repository documentation
 4. Existing implementation
+
+This order applies after identifying the subject's scope. The Engineering
+Manual always governs general engineering policy; ShellToolkit documentation
+and implementation govern contracts unique to this toolkit.
 
 If conflicts remain, stop and explain the conflict before modifying code.
 

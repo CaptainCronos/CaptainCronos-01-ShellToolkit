@@ -2,7 +2,11 @@
 
 **Current milestone:** `v1.3.0-beta1` — **Blackbeard**
 
-Captain Cronos Shell Toolkit is the reference implementation of the Captain Cronos engineering framework. It provides a standardized Linux shell environment, reusable Bash libraries, installer tooling, baseline capture, release defaults, storage workflows, asset tracking, reporting, and a growing command framework built around the `cc` command.
+Captain Cronos Shell Toolkit is the executable toolkit in the Captain Cronos
+ecosystem. It provides a managed Linux shell environment, reusable Bash
+libraries, installer tooling, baseline capture, release defaults, storage
+workflows, asset tracking, reporting, and a command framework built around the
+`cc` command.
 
 The project began as a personal Bash configuration and has evolved into a documented, versioned, installable toolkit intended to be reusable across Linux workstations, rescue environments, servers, NAS systems, and future Captain Cronos projects.
 
@@ -14,7 +18,8 @@ The project began as a personal Bash configuration and has evolved into a docume
 - Keep aliases, functions, installer logic, documentation, and defaults under Git control.
 - Separate operating-system baselines from Captain Cronos defaults.
 - Maintain rollback paths through timestamped backups.
-- Standardize script headers, versioning, repository layout, and release process.
+- Define and validate ShellToolkit's script metadata, version representation,
+  repository layout, and release gates.
 - Provide shared framework libraries for commands, reports, storage, YAML, assets, and terminal UI.
 - Build a foundation that future Captain Cronos repositories can reuse.
 
@@ -297,23 +302,29 @@ install/install.sh --version
 
 ---
 
-## Engineering Standards
+## Engineering Authority
 
-Project standards live in:
+Ecosystem-wide engineering policy is authoritative in:
 
 ```text
-docs/developer/standards/
+CaptainCronos-02-Engineering-Manual
 ```
 
-Current planned standards:
+ShellToolkit-specific implementation requirements live in
+[`docs/developer/standards/`](docs/developer/standards/README.md). They cover:
 
 - `CC-STD-001` — Script Header Standard
-- `CC-STD-002` — Repository Layout Standard
-- `CC-STD-003` — Versioning Standard
-- `CC-STD-004` — Bash Coding Standard
-- `CC-STD-005` — Documentation Standard
-- `CC-STD-006` — Release Process
+- `CC-STD-002` — ShellToolkit Repository Layout
+- `CC-STD-003` — ShellToolkit Version Representation
+- `CC-STD-004` — ShellToolkit Bash Conventions
+- `CC-STD-005` — ShellToolkit Documentation Requirements
+- `CC-STD-006` — ShellToolkit Release Gates
 - `CC-STD-007` — Command Framework
+
+If a local document conflicts with the Engineering Manual on a general
+engineering-policy question, the Engineering Manual wins. Local documentation
+remains authoritative for ShellToolkit behavior, interfaces, defaults,
+packaging, and validation contracts.
 
 ---
 

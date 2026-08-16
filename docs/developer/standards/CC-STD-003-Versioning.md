@@ -1,24 +1,27 @@
 # CC-STD-003 — Versioning
 
-Captain Cronos repositories use explicit version files and release tags.
+The Engineering Manual's `07-Standards/Versioning.md` governs ecosystem version
+identifiers and tags. This document defines the version representation consumed
+by ShellToolkit.
 
 ---
 
 ## Version Source
 
-The primary version file is:
+The ShellToolkit version source is:
 
 ```text
 VERSION
 ```
 
-Scripts should source `VERSION` or use shared library functions that read it.
+ShellToolkit commands should use shared version helpers that read `VERSION`
+rather than duplicating the toolkit version.
 
 ---
 
 ## Version Fields
 
-Common fields:
+Current ShellToolkit fields:
 
 ```bash
 TOOLKIT_VERSION="1.0.0-alpha1"
@@ -30,25 +33,8 @@ RELEASE_DATE="2026-06-28"
 
 ---
 
-## Tags
-
-Release tags use:
-
-```text
-vMAJOR.MINOR.PATCH
-vMAJOR.MINOR.PATCH-alphaN
-vMAJOR.MINOR.PATCH-betaN
-vMAJOR.MINOR.PATCH-rcN
-```
-
-Example:
-
-```text
-v2.0.0-alpha
-```
-
----
-
-## Changelog Rule
-
-Any version bump must update `CHANGELOG.md` before the tag is created.
+`TOOLKIT_VERSION` is the released toolkit identifier. The other fields are
+ShellToolkit metadata and do not establish a second ecosystem standards
+authority. Tag shape and the `CHANGELOG.md` update rule come from the
+Engineering Manual; local release validation is described in
+[`CC-STD-006-Release-Process.md`](CC-STD-006-Release-Process.md).

@@ -1,8 +1,12 @@
-# Captain Cronos Framework Standard
+# ShellToolkit Framework Contract
 
 ## Purpose
 
 This document defines the implementation standard for the Captain Cronos Shell Toolkit. It is the baseline for commands, plugins, namespaces, installation workflows, documentation, and quality gates.
+
+Its authority is limited to ShellToolkit implementation. Ecosystem engineering
+policy is governed by `CaptainCronos-02-Engineering-Manual`; that manual takes
+precedence on general policy questions.
 
 The framework is designed to be portable across developer workstations, live USB workbench sessions, laptops, servers, and NAS-adjacent environments.
 

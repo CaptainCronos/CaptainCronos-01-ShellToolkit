@@ -1,6 +1,8 @@
 # CC-STD-001 — Script Headers
 
-Every executable Captain Cronos script must begin with a standard header.
+Every executable ShellToolkit command must begin with the metadata header used
+by the `cc` registry, audit, help, and documentation generators. This is a
+ShellToolkit interface contract, not an ecosystem-wide script-header policy.
 
 ---
 

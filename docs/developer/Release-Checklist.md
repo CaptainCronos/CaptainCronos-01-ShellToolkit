@@ -1,6 +1,9 @@
 # Release Checklist
 
-Use this checklist before creating an annotated release tag.
+Use this ShellToolkit-specific checklist before release activity. The
+Engineering Manual's `02-Git/Release-Workflow.md` governs the release procedure
+and `07-Standards/Versioning.md` governs version and tag format. These checks
+add toolkit readiness requirements; they do not replace that policy.
 
 ---
 
@@ -12,7 +15,7 @@ Use this checklist before creating an annotated release tag.
 - [ ] `VERSION` contains the intended release version.
 - [ ] `manifest.yml` has been reviewed.
 - [ ] Developer documentation is current.
-- [ ] Standards are current.
+- [ ] ShellToolkit implementation documentation is current.
 
 ---
 
@@ -81,14 +84,10 @@ Confirm:
 
 ---
 
-## 5. Tag Release
+## 5. Perform the Governed Release
 
-Create annotated tag:
-
-```bash
-git tag -a vX.Y.Z-label -m "Captain Cronos Shell Toolkit vX.Y.Z-label"
-git push origin vX.Y.Z-label
-```
+After review, follow the Engineering Manual release workflow for committing,
+tagging, and publishing the ShellToolkit release.
 
 ---
 

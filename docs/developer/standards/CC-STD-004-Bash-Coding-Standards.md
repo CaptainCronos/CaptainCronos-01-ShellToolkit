@@ -1,10 +1,12 @@
 # CC-STD-004 — Bash Coding Standards
 
-Bash scripts must be readable, defensive, and usable from a rescue environment.
+The Engineering Manual's `07-Standards/Bash.md` is authoritative for general
+Bash safety, style, failure behavior, dependencies, and validation. This page
+adds ShellToolkit-specific conventions for code in this repository.
 
 ---
 
-## Required Script Settings
+## ShellToolkit Execution Context
 
 Executable scripts should start with:
 
@@ -12,27 +14,27 @@ Executable scripts should start with:
 set -euo pipefail
 ```
 
-Use exceptions only when documented.
+Use exceptions only when documented. Sourced ShellToolkit libraries must not
+unexpectedly alter the caller's shell options.
 
 ---
 
-## Style
+ShellToolkit code must remain usable in its documented rescue and live-USB
+environments.
+
+## Toolkit Conventions
 
 - Prefer functions for repeated logic.
-- Use clear variable names.
-- Quote variable expansions.
 - Avoid aliases inside scripts.
-- Avoid unnecessary external dependencies.
-- Keep POSIX-compatible commands where reasonable, but Bash-specific features are allowed.
+- Prefer shared libraries over duplicated command behavior.
+- Use `TOOLKIT_ROOT` for toolkit files and `CURRENT_REPO` for caller-repository
+  behavior.
 
 ---
 
 ## Safety
 
-- Never overwrite user files without backup unless explicitly requested.
 - Use `--dry-run` for installers and destructive operations where practical.
-- Validate required files before copying.
-- Run `bash -n` during verification.
 - Do not modify tracked repository files during normal install/update use.
 
 ---
@@ -52,4 +54,5 @@ cc_banner
 
 ## Dependencies
 
-Any required external command must be documented and checked before use.
+ShellToolkit command `Requires` metadata and the shared dependency layer define
+how required executables and semantic capabilities are checked.

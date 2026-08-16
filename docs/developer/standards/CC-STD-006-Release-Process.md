@@ -1,6 +1,8 @@
 # CC-STD-006 — Release Process
 
-A release is not complete until code, documentation, verification, and version records are aligned.
+The Engineering Manual's `02-Git/Release-Workflow.md` is authoritative for the
+ecosystem release procedure, and `07-Standards/Versioning.md` governs version
+and tag formats. This page adds ShellToolkit's project-specific release gates.
 
 ---
 
@@ -20,34 +22,6 @@ Before tagging a release:
 
 ---
 
-## Tag Format
-
-```text
-vMAJOR.MINOR.PATCH[-label]
-```
-
-Example:
-
-```bash
-git tag -a v2.0.0-alpha -m "Captain Cronos Shell Toolkit v2.0.0-alpha"
-git push origin v2.0.0-alpha
-```
-
----
-
-## Release Notes
-
-Release notes should summarize:
-
-- Added
-- Changed
-- Fixed
-- Removed
-- Known issues
-- Upgrade instructions
-
----
-
-## Rollback
-
-Each release must preserve a rollback path through Git tags and user backups.
+These checks supplement rather than replace the Manual's validation, review,
+commit, tagging, and publication steps. The maintained operational checklist is
+[`../Release-Checklist.md`](../Release-Checklist.md).

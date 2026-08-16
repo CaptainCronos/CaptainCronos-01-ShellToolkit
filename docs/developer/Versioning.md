@@ -2,6 +2,10 @@
 
 Captain Cronos Shell Toolkit uses explicit version files and release labels to keep the toolkit auditable.
 
+The Engineering Manual's `07-Standards/Versioning.md` governs ecosystem-wide
+version and tag policy. This page defines ShellToolkit's repository-local
+version data and how its commands consume it.
+
 ---
 
 ## Source of Truth
@@ -32,32 +36,25 @@ RELEASE_DATE="2026-06-28"
 |---|---|
 | Toolkit version | Overall release version of the shell toolkit. |
 | Installer version | Installer implementation version. |
-| Standards version | Version of governing engineering standards. |
+| Standards version | Toolkit compatibility metadata; not an engineering-policy authority. |
 | Baseline version | Operating-system baseline family. |
 | Command version | Optional version for individual command modules. |
 
 ---
 
-## Pre-release Labels
+## Toolkit Release Value
 
-The toolkit may use semantic pre-release labels:
-
-```text
-alpha   actively changing architecture
-beta    feature set stabilizing
-rc      release candidate
-stable  production release
-```
-
-Examples:
+`TOOLKIT_VERSION` follows the Engineering Manual's versioning standard. Current
+ShellToolkit release lines use values such as:
 
 ```text
 1.0.0-alpha1
-2.0.0-alpha
-2.0.0-beta1
-2.0.0-rc1
-2.0.0
+1.3.0-beta1
+1.3.0-rc1
 ```
+
+Label meaning and compatibility rules come from the Engineering Manual rather
+than this document.
 
 ---
 
@@ -81,14 +78,9 @@ That script version does not replace the toolkit version.
 
 ---
 
-## Release Tags
+## Release Integration
 
-Release tags should use this format:
-
-```text
-v2.0.0-alpha
-v2.0.0-beta1
-v2.0.0
-```
-
-Tagging should only occur after README, ROADMAP, CHANGELOG, VERSION, manifest, installer, and doctor checks are aligned.
+The Engineering Manual governs tag format and release procedure. ShellToolkit's
+additional readiness gates validate README, ROADMAP, CHANGELOG, VERSION,
+manifest, installer, generated documentation, and doctor state before release
+activity. See [`Release-Checklist.md`](Release-Checklist.md).

@@ -1,7 +1,9 @@
 # Captain Cronos Plugin Developer Guide
 
 ## Purpose
-This guide defines the standards for adding new commands and plugin functionality to the toolkit.
+This guide defines ShellToolkit-specific requirements for adding commands and
+plugin functionality. Ecosystem-wide engineering policy remains in
+`CaptainCronos-02-Engineering-Manual`.
 
 ## Command Location
 Core and plugin-facing commands currently live in:

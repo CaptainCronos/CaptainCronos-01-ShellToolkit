@@ -1,6 +1,8 @@
 # CC-STD-007 — Command Framework
 
-The command framework defines how user-facing operations are exposed.
+This document defines how ShellToolkit exposes user-facing operations. It is a
+project implementation contract; the Engineering Manual governs broader
+architecture policy.
 
 ---
 
