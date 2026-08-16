@@ -24,8 +24,9 @@ DEBUG=0
 PASSED=0
 FAILED=0
 RESULTS=""
-SELFTEST_TOTAL=45
+SELFTEST_TOTAL=0
 SELFTEST_TEMP=""
+SELFTEST_LAST_STATUS=0
 
 usage() {
     cat <<'EOF_HELP'
@@ -46,47 +47,11 @@ Checks:
   - plugin status load
 
 Options:
-  --verbose  Show full command output.
+  --verbose  Show captured-output diagnostics without replaying successful stdout.
   --json     Emit simple JSON summary.
   --debug    Emit intentional diagnostic events to stderr.
 EOF_HELP
 }
-
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        --help|-h)
-            usage
-            exit 0
-            ;;
-        --version)
-            cc_version
-            exit 0
-            ;;
-        --verbose)
-            VERBOSE=1
-            shift
-            ;;
-        --json)
-            JSON=1
-            shift
-            ;;
-        --debug)
-            DEBUG=1
-            shift
-            ;;
-        *)
-            usage
-            exit 1
-            ;;
-    esac
-done
-
-if [ "$DEBUG" -eq 1 ]; then
-    cc_debug_enable
-fi
-
-SELFTEST_TEMP="$(mktemp -d)"
-cc_debug_kv "selftest temporary path" "$SELFTEST_TEMP"
 
 selftest_cleanup() {
     cc_progress_cleanup
@@ -95,12 +60,6 @@ selftest_cleanup() {
         rm -rf "$SELFTEST_TEMP"
     fi
 }
-
-trap selftest_cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
-cc_progress_init "Captain Cronos Selftest" "$SELFTEST_TOTAL" "$JSON" TEST
 
 selftest_debug_context() {
     local subsystem="$1"
@@ -144,6 +103,34 @@ selftest_debug_context() {
     esac
 }
 
+selftest_present() {
+    if [ "$JSON" -eq 1 ] || cc_progress_live || cc_progress_sequential; then
+        printf '%s\n' "$1" >&2
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
+selftest_output_block() {
+    local stream="$1" file="$2" line
+    [ -s "$file" ] || return 0
+    selftest_present "[CC TEST DETAIL] [$(printf '%2d' "$CC_PROGRESS_CURRENT")/$SELFTEST_TOTAL] $CC_PROGRESS_LABEL $stream:"
+    while IFS= read -r line || [ -n "$line" ]; do
+        selftest_present "  | $line"
+    done < "$file"
+}
+
+selftest_success_detail() {
+    local stdout_file="$1" stderr_file="$2" stdout_bytes stdout_lines
+    if [ -s "$stdout_file" ]; then
+        stdout_bytes="$(wc -c < "$stdout_file" | tr -d ' ')"
+        stdout_lines="$(wc -l < "$stdout_file" | tr -d ' ')"
+        selftest_present \
+            "[CC TEST DETAIL] [$(printf '%2d' "$CC_PROGRESS_CURRENT")/$SELFTEST_TOTAL] $CC_PROGRESS_LABEL stdout captured: $stdout_lines lines, $stdout_bytes bytes (suppressed on success)"
+    fi
+    selftest_output_block stderr "$stderr_file"
+}
+
 run_check() {
     local label="$1"
     local subsystem="$2"
@@ -164,39 +151,37 @@ run_check() {
     else
         rc=$?
     fi
+    SELFTEST_LAST_STATUS="$rc"
+    cc_debug_kv "child exit status" "$SELFTEST_LAST_STATUS"
     cc_debug_result 0 "$rc" "$stdout_file" "$stderr_file"
-
-    if [ "$VERBOSE" -eq 1 ]; then
-        if [ "$JSON" -eq 1 ]; then
-            cat "$stdout_file" >&2
-        else
-            cat "$stdout_file"
-        fi
-        cat "$stderr_file" >&2
-    fi
 
     if [ "$rc" -eq 0 ]; then
         PASSED=$((PASSED + 1))
         RESULTS="${RESULTS}${label}:PASS\n"
         cc_progress_finish PASS
         if [ "$JSON" -eq 0 ] && ! cc_progress_live && ! cc_progress_sequential; then
-            cc_status_line "$label" "PASS"
+            cc_status_line \
+                "[CC TEST] [$(printf '%2d' "$CC_PROGRESS_CURRENT")/$SELFTEST_TOTAL] $label" \
+                "PASS" "${CC_PROGRESS_WIDTH:-62}"
         fi
     else
         FAILED=$((FAILED + 1))
         RESULTS="${RESULTS}${label}:FAIL\n"
         cc_progress_finish FAIL
         if [ "$JSON" -eq 0 ] && ! cc_progress_live && ! cc_progress_sequential; then
-            cc_status_line "$label" "FAIL"
+            cc_status_line \
+                "[CC TEST] [$(printf '%2d' "$CC_PROGRESS_CURRENT")/$SELFTEST_TOTAL] $label" \
+                "FAIL" "${CC_PROGRESS_WIDTH:-62}"
         fi
-        if [ "$VERBOSE" -eq 0 ] && ! cc_debug_enabled; then
-            if [ "$JSON" -eq 0 ]; then
-                cat "$stdout_file"
-            else
-                cat "$stdout_file" >&2
-            fi
-            cat "$stderr_file" >&2
+    fi
+
+    if [ "$rc" -ne 0 ]; then
+        if ! cc_debug_enabled; then
+            selftest_output_block stdout "$stdout_file"
+            selftest_output_block stderr "$stderr_file"
         fi
+    elif [ "$VERBOSE" -eq 1 ]; then
+        selftest_success_detail "$stdout_file" "$stderr_file"
     fi
 }
 
@@ -256,83 +241,158 @@ check_prompt_engine() {
     fi
 }
 
-if [ "$JSON" -eq 0 ]; then
-    cc_banner
-    echo
-    echo "Captain Cronos Engineering Self-Test"
-    echo "====================================="
-    echo
+selftest_count() {
+    SELFTEST_TOTAL=$((SELFTEST_TOTAL + 1))
+}
+
+# This is the canonical registration list. The same list is first counted and
+# then executed, so registration, announced totals, and execution cannot drift.
+selftest_suite() {
+    local runner="$1"
+    "$runner" "Common library" core check_library cc-common.sh
+    "$runner" "Diagnostics library" diagnostics check_library cc-diagnostics.sh
+    "$runner" "Diagnostic behavior" diagnostics bash "$PROJECT_ROOT/tests/diagnostics.sh"
+    "$runner" "Progress behavior" diagnostics bash "$PROJECT_ROOT/tests/progress.sh"
+    "$runner" "Presentation behavior" presentation bash "$PROJECT_ROOT/tests/presentation.sh"
+    "$runner" "Shell helpers" shell bash "$PROJECT_ROOT/tests/shell-helpers.sh"
+    "$runner" "Context library" core check_library cc-context.sh
+    "$runner" "Config library" configuration check_library cc-config.sh
+    "$runner" "Semantic dependencies" dependencies bash "$PROJECT_ROOT/tests/dependencies.sh"
+    "$runner" "Programs library" programs check_library cc-programs.sh
+    "$runner" "Packages library" packages check_library cc-packages.sh
+    "$runner" "Package operations" packages bash "$PROJECT_ROOT/tests/package-management.sh"
+    "$runner" "Kernel library" kernel check_library cc-kernel.sh
+    "$runner" "Kernel management" kernel bash "$PROJECT_ROOT/tests/kernel.sh"
+    "$runner" "Kernel artifact health" kernel bash "$PROJECT_ROOT/tests/kernel-artifacts.sh"
+    "$runner" "Kernel platform capabilities" kernel bash "$PROJECT_ROOT/tests/kernel-platform.sh"
+    "$runner" "Kernel health integration" kernel bash "$PROJECT_ROOT/tests/kernel-health-integration.sh"
+    "$runner" "Network library" network check_library cc-network.sh
+    "$runner" "Network interfaces" network bash "$PROJECT_ROOT/tests/network.sh"
+    "$runner" "Services library" services check_library cc-services.sh
+    "$runner" "Service operations" services bash "$PROJECT_ROOT/tests/services.sh"
+    "$runner" "HTTP library" http check_library cc-http.sh
+    "$runner" "HTTP interfaces" http bash "$PROJECT_ROOT/tests/http.sh"
+    "$runner" "Data library" data check_library cc-data.sh
+    "$runner" "Structured data" data bash "$PROJECT_ROOT/tests/data.sh"
+    "$runner" "Configuration safety" configuration bash "$PROJECT_ROOT/tests/config.sh"
+    "$runner" "Mutation safety contracts" maintenance bash "$PROJECT_ROOT/tests/safety-contracts.sh"
+    "$runner" "Developer update contracts" maintenance bash "$PROJECT_ROOT/tests/dev-updates.sh"
+    "$runner" "RC diagnostic integrity" maintenance bash "$PROJECT_ROOT/tests/rc-integrity.sh"
+    "$runner" "Storage library" storage check_library cc-storage.sh
+    "$runner" "Storage inventory" storage bash "$PROJECT_ROOT/tests/storage.sh"
+    "$runner" "SMART library" smart check_library cc-smart.sh
+    "$runner" "SMART parsing" smart bash "$PROJECT_ROOT/tests/smart.sh"
+    "$runner" "Asset library" assets check_library cc-assets.sh
+    "$runner" "Asset safety" assets bash "$PROJECT_ROOT/tests/assets.sh"
+    "$runner" "YAML compatibility library" data check_library cc-yaml.sh
+    "$runner" "Report library" reporting check_library cc-report.sh
+    "$runner" "Prompt engine library" prompt check_library cc-prompt-engine.sh
+    "$runner" "Prompt engine render" prompt check_prompt_engine
+    "$runner" "Strict command audit" engineering bash "$PROJECT_ROOT/tools/cc" audit --strict
+    "$runner" "Documentation lint" documentation bash "$PROJECT_ROOT/tools/cc" docs lint
+    "$runner" "Release check" engineering bash "$PROJECT_ROOT/tools/cc" release check
+    "$runner" "Registry load" registry bash "$PROJECT_ROOT/tools/cc" registry
+    "$runner" "About load" core bash "$PROJECT_ROOT/tools/cc" about
+    "$runner" "Roadmap load" documentation bash "$PROJECT_ROOT/tools/cc" roadmap
+    "$runner" "Plugin status load" plugins bash "$PROJECT_ROOT/tools/cc" plugin status
+}
+
+selftest_main() {
+    local status integrity_status=0 accounted
+
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --help|-h)
+                usage
+                return 0
+                ;;
+            --version)
+                cc_version
+                return 0
+                ;;
+            --verbose)
+                VERBOSE=1
+                shift
+                ;;
+            --json)
+                JSON=1
+                shift
+                ;;
+            --debug)
+                DEBUG=1
+                shift
+                ;;
+            *)
+                usage
+                return 1
+                ;;
+        esac
+    done
+
+    [ "$DEBUG" -eq 0 ] || cc_debug_enable
+    SELFTEST_TOTAL=0
+    selftest_suite selftest_count
+
+    SELFTEST_TEMP="$(mktemp -d)"
+    cc_debug_kv "selftest temporary path" "$SELFTEST_TEMP"
+    trap selftest_cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    cc_progress_init "Captain Cronos Selftest" "$SELFTEST_TOTAL" "$JSON" TEST
+
+    if [ "$JSON" -eq 0 ]; then
+        cc_banner
+        echo
+        echo "Captain Cronos Engineering Self-Test"
+        echo "====================================="
+        echo
+    fi
+
+    selftest_suite run_check
+
+    accounted=$((PASSED + FAILED))
+    if [ "$CC_PROGRESS_TOTAL" -eq "$SELFTEST_TOTAL" ] &&
+        [ "$CC_PROGRESS_COMPLETED" -eq "$SELFTEST_TOTAL" ] &&
+        [ "$accounted" -eq "$CC_PROGRESS_COMPLETED" ]; then
+        integrity_status=1
+    else
+        selftest_present \
+            "[CC TEST ERROR] accounting mismatch: registered=$SELFTEST_TOTAL announced=$CC_PROGRESS_TOTAL executed=$CC_PROGRESS_COMPLETED accounted=$accounted"
+    fi
+    cc_debug_kv "tests registered" "$SELFTEST_TOTAL"
+    cc_debug_kv "tests completed" "$CC_PROGRESS_COMPLETED"
+    cc_debug_kv "tests accounted" "$accounted"
+
+    status=PASS
+    if [ "$FAILED" -ne 0 ] || [ "$integrity_status" -ne 1 ]; then
+        status=FAIL
+    fi
+
+    if [ "$JSON" -eq 1 ]; then
+        # This is a jq expression, not a shell expression.
+        # shellcheck disable=SC2016
+        _cc_json_generate \
+            '{status: $status, registered: $registered, executed: $executed, passed: $passed, failed: $failed}' \
+            --compact-output \
+            --arg status "$status" \
+            --argjson registered "$SELFTEST_TOTAL" \
+            --argjson executed "$CC_PROGRESS_COMPLETED" \
+            --argjson passed "$PASSED" \
+            --argjson failed "$FAILED"
+    else
+        echo
+        echo "------------------------------------"
+        printf '%-18s %s\n' "Tests Registered:" "$SELFTEST_TOTAL"
+        printf '%-18s %s\n' "Tests Executed:" "$CC_PROGRESS_COMPLETED"
+        printf '%-18s %s\n' "Tests Passed:" "$PASSED"
+        printf '%-18s %s\n' "Tests Failed:" "$FAILED"
+        echo
+        cc_summary_status "Overall Status:" "$status"
+    fi
+
+    [ "$status" = PASS ]
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    selftest_main "$@"
 fi
-
-run_check "Common library" core check_library cc-common.sh
-run_check "Diagnostics library" diagnostics check_library cc-diagnostics.sh
-run_check "Diagnostic behavior" diagnostics bash "$PROJECT_ROOT/tests/diagnostics.sh"
-run_check "Progress behavior" diagnostics bash "$PROJECT_ROOT/tests/progress.sh"
-run_check "Presentation behavior" presentation bash "$PROJECT_ROOT/tests/presentation.sh"
-run_check "Shell helpers" shell bash "$PROJECT_ROOT/tests/shell-helpers.sh"
-run_check "Context library" core check_library cc-context.sh
-run_check "Config library" configuration check_library cc-config.sh
-run_check "Semantic dependencies" dependencies bash "$PROJECT_ROOT/tests/dependencies.sh"
-run_check "Programs library" programs check_library cc-programs.sh
-run_check "Packages library" packages check_library cc-packages.sh
-run_check "Package operations" packages bash "$PROJECT_ROOT/tests/package-management.sh"
-run_check "Kernel library" kernel check_library cc-kernel.sh
-run_check "Kernel management" kernel bash "$PROJECT_ROOT/tests/kernel.sh"
-run_check "Kernel artifact health" kernel bash "$PROJECT_ROOT/tests/kernel-artifacts.sh"
-run_check "Kernel platform capabilities" kernel bash "$PROJECT_ROOT/tests/kernel-platform.sh"
-run_check "Kernel health integration" kernel bash "$PROJECT_ROOT/tests/kernel-health-integration.sh"
-run_check "Network library" network check_library cc-network.sh
-run_check "Network interfaces" network bash "$PROJECT_ROOT/tests/network.sh"
-run_check "Services library" services check_library cc-services.sh
-run_check "Service operations" services bash "$PROJECT_ROOT/tests/services.sh"
-run_check "HTTP library" http check_library cc-http.sh
-run_check "HTTP interfaces" http bash "$PROJECT_ROOT/tests/http.sh"
-run_check "Data library" data check_library cc-data.sh
-run_check "Structured data" data bash "$PROJECT_ROOT/tests/data.sh"
-run_check "Configuration safety" configuration bash "$PROJECT_ROOT/tests/config.sh"
-run_check "Mutation safety contracts" maintenance bash "$PROJECT_ROOT/tests/safety-contracts.sh"
-run_check "Developer update contracts" maintenance bash "$PROJECT_ROOT/tests/dev-updates.sh"
-run_check "RC diagnostic integrity" maintenance bash "$PROJECT_ROOT/tests/rc-integrity.sh"
-run_check "Storage library" storage check_library cc-storage.sh
-run_check "Storage inventory" storage bash "$PROJECT_ROOT/tests/storage.sh"
-run_check "SMART library" smart check_library cc-smart.sh
-run_check "SMART parsing" smart bash "$PROJECT_ROOT/tests/smart.sh"
-run_check "Asset library" assets check_library cc-assets.sh
-run_check "Asset safety" assets bash "$PROJECT_ROOT/tests/assets.sh"
-run_check "YAML compatibility library" data check_library cc-yaml.sh
-run_check "Report library" reporting check_library cc-report.sh
-run_check "Prompt engine library" prompt check_library cc-prompt-engine.sh
-run_check "Prompt engine render" prompt check_prompt_engine
-run_check "Strict command audit" engineering bash "$PROJECT_ROOT/tools/cc" audit --strict
-run_check "Documentation lint" documentation bash "$PROJECT_ROOT/tools/cc" docs lint
-run_check "Release check" engineering bash "$PROJECT_ROOT/tools/cc" release check
-run_check "Registry load" registry bash "$PROJECT_ROOT/tools/cc" registry
-run_check "About load" core bash "$PROJECT_ROOT/tools/cc" about
-run_check "Roadmap load" documentation bash "$PROJECT_ROOT/tools/cc" roadmap
-run_check "Plugin status load" plugins bash "$PROJECT_ROOT/tools/cc" plugin status
-
-cc_debug_kv "tests completed" "$CC_PROGRESS_COMPLETED"
-cc_debug_kv "tests total" "$CC_PROGRESS_TOTAL"
-
-if [ "$JSON" -eq 1 ]; then
-    status="PASS"
-    [ "$FAILED" -eq 0 ] || status="FAIL"
-    # This is a jq expression, not a shell expression.
-    # shellcheck disable=SC2016
-    _cc_json_generate \
-        '{status: $status, passed: $passed, failed: $failed}' \
-        --compact-output \
-        --arg status "$status" \
-        --argjson passed "$PASSED" \
-        --argjson failed "$FAILED"
-else
-    echo
-    echo "------------------------------------"
-    printf '%-14s %s\n' "Tests Passed:" "$PASSED"
-    printf '%-14s %s\n' "Tests Failed:" "$FAILED"
-    echo
-    if [ "$FAILED" -eq 0 ]; then status=PASS; else status=FAIL; fi
-    cc_summary_status "Overall Status:" "$status"
-fi
-
-[ "$FAILED" -eq 0 ]

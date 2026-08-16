@@ -61,5 +61,9 @@ Focused shell tests supplement `cc selftest`:
 - `progress.sh` validates reusable count-based TTY, non-TTY, debug, machine,
   failure, and cleanup progress behavior.
 - `selftest-output.sh` validates normal/debug exit equivalence, sequential debug
-  activity, invalid options, JSON integrity, and stdout/stderr separation. It is
-  run separately because invoking it from `cc selftest` would recurse.
+  activity, invalid options, JSON integrity, stdout/stderr separation, canonical
+  result uniqueness, and registration/execution accounting. It is run separately
+  because invoking it from `cc selftest` would recurse.
+- `selftest-harness.sh` uses disposable child-command fixtures to validate
+  canonical output ownership, line-safe live progress, normal/verbose capture,
+  labeled failure streams, exit-status authority, and exact aggregate counting.

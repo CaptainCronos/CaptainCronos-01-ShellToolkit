@@ -42,9 +42,11 @@ Counts describe completed stages, not estimated execution time.
 
 When stderr is a terminal, normal selftest uses a live `RUNNING` line followed
 by the completed status. Redirected and piped execution retains stable existing
-result lines without terminal controls. Machine mode suppresses normal progress.
-Debug mode automatically selects sequential `[CC TEST]` lines instead of live
-redrawing, including when JSON is requested.
+numbered result lines without terminal controls. Child stdout and stderr remain
+captured until the harness has completed its canonical result line, so embedded
+commands cannot attach to or duplicate that presentation. Machine mode suppresses
+normal progress. Debug mode automatically selects sequential `[CC TEST]` lines
+instead of live redrawing, including when JSON is requested.
 
 ## Selftest
 
@@ -52,6 +54,12 @@ redrawing, including when JSON is requested.
 actual status, captured stream sizes, and redacted failure output. It returns
 the same status and retains the same final summary as normal selftest. Combine
 it with `--json` to keep JSON alone on stdout and diagnostics on stderr.
+
+`cc selftest --verbose` reports successful captured-stdout sizes rather than
+replaying child presentations, and emits successful stderr as a labeled detail
+block. Failed checks retain labeled stdout and stderr after the canonical `FAIL`
+line. Focused test scripts therefore keep their useful standalone success
+summaries without duplicating the selftest harness result.
 
 Future commands may reuse these APIs, but should only emit events that answer
 what is running, which path was selected, and why it passed or failed.

@@ -633,7 +633,7 @@ Checks:
   - plugin status load
 
 Options:
-  --verbose  Show full command output.
+  --verbose  Show captured-output diagnostics without replaying successful stdout.
   --json     Emit simple JSON summary.
   --debug    Emit intentional diagnostic events to stderr.
 ~~~
