@@ -83,13 +83,15 @@ release_version_consistent() {
     grep -Fq "v$version" "$PROJECT_ROOT/README.md" || return 1
     grep -Fq "v$version" "$PROJECT_ROOT/ROADMAP.md" || return 1
     grep -Fq "v$version" "$PROJECT_ROOT/CHANGELOG.md" || return 1
-    ! rg -n '^[[:space:]]*status:[[:space:]]*(alpha|beta|rc)' "$PROJECT_ROOT/manifest.yml"
+    ! grep -Eq '^[[:space:]]*status:[[:space:]]*(alpha|beta|rc)' "$PROJECT_ROOT/manifest.yml"
 }
 
 release_docs_consistent() {
+    # These are literal Markdown fragments, not shell expressions.
+    # shellcheck disable=SC2016
     grep -Fq 'Root `ROADMAP.md` is the roadmap authority.' "$PROJECT_ROOT/docs/ARCHITECTURE.md" &&
     grep -Fq '`CHANGELOG.md` is the release-history' "$PROJECT_ROOT/docs/ARCHITECTURE.md" &&
-    ! rg -n 'Before tagging 1\.3\.0-alpha1|docs/ROADMAP\.md' \
+    ! grep -Eq 'Before tagging 1\.3\.0-alpha1|docs/ROADMAP\.md' \
         "$PROJECT_ROOT/docs/RELEASE_1.3_CHECKLIST.md" "$PROJECT_ROOT/tools/commands/roadmap"
 }
 
@@ -110,8 +112,8 @@ release_shellcheck() {
 release_temp_safety() {
     local pattern
     pattern='/tmp/'"cc-[A-Za-z0-9_.-]+"
-    ! rg -n "$pattern" "$PROJECT_ROOT/tools" "$PROJECT_ROOT/install" "$PROJECT_ROOT/lib" "$PROJECT_ROOT/tests" \
-        --glob '!*fixtures*'
+    ! grep -ERn --exclude='*fixtures*' --exclude-dir='*fixtures*' "$pattern" \
+        "$PROJECT_ROOT/tools" "$PROJECT_ROOT/install" "$PROJECT_ROOT/lib" "$PROJECT_ROOT/tests"
 }
 
 release_check() {

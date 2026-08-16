@@ -91,6 +91,37 @@ source "$PROJECT_ROOT/tools/commands/release"
 release_version_consistent || fail "canonical version state was rejected"
 release_temp_safety || fail "predictable temporary output regression detected"
 
+# Release searches must work with the declared core grep interface and must not
+# turn a missing optional ripgrep executable into a false PASS.
+release_search_repo="$TEST_DIR/release-search-repo"
+release_search_bin="$TEST_DIR/release-search-bin"
+mkdir -p "$release_search_repo/docs" "$release_search_repo/tools/commands" \
+    "$release_search_repo/install" "$release_search_repo/lib" "$release_search_repo/tests" \
+    "$release_search_bin"
+ln -s "$(command -v grep)" "$release_search_bin/grep"
+cp "$PROJECT_ROOT/VERSION" "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/ROADMAP.md" \
+    "$PROJECT_ROOT/CHANGELOG.md" "$PROJECT_ROOT/manifest.yml" "$release_search_repo/"
+cp "$PROJECT_ROOT/docs/ARCHITECTURE.md" "$PROJECT_ROOT/docs/RELEASE_1.3_CHECKLIST.md" \
+    "$release_search_repo/docs/"
+cp "$PROJECT_ROOT/tools/commands/roadmap" "$release_search_repo/tools/commands/"
+if ! PROJECT_ROOT="$release_search_repo" PATH="$release_search_bin" release_version_consistent ||
+    ! PROJECT_ROOT="$release_search_repo" PATH="$release_search_bin" release_docs_consistent ||
+    ! PROJECT_ROOT="$release_search_repo" PATH="$release_search_bin" release_temp_safety; then
+    fail "release searches require an undeclared ripgrep executable"
+fi
+printf 'status: beta\n' >>"$release_search_repo/manifest.yml"
+if PROJECT_ROOT="$release_search_repo" PATH="$release_search_bin" release_version_consistent; then
+    fail "release version search accepted forbidden maturity metadata without ripgrep"
+fi
+printf 'docs/ROADMAP.md\n' >>"$release_search_repo/tools/commands/roadmap"
+if PROJECT_ROOT="$release_search_repo" PATH="$release_search_bin" release_docs_consistent; then
+    fail "release documentation search accepted a forbidden stale path without ripgrep"
+fi
+printf '%s\n' '/tmp/'"cc-predictable" >"$release_search_repo/tools/predictable-temp"
+if PROJECT_ROOT="$release_search_repo" PATH="$release_search_bin" release_temp_safety >/dev/null 2>&1; then
+    fail "release temporary-path search accepted a predictable path without ripgrep"
+fi
+
 if [ "${CC_RC_SKIP_RELEASE_FIXTURES:-0}" != 1 ]; then
     # Exercise the complete release gate in a disposable clean repository. This
     # avoids weakening the real gate merely to make dirty-development tests pass.

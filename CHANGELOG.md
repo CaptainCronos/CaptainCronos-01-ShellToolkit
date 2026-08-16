@@ -54,6 +54,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- Release integrity searches now use the declared core `grep` interface, so a
+  missing optional `rg` executable cannot turn a forbidden-content check into a
+  false PASS.
 - PASS/WARN/FAIL/SKIP rendering, dotted status rows, summaries, progress rows,
   and diagnostic prefixes now use the shared presentation layer; ordinary
   data and generated or redirected output remain uncolored.
