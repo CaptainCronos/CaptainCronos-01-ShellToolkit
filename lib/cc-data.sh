@@ -6,7 +6,7 @@
 # Script      : cc-data.sh
 # Version     : reads VERSION
 # Category    : Core
-# Requires    : bash command mktemp cp mv rm
+# Requires    : bash command cp mv
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Provide semantic JSON and YAML processing operations.
 # ==============================================================================
@@ -116,18 +116,24 @@ _cc_data_atomic_output() {
     [ "$#" -ge 2 ] || return 2
     local destination="$1" temporary status
     shift
-    temporary="$(mktemp "${destination}.tmp.XXXXXX")" || return 1
+    cc_temp_file temporary "${destination}.tmp.XXXXXX" || return 1
     if [ -f "$destination" ]; then
         cp -p "$destination" "$temporary" || {
-            rm -f "$temporary"
+            cc_temp_remove "$temporary"
             return 1
         }
     fi
     if "$@" > "$temporary"; then
-        mv "$temporary" "$destination"
+        if mv "$temporary" "$destination"; then
+            cc_temp_unregister "$temporary"
+        else
+            status=$?
+            cc_temp_remove "$temporary" || :
+            return "$status"
+        fi
     else
         status=$?
-        rm -f "$temporary"
+        cc_temp_remove "$temporary" || :
         return "$status"
     fi
 }

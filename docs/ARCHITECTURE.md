@@ -326,6 +326,27 @@ The first primary consumer is `cc selftest --debug`. Program, dependency,
 platform/package, service, configuration, SMART, and storage helpers expose
 representative decision diagnostics without global shell tracing.
 
+### Temporary Resource Ownership
+
+`lib/cc-temp.sh` owns secure temporary files and directories created by toolkit
+production code. Creation and registration occur together in the current shell;
+the per-process registry records the exact absolute path, resource type, owner,
+device, and inode. Cleanup never scans a directory or accepts a wildcard. A
+changed identity, unsafe path, or ownership mismatch is left untouched.
+
+Registered resources are removed deterministically by their consumer and again
+as a safe no-op at process exit. Lazy EXIT, INT, and TERM hooks preserve handlers
+that existed before the first allocation. Catchable INT and TERM perform cleanup,
+run the prior handler, and retain conventional statuses 130 and 143. SIGKILL is
+inherently uncatchable, so no producer can guarantee cleanup after it.
+
+Destination-adjacent staging files use the same secure creation path. After an
+atomic rename succeeds, the old staging name is explicitly unregistered; the
+published destination is never registered for cleanup. On failure or catchable
+interruption, only the exact still-registered staging resource is eligible for
+removal. Test fixtures and caller-selected destinations are not toolkit cleanup
+roots.
+
 ### Assets
 Current lifecycle state is stored under:
 

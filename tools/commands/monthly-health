@@ -77,11 +77,11 @@ redact_report() {
 run_health_section() {
     local label="$1" rc state output
     shift
-    output="$(mktemp "${TMPDIR:-/tmp}/cc-monthly-section.XXXXXX")" || return 1
+    cc_temp_file output "${TMPDIR:-/tmp}/cc-monthly-section.XXXXXX" || return 1
     chmod 600 "$output"
     if "$@" >"$output" 2>&1; then rc=0; else rc=$?; fi
     redact_report <"$output"
-    rm -f "$output"
+    cc_temp_remove "$output" || return 1
     state="$(cc_result_from_rc "$rc")"
     cc_result_record "$label" "$state"
 }
@@ -394,11 +394,18 @@ monthly_health_main() {
         umask 077
         mkdir -p "$REPORT_DIR"
         chmod 700 "$REPORT_DIR"
-        temporary="$(mktemp "$REPORT_DIR/.monthly-health.XXXXXX")" || return 1
+        cc_temp_file temporary "$REPORT_DIR/.monthly-health.XXXXXX" || return 1
         chmod 600 "$temporary"
         generate_report | redact_report > "$temporary" || rc=$?
         chmod 600 "$temporary"
-        mv "$temporary" "$REPORT_FILE"
+        if mv "$temporary" "$REPORT_FILE"; then
+            :
+        else
+            rc=$?
+            cc_temp_remove "$temporary" || :
+            return "$rc"
+        fi
+        cc_temp_unregister "$temporary"
         chmod 600 "$REPORT_FILE"
         ln -sfn "$REPORT_FILE" "$LATEST_LINK"
         cc_log "Monthly health report written: $REPORT_FILE"

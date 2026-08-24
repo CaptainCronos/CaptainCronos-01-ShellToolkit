@@ -117,10 +117,9 @@ release_temp_safety() {
 }
 
 release_check() {
-    local failed=0 shellcheck_rc=0 branch
-    RELEASE_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/cc-release-check.XXXXXX")" || return 1
+    local failed=0 shellcheck_rc=0 branch status=0
+    cc_temp_dir RELEASE_TEMP "${TMPDIR:-/tmp}/cc-release-check.XXXXXX" || return 1
     chmod 700 "$RELEASE_TEMP"
-    trap 'rm -rf "$RELEASE_TEMP"' RETURN
 
     cc_banner
     echo
@@ -174,7 +173,9 @@ release_check() {
         cc_summary_status "Overall Status:" FAIL
     fi
 
-    [ "$failed" -eq 0 ]
+    [ "$failed" -eq 0 ] || status=1
+    cc_temp_remove "$RELEASE_TEMP" || return 1
+    return "$status"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

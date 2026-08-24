@@ -24,6 +24,13 @@ if ! declare -F cc_debug >/dev/null 2>&1; then
     unset _cc_common_lib_dir
 fi
 
+if [ -z "${CC_TEMP_LOADED:-}" ]; then
+    _cc_common_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    # shellcheck disable=SC1091
+    source "$_cc_common_lib_dir/cc-temp.sh"
+    unset _cc_common_lib_dir
+fi
+
 cc_load_version() {
     local root
     root="$(cc_toolkit_root 2>/dev/null || pwd)"

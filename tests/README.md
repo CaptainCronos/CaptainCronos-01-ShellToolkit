@@ -23,6 +23,12 @@ or mutation paths in either consumer.
 
 Focused shell tests supplement `cc selftest`:
 
+- `temp-lifecycle.sh` validates secure file/directory creation, deterministic and
+  process-exit cleanup, failure status preservation, catchable INT/TERM cleanup,
+  prior-trap chaining, nested registration, atomic commit/unregister behavior,
+  path and symlink confinement, custom `TMPDIR`, and direct validation-command
+  cleanup. Its SIGKILL fixture explicitly confirms that uncatchable termination
+  can leave residue only inside the disposable test root.
 - `safety-contracts.sh` validates default-safe and explicit-apply behavior for
   launcher/full installation, toolkit update, system update, the complete update
   orchestrator, and monthly-health previews. Mutation paths run only through

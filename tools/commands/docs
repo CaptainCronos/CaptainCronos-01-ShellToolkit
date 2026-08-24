@@ -70,11 +70,24 @@ write_output() {
     local name="$1"
     shift
     if [ "$APPLY" -eq 1 ]; then
-        local temporary
+        local temporary status
         mkdir -p "$OUT_DIR"
-        temporary="$(mktemp "$OUT_DIR/.${name}.XXXXXX")" || return 1
-        if ! "$@" > "$temporary"; then rm -f "$temporary"; return 1; fi
-        mv "$temporary" "$OUT_DIR/$name"
+        cc_temp_file temporary "$OUT_DIR/.${name}.XXXXXX" || return 1
+        if "$@" > "$temporary"; then
+            :
+        else
+            status=$?
+            cc_temp_remove "$temporary" || :
+            return "$status"
+        fi
+        if mv "$temporary" "$OUT_DIR/$name"; then
+            :
+        else
+            status=$?
+            cc_temp_remove "$temporary" || :
+            return "$status"
+        fi
+        cc_temp_unregister "$temporary"
         cc_log "Generated: $OUT_DIR/$name"
     else
         "$@"
@@ -171,10 +184,15 @@ generate_all_into() {
 }
 
 check_freshness() {
-    local temporary name stale=0
-    temporary="$(mktemp -d "${TMPDIR:-/tmp}/cc-docs-check.XXXXXX")" || return 1
-    trap 'rm -rf "$temporary"' RETURN
-    generate_all_into "$temporary" || return 1
+    local temporary name stale=0 status=0
+    cc_temp_dir temporary "${TMPDIR:-/tmp}/cc-docs-check.XXXXXX" || return 1
+    if generate_all_into "$temporary"; then
+        :
+    else
+        status=$?
+        cc_temp_remove "$temporary" || :
+        return "$status"
+    fi
     for name in COMMAND_INVENTORY.md COMMAND_REFERENCE.md CHANGE_SUMMARY.md DOCS_LINT.md README.md; do
         if [ ! -f "$OUT_DIR/$name" ] || ! cmp -s "$temporary/$name" "$OUT_DIR/$name"; then
             cc_status_line "Generated $name" "FAIL"
@@ -183,7 +201,9 @@ check_freshness() {
             cc_status_line "Generated $name" "PASS"
         fi
     done
-    [ "$stale" -eq 0 ]
+    [ "$stale" -eq 0 ] || status=1
+    cc_temp_remove "$temporary" || return 1
+    return "$status"
 }
 
 cc_banner

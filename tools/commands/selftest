@@ -6,7 +6,7 @@
 # Script      : selftest
 # Version     : reads VERSION
 # Category    : Engineering
-# Requires    : bash git awk grep mktemp rm cat
+# Requires    : bash git awk grep mktemp stat rm cat
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Run the full toolkit engineering self-test suite.
 # ==============================================================================
@@ -250,6 +250,7 @@ selftest_count() {
 selftest_suite() {
     local runner="$1"
     "$runner" "Common library" core check_library cc-common.sh
+    "$runner" "Temporary-resource library" core check_library cc-temp.sh
     "$runner" "Diagnostics library" diagnostics check_library cc-diagnostics.sh
     "$runner" "Diagnostic behavior" diagnostics bash "$PROJECT_ROOT/tests/diagnostics.sh"
     "$runner" "Progress behavior" diagnostics bash "$PROJECT_ROOT/tests/progress.sh"
@@ -257,6 +258,7 @@ selftest_suite() {
     "$runner" "Shell helpers" shell bash "$PROJECT_ROOT/tests/shell-helpers.sh"
     "$runner" "Context library" core check_library cc-context.sh
     "$runner" "Config library" configuration check_library cc-config.sh
+    "$runner" "Temporary-resource lifecycle" core bash "$PROJECT_ROOT/tests/temp-lifecycle.sh"
     "$runner" "Semantic dependencies" dependencies bash "$PROJECT_ROOT/tests/dependencies.sh"
     "$runner" "Programs library" programs check_library cc-programs.sh
     "$runner" "Packages library" packages check_library cc-packages.sh

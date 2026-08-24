@@ -14,6 +14,13 @@
 # Stored expansion syntax is deliberately matched as literal configuration data.
 # shellcheck disable=SC2016
 
+if [ -z "${CC_TEMP_LOADED:-}" ]; then
+    _cc_config_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    # shellcheck disable=SC1091
+    source "$_cc_config_lib_dir/cc-temp.sh"
+    unset _cc_config_lib_dir
+fi
+
 cc_config_dir() {
     echo "${CAPTAIN_CRONOS_CONFIG_DIR:-$HOME/.captaincronos}"
 }
@@ -78,14 +85,14 @@ cc_config_get() {
 }
 
 cc_config_set() {
-    local key="$1" value="$2" cfg tmp encoded
+    local key="$1" value="$2" cfg tmp encoded status
     [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 2
     case "$value" in
         *$'\n'*|*$'\r'*) return 2 ;;
     esac
     cfg="$(cc_config_file)"
     cc_config_init
-    tmp="$(mktemp "${cfg}.tmp.XXXXXX")" || return 1
+    cc_temp_file tmp "${cfg}.tmp.XXXXXX" || return 1
     encoded="${value//\\/\\\\}"
     encoded="${encoded//\"/\\\"}"
     if grep -qE "^${key}=" "$cfg"; then
@@ -94,7 +101,13 @@ cc_config_set() {
         cp "$cfg" "$tmp"
         printf '%s="%s"\n' "$key" "$encoded" >> "$tmp"
     fi
-    mv "$tmp" "$cfg"
+    if mv "$tmp" "$cfg"; then
+        cc_temp_unregister "$tmp"
+    else
+        status=$?
+        cc_temp_remove "$tmp" || :
+        return "$status"
+    fi
 }
 
 cc_config_show() {

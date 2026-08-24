@@ -68,9 +68,8 @@ while [ "$#" -gt 0 ]; do
 done
 
 verify_all() {
-    local output
-    output="$(mktemp "${TMPDIR:-/tmp}/cc-verify.XXXXXX")" || return 1
-    trap 'rm -f "$output"' RETURN
+    local output status=0
+    cc_temp_file output "${TMPDIR:-/tmp}/cc-verify.XXXXXX" || return 1
     cc_banner
     echo
     echo "Repository Verification"
@@ -80,6 +79,7 @@ verify_all() {
         cc_status_line "Repository verification" "PASS"
         echo
         cc_summary_status "Overall Status:" PASS
+        cc_temp_remove "$output" || return 1
         return 0
     fi
 
@@ -88,7 +88,9 @@ verify_all() {
     cat "$output"
     echo
     cc_summary_status "Overall Status:" FAIL
-    return 1
+    status=1
+    cc_temp_remove "$output" || return 1
+    return "$status"
 }
 
 verify_executable() {

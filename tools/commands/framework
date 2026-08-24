@@ -112,9 +112,8 @@ run_gate() {
 }
 
 show_verify() {
-    local failed=0
-    FRAMEWORK_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/cc-framework-verify.XXXXXX")" || return 1
-    trap 'rm -rf "$FRAMEWORK_TEMP"' RETURN
+    local failed=0 status=0
+    cc_temp_dir FRAMEWORK_TEMP "${TMPDIR:-/tmp}/cc-framework-verify.XXXXXX" || return 1
 
     cc_banner
     echo
@@ -134,7 +133,9 @@ show_verify() {
         cc_summary_status "Overall Status:" FAIL
     fi
 
-    [ "$failed" -eq 0 ]
+    [ "$failed" -eq 0 ] || status=1
+    cc_temp_remove "$FRAMEWORK_TEMP" || return 1
+    return "$status"
 }
 
 case "$ACTION" in
