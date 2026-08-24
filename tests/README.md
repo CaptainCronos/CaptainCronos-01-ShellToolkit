@@ -23,6 +23,11 @@ or mutation paths in either consumer.
 
 Focused shell tests supplement `cc selftest`:
 
+- `path-environment.sh` validates canonical managed PATH repair, known legacy
+  normalization, five-source and fresh-shell idempotency, NVM/custom ordering,
+  guarded profile interaction, ambiguous-line preservation, atomic no-op
+  repair, inspection immutability, permissions, failures, and symlink safety
+  using disposable home directories.
 - `temp-lifecycle.sh` validates secure file/directory creation, deterministic and
   process-exit cleanup, failure status preservation, catchable INT/TERM cleanup,
   prior-trap chaining, nested registration, atomic commit/unregister behavior,

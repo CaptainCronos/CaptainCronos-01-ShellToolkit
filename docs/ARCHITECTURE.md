@@ -33,6 +33,7 @@ Important libraries:
 - `cc-common.sh` — banner, logging, shared display behavior
 - `cc-diagnostics.sh` — debug diagnostics, redaction, and TTY-aware workflow progress
 - `cc-config.sh` — toolkit configuration helpers
+- `cc-path.sh` — managed PATH policy, startup auditing, and atomic repair
 - `cc-programs.sh` — configured command-line capability resolution
 - `cc-packages.sh` — semantic, platform-aware system package operations
 - `cc-kernel.sh` — kernel discovery, ordering, classification, ownership, and reboot-state inspection
@@ -80,6 +81,36 @@ a literal executable. The dependency layer resolves known capabilities through
 only for literal executable dependencies. Capability-specific platform adapters,
 such as the package library's native manager resolver, plug into this generic
 dependency contract without teaching the dispatcher executable mappings.
+
+### Managed PATH Architecture
+
+`lib/cc-path.sh` is the single Captain Cronos policy owner for `~/bin` and
+`~/.local/bin`. It generates the marked managed block deployed in
+`bash/bashrc`, audits installed startup configuration, classifies exact legacy
+writers, and performs atomic `.bashrc` repair. The full installer and toolkit
+update deploy the authoritative shell file; they do not maintain a separate
+PATH prepend.
+
+The managed block runs after NVM and other content in the authoritative
+`.bashrc`. On every source it preserves the first occurrence and position of
+each managed entry, removes later occurrences of those entries, inserts missing
+managed entries, and leaves unrelated PATH entries in their existing relative
+order. Repeated sourcing must therefore produce the same managed PATH state.
+Guarded `.profile` insertion remains compatible and `.profile` is not written
+by ShellToolkit.
+
+`cc env` and `cc env path` only inspect. Persistent repair requires
+`cc env path --fix` (with `--apply` retained as a compatibility spelling).
+Repair removes only exact historical conditional prepends and exact marked
+Captain Cronos guards for the two managed directories. Ambiguous or user-owned
+PATH statements are preserved and reported. Repair uses same-directory secure
+staging, preserves an existing file's mode, refuses symlinked or non-regular
+targets, and replaces `.bashrc` atomically only when content changed.
+
+A command process cannot change its parent shell environment. Successful repair
+therefore distinguishes startup-file state from the PATH already active in the
+invoking shell and directs the administrator to source the repaired `.bashrc`
+or start a new interactive shell.
 
 ### Update Architecture
 Maintenance updates are split into three surfaces:

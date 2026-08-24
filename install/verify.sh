@@ -40,12 +40,13 @@ for d in bash config install lib baseline/ubuntu-26.04 defaults/v1 docs template
     cc_require_dir "$d"
 done
 
-for f in VERSION manifest.yml config/programs.conf lib/cc-context.sh lib/cc-common.sh lib/cc-programs.sh lib/cc-packages.sh lib/cc-kernel.sh lib/cc-network.sh lib/cc-services.sh lib/cc-http.sh lib/cc-data.sh lib/cc-yaml.sh lib/cc-prompt-engine.sh bash/bashrc bash/bash_aliases bash/bash_functions defaults/v1/bashrc defaults/v1/bash_aliases defaults/v1/bash_functions defaults/v1/manifest.txt install/install.sh; do
+for f in VERSION manifest.yml config/programs.conf lib/cc-context.sh lib/cc-common.sh lib/cc-path.sh lib/cc-programs.sh lib/cc-packages.sh lib/cc-kernel.sh lib/cc-network.sh lib/cc-services.sh lib/cc-http.sh lib/cc-data.sh lib/cc-yaml.sh lib/cc-prompt-engine.sh bash/bashrc bash/bash_aliases bash/bash_functions defaults/v1/bashrc defaults/v1/bash_aliases defaults/v1/bash_functions defaults/v1/manifest.txt install/install.sh; do
     cc_require_file "$f"
 done
 
 bash -n lib/cc-context.sh
 bash -n lib/cc-common.sh
+bash -n lib/cc-path.sh
 bash -n lib/cc-programs.sh
 bash -n lib/cc-packages.sh
 bash -n lib/cc-kernel.sh
@@ -65,6 +66,16 @@ bash -n tools/commands/programs
 cmp -s bash/bashrc defaults/v1/bashrc || { cc_error "Promoted bashrc differs from authoritative source."; exit 1; }
 cmp -s bash/bash_aliases defaults/v1/bash_aliases || { cc_error "Promoted bash_aliases differs from authoritative source."; exit 1; }
 cmp -s bash/bash_functions defaults/v1/bash_functions || { cc_error "Promoted bash_functions differs from authoritative source."; exit 1; }
+
+source "$TOOLKIT_ROOT/lib/cc-path.sh"
+cmp -s <(cc_path_managed_block) <(
+    awk -v begin="$CC_PATH_BLOCK_BEGIN" -v end="$CC_PATH_BLOCK_END" '
+        $0 == begin { copying=1; blocks++ }
+        copying { print }
+        $0 == end { copying=0; ends++ }
+        END { if (blocks != 1 || ends != 1) exit 1 }
+    ' bash/bashrc
+) || { cc_error "Authoritative bashrc PATH block differs from shared policy."; exit 1; }
 
 cc_load_version
 defaults_version="$(sed -n 's/^Version: //p' defaults/v1/manifest.txt)"

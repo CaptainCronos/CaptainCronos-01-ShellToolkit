@@ -280,7 +280,7 @@ if path_has_home_bin; then
     cc_log "$HOME/bin is already in PATH."
 else
     cc_warn "$HOME/bin is not currently in PATH."
-    cc_warn "Add this to your shell profile if needed: export PATH=\"$HOME/bin:\$PATH\""
+    cc_warn "Repair managed startup entries with: cc env path --fix"
 fi
 
 echo

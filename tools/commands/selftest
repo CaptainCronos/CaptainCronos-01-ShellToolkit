@@ -251,12 +251,14 @@ selftest_suite() {
     local runner="$1"
     "$runner" "Common library" core check_library cc-common.sh
     "$runner" "Temporary-resource library" core check_library cc-temp.sh
+    "$runner" "Managed PATH library" core check_library cc-path.sh
     "$runner" "Diagnostics library" diagnostics check_library cc-diagnostics.sh
     "$runner" "Diagnostic behavior" diagnostics bash "$PROJECT_ROOT/tests/diagnostics.sh"
     "$runner" "Progress behavior" diagnostics bash "$PROJECT_ROOT/tests/progress.sh"
     "$runner" "Presentation behavior" presentation bash "$PROJECT_ROOT/tests/presentation.sh"
     "$runner" "Help presentation" presentation bash "$PROJECT_ROOT/tests/help.sh"
     "$runner" "Shell helpers" shell bash "$PROJECT_ROOT/tests/shell-helpers.sh"
+    "$runner" "PATH environment behavior" shell bash "$PROJECT_ROOT/tests/path-environment.sh"
     "$runner" "Context library" core check_library cc-context.sh
     "$runner" "Config library" configuration check_library cc-config.sh
     "$runner" "Temporary-resource lifecycle" core bash "$PROJECT_ROOT/tests/temp-lifecycle.sh"

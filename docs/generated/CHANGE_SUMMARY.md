@@ -14,6 +14,8 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Shared managed-PATH policy and disposable-home regression coverage for legacy
+  normalization, repeated sourcing, shell ordering, and startup-file safety.
 - Focused terminal-presentation fixtures for semantic colors, TTY detection,
   `NO_COLOR`, `TERM=dumb`, redirection, summaries, and long status labels.
 - Shared PASS/WARN/FAIL/SKIP result aggregation for maintenance and reports.
@@ -58,6 +60,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- `cc env path --fix` now atomically installs one canonical idempotent PATH
+  block, removes only recognized legacy writers, preserves ambiguous user
+  customization, and reports the parent-shell reload boundary accurately.
 - Release integrity searches now use the declared core `grep` interface, so a
   missing optional `rg` executable cannot turn a forbidden-content check into a
   false PASS.

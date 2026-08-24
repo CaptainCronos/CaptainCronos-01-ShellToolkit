@@ -207,6 +207,18 @@ Required PATH entries:
 ~/.local/bin
 ```
 
+`lib/cc-path.sh` is the sole policy owner for these entries. Its canonical
+`.bashrc` block must keep each entry exactly once across repeated sourcing while
+preserving unrelated entries and their relative order. `cc env` and
+`cc env path` are read-only; persistent normalization requires the explicit
+`cc env path --fix` contract. Repair may remove only exact recognized Captain
+Cronos legacy writers and guards. Ambiguous user PATH logic must be preserved
+and reported.
+
+Startup-file repair does not imply that the already-running parent shell was
+changed. Commands must report that boundary accurately and may recommend
+sourcing the repaired `.bashrc` only while source idempotency is maintained.
+
 ## Installation Standard
 
 Installation is the first-time enrollment path.

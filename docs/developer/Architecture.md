@@ -200,6 +200,35 @@ while gaining real YAML parsing and safe atomic writes.
 
 ---
 
+## Managed PATH Ownership
+
+`lib/cc-path.sh` owns Captain Cronos PATH policy. The public command
+`tools/commands/env` consumes that library for inspection and explicit repair;
+the authoritative `bash/bashrc` and promoted default contain the library's
+generated managed block. Installer, update, and init code must not emit a
+second prepend or guard for `~/bin` or `~/.local/bin`.
+
+The block is placed after environment managers in the authoritative startup
+file. It normalizes only the two Captain Cronos managed entries, retaining their
+first positions when present and preserving the relative order of unrelated
+entries. Missing managed entries are inserted deterministically. Five or more
+successive sources and a fresh interactive shell must converge on the same
+state with one occurrence of each managed entry.
+
+Repair is authorized only by `cc env path --fix` or its compatible `--apply`
+spelling. It recognizes a narrow whitelist of historical conditional `$HOME`,
+`${HOME}`, and literal-home prepends plus the exact earlier marked guard shape.
+Unknown PATH logic remains byte-preserved and is reported. Mutation uses the
+shared temporary-resource lifecycle, same-directory staging, mode preservation,
+target identity checks, symlink refusal, content comparison, and atomic rename.
+Read-only environment commands create no files or directories.
+
+Because child processes cannot mutate a parent environment, command output must
+describe startup repair and current-shell health separately. Reload guidance is
+valid only because the installed managed block is source-idempotent.
+
+---
+
 ## Installation Model
 
 The installer performs:

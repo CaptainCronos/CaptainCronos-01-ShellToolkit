@@ -99,11 +99,6 @@ if ! shopt -oq posix; then
 fi
 
 # =============================
-# PATH
-# =============================
-[ -d "$HOME/bin" ] && export PATH="$HOME/bin:$PATH"
-
-# =============================
 # NVM
 # =============================
 export NVM_DIR="$HOME/.nvm"
@@ -123,3 +118,49 @@ fi
 if command -v fastfetch >/dev/null 2>&1 && [ -z "${SSH_CONNECTION:-}" ]; then
     fastfetch
 fi
+
+# Captain Cronos managed PATH: begin
+_cc_path_normalize_managed() {
+    local _cc_path_remaining="${PATH:-}" _cc_path_entry _cc_path_output=""
+    local _cc_path_separator="" _cc_path_more _cc_path_keep
+    local _cc_path_home_bin_seen=0 _cc_path_local_bin_seen=0
+
+    while :; do
+        if [[ "$_cc_path_remaining" == *:* ]]; then
+            _cc_path_entry="${_cc_path_remaining%%:*}"
+            _cc_path_remaining="${_cc_path_remaining#*:}"
+            _cc_path_more=1
+        else
+            _cc_path_entry="$_cc_path_remaining"
+            _cc_path_more=0
+        fi
+        _cc_path_keep=1
+        case "$_cc_path_entry" in
+            "$HOME/bin")
+                [ "$_cc_path_home_bin_seen" -eq 0 ] || _cc_path_keep=0
+                _cc_path_home_bin_seen=1
+                ;;
+            "$HOME/.local/bin")
+                [ "$_cc_path_local_bin_seen" -eq 0 ] || _cc_path_keep=0
+                _cc_path_local_bin_seen=1
+                ;;
+        esac
+        if [ "$_cc_path_keep" -eq 1 ]; then
+            _cc_path_output+="${_cc_path_separator}${_cc_path_entry}"
+            _cc_path_separator=:
+        fi
+        [ "$_cc_path_more" -eq 1 ] || break
+    done
+
+    if [ "$_cc_path_home_bin_seen" -eq 0 ]; then
+        _cc_path_output="$HOME/bin${_cc_path_separator}${_cc_path_output}"
+        _cc_path_separator=:
+    fi
+    if [ "$_cc_path_local_bin_seen" -eq 0 ]; then
+        _cc_path_output="$HOME/.local/bin${_cc_path_separator}${_cc_path_output}"
+    fi
+    export PATH="$_cc_path_output"
+}
+_cc_path_normalize_managed
+unset -f _cc_path_normalize_managed
+# Captain Cronos managed PATH: end

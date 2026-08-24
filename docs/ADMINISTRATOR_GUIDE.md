@@ -17,6 +17,34 @@ is metadata only in v1.3; it does not drive installation.
 ## Configuration
 Use `cc config` to review and modify toolkit settings.
 
+## PATH Management
+
+Captain Cronos manages exactly `~/bin` and `~/.local/bin` through one marked
+block in `~/.bashrc`. Check both the active PATH and startup configuration with:
+
+```bash
+cc env path
+```
+
+Inspection is read-only. Apply a repair explicitly with:
+
+```bash
+cc env path --fix
+```
+
+Repair creates missing managed directories, removes only recognized historical
+Captain Cronos conditional prepends and marked guards, installs one canonical
+block atomically, and preserves unrelated shell content, PATH entries, and
+their relative ordering. Unrecognized PATH statements are retained and
+reported for manual review rather than guessed at or deleted.
+
+The repair process cannot alter the parent shell that launched `cc`. Its report
+therefore distinguishes repaired startup configuration from inherited
+duplicates still active in the current shell. After a successful repair, run
+`source ~/.bashrc` to normalize the current interactive Bash session, or start a
+new interactive shell. Repeated sourcing is safe and keeps each managed entry
+exactly once.
+
 ## Daily Operations
 - `cc update`
 - `cc doctor`

@@ -299,9 +299,11 @@ PATH policy:
 
 Fix/apply behavior:
   - creates required directories when missing
-  - appends guarded PATH entries to ~/.bashrc when missing
-  - removes duplicate PATH entries in the current output guidance
+  - atomically installs one canonical managed PATH block in ~/.bashrc
+  - removes exact known legacy Captain Cronos PATH lines and guards
+  - preserves unknown PATH customization and unrelated file content
   - preserves first occurrence order when showing the cleaned PATH
+  - cannot modify the already-running parent shell's PATH
 ~~~
 
 ## cc framework

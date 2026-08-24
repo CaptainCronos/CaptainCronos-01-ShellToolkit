@@ -6,7 +6,7 @@
 # Script      : env
 # Version     : reads VERSION
 # Category    : Core
-# Requires    : bash awk grep mkdir
+# Requires    : bash mkdir stat mv chmod
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Inspect and repair Captain Cronos environment and PATH health.
 # ==============================================================================
@@ -17,6 +17,7 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-environment.sh"
+source "$PROJECT_ROOT/lib/cc-path.sh"
 source "$PROJECT_ROOT/lib/cc-platform.sh"
 
 ACTION="summary"
@@ -40,9 +41,11 @@ PATH policy:
 
 Fix/apply behavior:
   - creates required directories when missing
-  - appends guarded PATH entries to ~/.bashrc when missing
-  - removes duplicate PATH entries in the current output guidance
+  - atomically installs one canonical managed PATH block in ~/.bashrc
+  - removes exact known legacy Captain Cronos PATH lines and guards
+  - preserves unknown PATH customization and unrelated file content
   - preserves first occurrence order when showing the cleaned PATH
+  - cannot modify the already-running parent shell's PATH
 EOF_HELP
 }
 
@@ -71,25 +74,9 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-count_path_entry() {
-    local needle="$1" count=0 entry
-    IFS=':' read -r -a entries <<< "$PATH"
-    for entry in "${entries[@]}"; do
-        [ "$entry" = "$needle" ] && count=$((count + 1))
-    done
-    echo "$count"
-}
-
-path_cleaned() {
-    awk -v RS=':' '
-        NF && !seen[$0]++ { out = out (out ? ":" : "") $0 }
-        END { print out }
-    ' <<< "$PATH"
-}
-
 path_status_for() {
     local label="$1" dir="$2" count status note
-    count="$(count_path_entry "$dir")"
+    count="$(cc_path_count_entry "$PATH" "$dir")"
     status="PASS"
     note=""
 
@@ -118,7 +105,7 @@ path_status_for() {
 path_overall() {
     local fail=0 warn=0 dir count
     for dir in "$HOME/bin" "$HOME/.local/bin"; do
-        count="$(count_path_entry "$dir")"
+        count="$(cc_path_count_entry "$PATH" "$dir")"
         if [ "$count" -eq 0 ]; then
             fail=$((fail + 1))
         elif [ "$count" -gt 1 ] || [ ! -d "$dir" ]; then
@@ -131,24 +118,38 @@ path_overall() {
     fi
 }
 
-ensure_path_guard() {
-    local file="$1" dir="$2" label="$3"
-    grep -Fq "$dir" "$file" 2>/dev/null && return 0
-    cat >> "$file" <<EOF_GUARD
-
-# Captain Cronos PATH guard: $label
-case ":\$PATH:" in
-    *":$dir:"*) ;;
-    *) export PATH="$dir:\$PATH" ;;
-esac
-EOF_GUARD
-}
-
 fix_path() {
     mkdir -p "$HOME/bin" "$HOME/.local/bin"
-    touch "$HOME/.bashrc"
-    ensure_path_guard "$HOME/.bashrc" "$HOME/bin" "home bin"
-    ensure_path_guard "$HOME/.bashrc" "$HOME/.local/bin" "local bin"
+    cc_path_repair_bashrc "$HOME/.bashrc"
+}
+
+show_startup_path_status() {
+    local status=PASS note="" known
+    if ! cc_path_startup_audit "$HOME/.bashrc"; then
+        status=WARN
+        note="unsafe or unreadable ~/.bashrc"
+    else
+        known=$((CC_PATH_LEGACY_LINES + CC_PATH_LEGACY_GUARDS))
+        if [ "$CC_PATH_CANONICAL_BLOCKS" -ne 1 ] || [ "$CC_PATH_CANONICAL_ENDS" -ne 1 ] ||
+            [ "$CC_PATH_CANONICAL_MALFORMED" -ne 0 ]; then
+            status=WARN
+            note="canonical block missing or malformed"
+        fi
+        if [ "$known" -gt 0 ]; then
+            status=WARN
+            if [ -n "$note" ]; then note="$note; "; fi
+            note="${note}$known known legacy writer(s)"
+        fi
+        if [ "$CC_PATH_AMBIGUOUS_LINES" -gt 0 ]; then
+            status=WARN
+            if [ -n "$note" ]; then note="$note; "; fi
+            note="${note}${CC_PATH_AMBIGUOUS_LINES} ambiguous line(s) preserved"
+        fi
+    fi
+    printf '%-18s ' "Startup config"
+    cc_status_word "$status"
+    [ -z "$note" ] || printf ' %s' "$note"
+    printf '\n'
 }
 
 show_path() {
@@ -161,6 +162,7 @@ show_path() {
     path_status_for "~/bin" "$HOME/bin"
     # shellcheck disable=SC2088
     path_status_for "~/.local/bin" "$HOME/.local/bin"
+    show_startup_path_status
     printf '%-18s ' "Overall"
     cc_status_word "$overall"
     printf '\n'
@@ -171,13 +173,25 @@ show_path() {
     echo
     echo "Deduplicated PATH"
     echo "-----------------"
-    path_cleaned
+    cc_path_deduplicated "$PATH"
 
     if [ "$APPLY" -eq 1 ]; then
         echo
-        cc_log "Applying PATH directory and ~/.bashrc guards."
-        fix_path
-        cc_log "PATH guard update complete. Reload shell or run: source ~/.bashrc"
+        cc_log "Repairing Captain Cronos PATH startup configuration."
+        fix_path || return
+        cc_path_startup_audit "$HOME/.bashrc" || return
+        cc_log "Startup configuration repaired with one canonical managed PATH block."
+        if [ "$CC_PATH_AMBIGUOUS_LINES" -gt 0 ]; then
+            cc_warn "$CC_PATH_AMBIGUOUS_LINES ambiguous PATH line(s) were preserved for manual review."
+        fi
+        if [ "$overall" = PASS ]; then
+            cc_log "The current parent shell PATH was already healthy and was not changed."
+        else
+            cc_warn "Startup configuration is repaired; the current parent shell PATH remains $overall."
+        fi
+        cc_log "Run: source ~/.bashrc"
+        cc_log "Or start a new interactive shell to load the repaired configuration."
+        return 0
     elif [ "$overall" != "PASS" ]; then
         echo
         cc_warn "PATH health is $overall. Run: cc env path --fix"
