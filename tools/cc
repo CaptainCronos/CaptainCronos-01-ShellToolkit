@@ -68,12 +68,27 @@ cd "$TOOLKIT_ROOT"
 source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
 source "$TOOLKIT_ROOT/lib/cc-deps.sh"
+source "$TOOLKIT_ROOT/lib/cc-metadata.sh"
 source "$TOOLKIT_ROOT/lib/cc-packages.sh"
 cc_context_init "$TOOLKIT_ROOT" "$ORIGINAL_PWD"
 
 COMMAND_DIR="$TOOLKIT_ROOT/tools/commands"
 
 show_help() {
+    local command_name command_desc script version category requires repository
+    local max_name_length=0 leader_width minimum_dots=8 index
+    local -a command_names=() command_descriptions=()
+
+    while IFS=$'\t' read -r command_name script version category requires repository command_desc; do
+        [ -n "$command_name" ] || continue
+        command_names+=("$command_name")
+        command_descriptions+=("${command_desc:-No description.}")
+        if [ "${#command_name}" -gt "$max_name_length" ]; then
+            max_name_length=${#command_name}
+        fi
+    done < <(cc_registry_tsv)
+    leader_width=$((max_name_length + minimum_dots))
+
     echo "Captain Cronos Shell Toolkit"
     echo "============================"
     echo
@@ -81,14 +96,10 @@ show_help() {
     echo "  cc <command> [options]"
     echo
     echo "Commands:"
-    if [ -d "$COMMAND_DIR" ]; then
-        for command_file in "$COMMAND_DIR"/*; do
-            [ -f "$command_file" ] || continue
-            command_name="$(basename "$command_file")"
-            command_desc="$(grep -m 1 '^# Purpose     :' "$command_file" | sed 's/^# Purpose     : //')"
-            printf "  %-12s %s\n" "$command_name" "${command_desc:-No description.}"
-        done | sort
-    fi
+    for index in "${!command_names[@]}"; do
+        printf '  '
+        cc_dotted_line "${command_names[$index]}" "${command_descriptions[$index]}" "$leader_width"
+    done
     echo
     echo "Examples:"
     echo "  cc version"

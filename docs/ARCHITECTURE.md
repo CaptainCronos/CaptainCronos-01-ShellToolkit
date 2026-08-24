@@ -50,8 +50,10 @@ Important libraries:
 
 Commands retain semantic state as plain PASS, WARN, FAIL, SKIP, or INFO values.
 `cc-results.sh` aggregates those values without inspecting display text, and
-`cc-common.sh` renders them through shared status-word, dotted-row, summary, and
-diagnostic helpers. `cc-diagnostics.sh` uses the same renderer for completed
+`cc-common.sh` renders them through shared status-word, dotted-leader row,
+summary, and diagnostic helpers. The general dotted-leader renderer also keeps
+plain label/value inventories such as `cc help` readable without coupling their
+meaning to color. `cc-diagnostics.sh` uses the status renderer for completed
 progress rows. Exit status remains authoritative; neither commands nor tests
 derive results from ANSI sequences.
 

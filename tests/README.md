@@ -66,6 +66,9 @@ Focused shell tests supplement `cc selftest`:
   literal dependency traces, captured failures, and secret redaction.
 - `progress.sh` validates reusable count-based TTY, non-TTY, debug, machine,
   failure, and cleanup progress behavior.
+- `help.sh` validates registry-derived command inventory completeness, unique and
+  correctly associated descriptions, aligned dotted leaders, long command names,
+  unchanged help/dispatch statuses, and ANSI-free redirected color-policy modes.
 - `selftest-output.sh` validates normal/debug exit equivalence, sequential debug
   activity, invalid options, JSON integrity, stdout/stderr separation, canonical
   result uniqueness, and registration/execution accounting. It is run separately

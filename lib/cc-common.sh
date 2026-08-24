@@ -97,8 +97,8 @@ cc_status_cell() {
     [ "$padding" -gt 0 ] && printf '%*s' "$padding" ''
 }
 
-cc_status_line_fd() {
-    local fd="$1" label="$2" status="$3" width="${4:-${CC_STATUS_WIDTH:-38}}" label_len dots
+cc_dotted_leader_fd() {
+    local fd="$1" label="$2" width="${3:-${CC_STATUS_WIDTH:-38}}" label_len dots
     label_len=${#label}
     if [ "$label_len" -ge "$width" ]; then
         printf '%s ' "$label" >&"$fd"
@@ -108,6 +108,21 @@ cc_status_line_fd() {
         printf '%*s' "$dots" '' | tr ' ' '.' >&"$fd"
         printf ' ' >&"$fd"
     fi
+}
+
+cc_dotted_line_fd() {
+    local fd="$1" label="$2" value="$3" width="${4:-${CC_STATUS_WIDTH:-38}}"
+    cc_dotted_leader_fd "$fd" "$label" "$width"
+    printf '%s\n' "$value" >&"$fd"
+}
+
+cc_dotted_line() {
+    cc_dotted_line_fd 1 "$1" "$2" "${3:-${CC_STATUS_WIDTH:-38}}"
+}
+
+cc_status_line_fd() {
+    local fd="$1" label="$2" status="$3" width="${4:-${CC_STATUS_WIDTH:-38}}"
+    cc_dotted_leader_fd "$fd" "$label" "$width"
     cc_status_word_fd "$fd" "$status"
     printf '\n' >&"$fd"
 }

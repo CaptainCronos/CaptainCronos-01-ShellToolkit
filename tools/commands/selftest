@@ -255,6 +255,7 @@ selftest_suite() {
     "$runner" "Diagnostic behavior" diagnostics bash "$PROJECT_ROOT/tests/diagnostics.sh"
     "$runner" "Progress behavior" diagnostics bash "$PROJECT_ROOT/tests/progress.sh"
     "$runner" "Presentation behavior" presentation bash "$PROJECT_ROOT/tests/presentation.sh"
+    "$runner" "Help presentation" presentation bash "$PROJECT_ROOT/tests/help.sh"
     "$runner" "Shell helpers" shell bash "$PROJECT_ROOT/tests/shell-helpers.sh"
     "$runner" "Context library" core check_library cc-context.sh
     "$runner" "Config library" configuration check_library cc-config.sh

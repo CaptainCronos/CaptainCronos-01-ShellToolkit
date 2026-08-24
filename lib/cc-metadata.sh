@@ -16,7 +16,7 @@ cc_command_dir() {
 }
 
 cc_command_list() {
-    find "$(cc_command_dir)" -maxdepth 1 -type f -printf '%f\n' 2>/dev/null | sort
+    find "$(cc_command_dir)" -maxdepth 1 -type f -printf '%f\n' 2>/dev/null | LC_ALL=C sort
 }
 
 cc_metadata_field() {

@@ -84,7 +84,10 @@ Each command script should include a standard header:
 # ==============================================================================
 ```
 
-The `Purpose` line should be concise because `cc help` may use it for generated command listings.
+The `Purpose` line should be concise because `cc help` uses the shared metadata
+registry to generate its command listing. The listing derives one dotted-leader
+endpoint from the longest registered command, preserving every command and
+description without per-command padding or truncation.
 
 ---
 
