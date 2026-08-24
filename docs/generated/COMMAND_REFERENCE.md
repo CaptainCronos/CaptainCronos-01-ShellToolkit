@@ -11,6 +11,22 @@ Usage:
 Shows toolkit overview, major components, and documentation locations.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc about
+
+Usage:
+  cc about
+
+Show toolkit overview, components, and documentation locations.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+~~~
+
 ## cc asset
 
 ~~~text
@@ -37,6 +53,39 @@ Types:
 
 Lifecycle states:
   new inventory testing qualified production watch failed retired
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc asset
+
+Usage:
+  cc asset <subcommand> [arguments]
+
+Manage local lifecycle asset inventory records.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  init............. Initialize asset directories.
+  list............. List assets, optionally by type.
+  show............. Show one asset record.
+  path............. Show an asset directory path.
+  search........... Search asset records by type and query.
+  inventory........ Show an inventory for one asset type.
+  create........... Create an asset record from key=value fields.
+  set.............. Update fields on an existing asset record.
+  state............ Change lifecycle state and optionally record a note.
+  history.......... Show one asset's lifecycle history.
+  retire........... Retire an asset and optionally record a note.
+  export........... Export assets, optionally by type.
+
+Discovery:
+  cc asset <subcommand> switches
 ~~~
 
 ## cc audit
@@ -73,12 +122,52 @@ Notes:
   packaging and strict audit compliance.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc audit
+
+Usage:
+  cc audit [summary
+
+commands] [switches]; cc audit fix [switches]
+
+Switches:
+  --strict.......... Require executable bits plus Category and Requires headers.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  summary......... Show the default command audit summary.
+  commands........ Show per-command audit detail.
+  fix............. Preview or apply managed audit repairs.
+
+Discovery:
+  cc audit <subcommand> switches
+~~~
+
 ## cc baseline
 
 ~~~text
 Usage: cc baseline
 
 Captures operating-system baseline shell files.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc baseline
+
+Usage:
+  cc baseline
+
+Capture operating-system baseline shell files.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc capability
@@ -94,6 +183,29 @@ Examples:
   cc capability check zfs
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc capability
+
+Usage:
+  cc capability [list
+
+check NAME]
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  list......... List platform capabilities.
+  check........ Check one named capability.
+
+Discovery:
+  cc capability <subcommand> switches
+~~~
+
 ## cc config
 
 ~~~text
@@ -107,12 +219,53 @@ Configuration file:
   ~/.captaincronos/config
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc config
+
+Usage:
+  cc config <subcommand> [arguments]
+
+Read or update toolkit configuration.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  show........ Show resolved toolkit configuration.
+  init........ Initialize the user configuration file.
+  get......... Read one key with an optional default.
+  set......... Set one configuration key and value.
+
+Discovery:
+  cc config <subcommand> switches
+~~~
+
 ## cc defaults
 
 ~~~text
 Usage: cc defaults
 
 Promotes active shell files into defaults/v1.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc defaults
+
+Usage:
+  cc defaults
+
+Promote active shell files into defaults/v1.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc deps
@@ -128,6 +281,34 @@ Usage:
   cc deps optional
 
 Shows dependency status for toolkit commands and dependency groups.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc deps
+
+Usage:
+  cc deps [subcommand] [arguments]
+
+Show dependency status by command or profile.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  summary......... Show the default dependency summary.
+  command......... Show dependencies for one registered command.
+  core............ Show core dependencies.
+  docs............ Show documentation dependencies.
+  storage......... Show storage dependencies.
+  kernel.......... Show kernel dependencies and optional capabilities.
+  optional........ Show optional dependencies.
+
+Discovery:
+  cc deps <subcommand> switches
 ~~~
 
 ## cc dev-update
@@ -155,6 +336,24 @@ Notes:
   pip, cargo, go, and gem are report-only until a safer per-ecosystem policy exists.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc dev-update
+
+Usage:
+  cc dev-update [TARGET] [switches]
+
+Review or apply supported developer package-manager updates.
+
+Switches:
+  --dry-run............ Report supported update operations without mutation. [default]
+  --apply.............. Authorize only the developer ecosystem updates implemented as mutable.
+  --status-only........ Report manager availability and policy without running update commands.
+  --help, -h........... Show contextual command help.
+  --version............ Show toolkit version information.
+~~~
+
 ## cc docs
 
 ~~~text
@@ -174,6 +373,34 @@ Options:
   --out DIR  Override output directory.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc docs
+
+Usage:
+  cc docs [subcommand] [switches]
+
+Generate, lint, or verify toolkit documentation.
+
+Switches:
+  --apply........... Write generated files; omission prints output without updating generated files.
+  --out DIR......... Use DIR instead of docs/generated as the output destination.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  build............ Generate every managed documentation output.
+  inventory........ Generate the command inventory.
+  reference........ Generate the command reference including switch contracts.
+  changelog........ Generate the recent change summary.
+  lint............. Check command headers and Bash syntax.
+  check............ Verify generated documents are current; always read-only.
+
+Discovery:
+  cc docs <subcommand> switches
+~~~
+
 ## cc doctor
 
 ~~~text
@@ -181,6 +408,22 @@ Usage: cc doctor [--full]
 
 Runs repository, installation, semantic kernel, and basic host health checks.
 Use --full to include storage inventory and SMART summary.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc doctor
+
+Usage:
+  cc doctor [switches]
+
+Run repository, installation, kernel, and host health checks.
+
+Switches:
+  --full............ Include storage inventory and SMART summary in diagnostics.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc drive-burnin
@@ -199,6 +442,30 @@ Actions:
   status  Show current SMART self-test status.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc drive-burnin
+
+Usage:
+  cc drive-burnin [subcommand] DEVICE
+
+Run the non-destructive drive burn-in workflow framework.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  plan.......... Show the intended acceptance workflow.
+  start......... Capture a report and begin non-destructive qualification.
+  status........ Show current SMART self-test status.
+
+Discovery:
+  cc drive-burnin <subcommand> switches
+~~~
+
 ## cc drive-inventory
 
 ~~~text
@@ -208,6 +475,30 @@ Usage:
 Shows attached block devices with model, serial, size, transport, mountpoints, and SMART basics.
 
 This is read-only inventory output. It does not start SMART tests or modify disks.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc drive-inventory
+
+Usage:
+  cc drive-inventory [table
+
+csv
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  table........... Render the default table format.
+  csv............. Render CSV inventory.
+  markdown........ Render Markdown inventory.
+
+Discovery:
+  cc drive-inventory <subcommand> switches
 ~~~
 
 ## cc drive-qualify
@@ -231,6 +522,30 @@ Notes:
   This is non-destructive. It does not run write/read burn-in.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc drive-qualify
+
+Usage:
+  cc drive-qualify [subcommand] [switches] DEVICE
+
+Run non-destructive drive qualification.
+
+Switches:
+  --long............ Start a SMART long self-test after the initial report instead of a short test.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  start........... Capture pre-test state and start SMART qualification.
+  status.......... Show SMART qualification status.
+  complete........ Capture final state and qualify a healthy asset.
+
+Discovery:
+  cc drive-qualify <subcommand> switches
+~~~
+
 ## cc drive-report
 
 ~~~text
@@ -242,6 +557,22 @@ Creates an archived drive report under the host report directory.
 Also creates/updates a drive asset record and appends asset history.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc drive-report
+
+Usage:
+  cc drive-report DEVICE
+
+Archive a drive report and update its asset record.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+~~~
+
 ## cc drive-smart
 
 ~~~text
@@ -250,6 +581,22 @@ Usage:
   cc drive-smart /dev/nvme0n1
 
 Shows a concise SMART health summary for one drive.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc drive-smart
+
+Usage:
+  cc drive-smart DEVICE
+
+Show a concise SMART health summary.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc drive-test
@@ -272,12 +619,53 @@ Notes:
   This command does not run destructive write/read burn-in tests.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc drive-test
+
+Usage:
+  cc drive-test <subcommand> DEVICE
+
+Start or inspect SMART self-tests.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status........ Show SMART self-test status and recent log.
+  short......... Start a SMART short self-test.
+  long.......... Start a SMART long self-test.
+  abort......... Use the retained compatibility abort handler.
+
+Discovery:
+  cc drive-test <subcommand> switches
+~~~
+
 ## cc drives
 
 ~~~text
 Usage: cc drives
 
 Shows physical block devices, filesystems, labels, UUIDs, usage, and mount points.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc drives
+
+Usage:
+  cc drives
+
+Show physical devices, filesystems, labels, usage, and mounts.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc env
@@ -306,6 +694,32 @@ Fix/apply behavior:
   - cannot modify the already-running parent shell's PATH
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc env
+
+Usage:
+  cc env [subcommand] [switches]
+
+Inspect or repair host identity, shell files, and PATH health.
+
+Switches:
+  --fix, --apply........ Repair managed PATH startup configuration; inspection is the default.
+  --help, -h............ Show contextual command help.
+  --version............. Show toolkit version information.
+
+Subcommands:
+  summary........ Show the environment summary.
+  path........... Inspect or repair managed PATH state.
+  shell.......... Inspect managed shell-file state.
+  host........... Show resolved host identity.
+  doctor......... Run environment diagnostics and optionally repair PATH.
+
+Discovery:
+  cc env <subcommand> switches
+~~~
+
 ## cc framework
 
 ~~~text
@@ -316,6 +730,30 @@ Actions:
   status     Show framework milestone progress.
   checklist  Print the 1.3 framework completion checklist.
   verify     Run the 1.3 framework quality gates.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc framework
+
+Usage:
+  cc framework [subcommand]
+
+Inspect or verify framework milestone status.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status........... Show framework milestone progress.
+  checklist........ Print the 1.3 completion checklist.
+  verify........... Run framework quality gates.
+
+Discovery:
+  cc framework <subcommand> switches
 ~~~
 
 ## cc gitflow
@@ -331,6 +769,22 @@ Examples:
   cc gitflow ~/GitHub/CaptainCronos-01-ShellToolkit
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc gitflow
+
+Usage:
+  cc gitflow [REPOSITORY]
+
+Launch the interactive Captain Cronos Git assistant.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+~~~
+
 ## cc helpme-refresh
 
 ~~~text
@@ -339,6 +793,23 @@ Usage:
 
 Replaces the installed helpme function with canonical Captain Cronos framework help.
 Default is dry-run.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc helpme-refresh
+
+Usage:
+  cc helpme-refresh [switches]
+
+Preview or replace the installed helpme function.
+
+Switches:
+  --dry-run......... Preview replacement of the installed helpme function. [default]
+  --apply........... Authorize replacement of the managed helpme function block.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc init
@@ -368,6 +839,27 @@ Profiles:
 Default is dry-run.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc init
+
+Usage:
+  cc init [switches]
+
+Initialize a portable host identity, optionally interactively.
+
+Switches:
+  --apply.................. Authorize host identity and managed environment writes; omission is dry-run. [default: dry-run]
+  --interactive............ Collect host identity choices interactively.
+  --selftest............... Run the engineering selftest after initialization.
+  --host-id ID............. Set the normalized Captain Cronos host identifier.
+  --role ROLE.............. Select a supported host role.
+  --profile PROFILE........ Select a supported platform profile.
+  --help, -h............... Show contextual command help.
+  --version................ Show toolkit version information.
+~~~
+
 ## cc install
 
 ~~~text
@@ -388,6 +880,24 @@ Notes:
   Dry-run is the default. Launcher mutation requires --apply.
   This command installs only the cc launcher. The full shell-file installer
   remains available as install/install.sh --apply.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc install
+
+Usage:
+  cc install [switches]
+
+Install or update only the active cc launcher.
+
+Switches:
+  --dry-run......... Preview launcher installation without changing files. [default]
+  --apply........... Explicitly authorize launcher installation or update.
+  --force........... Reinstall the launcher even when the installed copy already matches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc kernel
@@ -430,6 +940,38 @@ Examples:
   cc kernel cleanup --dry-run
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc kernel
+
+Usage:
+  cc kernel <subcommand> [switches]
+
+Inspect kernel state, artifacts, health, dependencies, and cleanup candidates.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status.............. Show kernel state and boot filesystem usage.
+  help................ Show kernel namespace help.
+  list................ List installed kernels and protection state.
+  running............. Show the running release and matching packages.
+  platform............ Show kernel platform support.
+  capabilities........ Alias for platform.
+  artifacts........... Correlate packages and boot artifacts.
+  health.............. Evaluate package and artifact consistency read-only.
+  cleanup............. Preview or apply protected obsolete-kernel cleanup.
+  deps................ Show kernel-management dependencies.
+  dependencies........ Alias for deps.
+
+Discovery:
+  cc kernel <subcommand> switches
+~~~
+
 ## cc kernel-cleanup
 
 ~~~text
@@ -440,6 +982,23 @@ Defaults to --dry-run and keeps the running kernel plus KEEP_COUNT newest
 additional installed kernels (default: 2).
 
 Environment: KEEP_COUNT=3 cc kernel-cleanup --dry-run
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc kernel-cleanup
+
+Usage:
+  cc kernel-cleanup [switches]
+
+Compatibility entry point for cc kernel cleanup.
+
+Switches:
+  --dry-run......... Preview obsolete-kernel package removal without mutation. [default]
+  --apply........... Delegate explicit removal authorization to cc kernel cleanup.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc monthly-health
@@ -460,6 +1019,23 @@ Environment:
   TOP_N=10 cc monthly-health --stdout
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc monthly-health
+
+Usage:
+  cc monthly-health [switches]
+
+Generate a host health and maintenance report without kernel cleanup.
+
+Switches:
+  --stdout.......... Write the report to standard output instead of a report file.
+  --file............ Write the report file under the configured report directory. [default]
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+~~~
+
 ## cc monthly-health-timer
 
 ~~~text
@@ -469,6 +1045,33 @@ Recommended architecture: run cc monthly-health from the existing daily-backup-r
 The standalone user timer is retained only as an optional fallback.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc monthly-health-timer
+
+Usage:
+  cc monthly-health-timer <subcommand>
+
+Manage the optional user-scoped monthly-health timer.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status.................... Show optional user timer state.
+  retire.................... Retire the standalone timer configuration.
+  run-once.................. Run monthly health once.
+  install-standalone........ Install the optional standalone user timer.
+  enable.................... Enable the optional user timer.
+  disable................... Disable the optional user timer.
+
+Discovery:
+  cc monthly-health-timer <subcommand> switches
+~~~
+
 ## cc platform
 
 ~~~text
@@ -476,6 +1079,29 @@ Usage:
   cc platform [summary|capabilities]
 
 Shows detected platform, package manager, init system, host identity, and capabilities.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc platform
+
+Usage:
+  cc platform [summary
+
+capabilities]
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  summary............. Show the platform summary.
+  capabilities........ Show detected platform capabilities.
+
+Discovery:
+  cc platform <subcommand> switches
 ~~~
 
 ## cc plugin
@@ -490,6 +1116,30 @@ Actions:
   info NAME   Show detail for one plugin directory.
 
 This command only inspects plugin directories. It does not enable, disable, or execute plugins yet.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc plugin
+
+Usage:
+  cc plugin [subcommand] [arguments]
+
+Inspect plugin directories without executing plugins.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  list.......... List plugin directories.
+  status........ Show plugin directory status and file counts.
+  info.......... Show details for one plugin directory.
+
+Discovery:
+  cc plugin <subcommand> switches
 ~~~
 
 ## cc programs
@@ -508,6 +1158,29 @@ Examples:
   cc programs show http-api
   cc programs show json
   cc programs show yaml
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc programs
+
+Usage:
+  cc programs [subcommand] [arguments]
+
+Report configured semantic program interfaces.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  check........ Check required and optional program interfaces.
+  show......... Show the implementation for one capability.
+
+Discovery:
+  cc programs <subcommand> switches
 ~~~
 
 ## cc prompt
@@ -535,6 +1208,22 @@ After preview:
   3 Cancel    Exit without generating.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc prompt
+
+Usage:
+  cc prompt [TEMPLATE]
+
+Run the interactive, metadata-discovered prompt engine.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+~~~
+
 ## cc registry
 
 ~~~text
@@ -542,6 +1231,30 @@ Usage:
   cc registry [table|tsv|markdown]
 
 Shows the command metadata registry generated from tools/commands headers.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc registry
+
+Usage:
+  cc registry [table
+
+tsv
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  table........... Render the metadata registry as a table.
+  tsv............. Render tab-separated registry data.
+  markdown........ Render the registry as Markdown.
+
+Discovery:
+  cc registry <subcommand> switches
 ~~~
 
 ## cc release
@@ -557,12 +1270,51 @@ Actions:
 This is the first release-engine stage. Version bumping, tagging, and push automation are intentionally not automatic yet.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc release
+
+Usage:
+  cc release [subcommand] [switches]
+
+Plan or check the release workflow.
+
+Switches:
+  --apply........... Accepted for workflow compatibility; release automation still does not bump, tag, or push.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  plan......... Show the release workflow checklist.
+  check........ Run pre-release verification checks.
+
+Discovery:
+  cc release <subcommand> switches
+~~~
+
 ## cc repo
 
 ~~~text
 Usage: cc repo
 
 Shows the repository path, current branch, and origin remote.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc repo
+
+Usage:
+  cc repo
+
+Show the current repository path, branch, and origin.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc repos
@@ -606,6 +1358,44 @@ Examples:
   cc repos publish --apply
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc repos
+
+Usage:
+  cc repos [subcommand] [switches]
+
+Inventory or conservatively manage local Git repositories.
+
+Switches:
+  --root PATH............. Inspect repositories below PATH. [default: ~/GitHub]
+  --out FILE.............. Write inventory output to a .md or .csv file.
+  --bundle-dir DIR........ Use DIR for bundle backups. [default: ~/.captaincronos/repo-bundles]
+  --message TEXT.......... Set the commit message required by the commit subcommand; --message=TEXT is also accepted.
+  --apply................. Authorize the selected mutating Git action; omission is dry-run. [default: dry-run]
+  --help, -h.............. Show contextual command help.
+  --version............... Show toolkit version information.
+
+Subcommands:
+  list............. List detected Git repositories.
+  status........... Show the repository dashboard.
+  health........... Show health-only dashboard and summary.
+  inventory........ Generate a repository inventory.
+  fetch............ Fetch and prune; dry-run by default.
+  pull............. Pull fast-forward-only for clean repositories; dry-run by default.
+  sync............. Fetch then fast-forward-only pull; dry-run by default.
+  backup........... Create Git bundle backups; dry-run by default.
+  commit........... Commit dirty repositories with a required message; dry-run by default.
+  push............. Push eligible branches without force; dry-run by default.
+  publish.......... Push eligible clean main branches; dry-run by default.
+  verify........... Run cc verify in toolkit repositories.
+  doctor........... Run cc doctor in toolkit repositories.
+
+Discovery:
+  cc repos <subcommand> switches
+~~~
+
 ## cc roadmap
 
 ~~~text
@@ -613,6 +1403,22 @@ Usage:
   cc roadmap [markdown]
 
 Shows the canonical project roadmap from ROADMAP.md.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc roadmap
+
+Usage:
+  cc roadmap [markdown]
+
+Show the canonical project roadmap.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc selftest
@@ -640,6 +1446,24 @@ Options:
   --debug    Emit intentional diagnostic events to stderr.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc selftest
+
+Usage:
+  cc selftest [switches]
+
+Run the toolkit engineering self-test suite.
+
+Switches:
+  --verbose......... Show captured-output diagnostics without replaying successful stdout.
+  --json............ Emit the selftest summary as JSON.
+  --debug........... Emit intentional diagnostic events to standard error.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+~~~
+
 ## cc smart
 
 ~~~text
@@ -652,12 +1476,45 @@ Examples:
   cc smart sdd --logs
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc smart
+
+Usage:
+  cc smart [DEVICE] [switches]
+
+Show storage and SMART detail, optionally for one device.
+
+Switches:
+  --full............ Show full SMART device information for the selected device.
+  --logs............ Show SMART log information for the selected device.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+~~~
+
 ## cc status
 
 ~~~text
 Usage: cc status
 
 Shows branch, origin, recent commits, and working tree status.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc status
+
+Usage:
+  cc status
+
+Show repository branch, origin, commits, and worktree status.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc storage
@@ -700,6 +1557,40 @@ Examples:
   cc storage workbench status
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc storage
+
+Usage:
+  cc storage <subcommand> [arguments]
+
+Route storage inventory, SMART, testing, reporting, and workbench operations.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  inventory........... Delegate to read-only drive inventory.
+  help................ Show storage namespace help.
+  drives.............. Delegate to mounted and installed device reporting.
+  smart............... Delegate to concise SMART reporting.
+  test................ Delegate to SMART self-test operations.
+  report.............. Delegate to archived drive reporting.
+  qualify............. Delegate to non-destructive qualification.
+  burnin.............. Delegate to the burn-in workflow framework.
+  burn-in............. Alias for burnin.
+  workbench........... Delegate to workbench inspection or preparation.
+  deps................ Show storage dependency status.
+  dependencies........ Alias for deps.
+  status.............. Show workbench-oriented storage status.
+
+Discovery:
+  cc storage <subcommand> switches
+~~~
+
 ## cc system-update
 
 ~~~text
@@ -717,6 +1608,23 @@ Notes:
   This command does not purge old kernels. Review kernel cleanup separately after this workflow is stable.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc system-update
+
+Usage:
+  cc system-update [switches]
+
+Preview or apply managed OS and packaged-application updates.
+
+Switches:
+  --dry-run......... Preview package, Snap, and Flatpak operations without persistent mutation. [default]
+  --apply........... Explicitly authorize implemented package, Snap, and Flatpak mutations.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+~~~
+
 ## cc toolkit-update
 
 ~~~text
@@ -730,6 +1638,23 @@ Default:
 Options:
   --dry-run  Preview toolkit update and installation.
   --apply    Pull origin/main and run the full installer with explicit apply.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc toolkit-update
+
+Usage:
+  cc toolkit-update [switches]
+
+Preview or apply the toolkit Git and installer workflow.
+
+Switches:
+  --dry-run......... Inspect local state and preview update/install without Git or file mutation. [default]
+  --apply........... Authorize origin/main pull and the full installer apply path.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc update
@@ -762,6 +1687,40 @@ Notes:
   Use cc kernel cleanup separately before trusting automated cleanup.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc update
+
+Usage:
+  cc update [subcommand] [switches]
+
+Run managed toolkit, system, kernel, health, and optional developer maintenance.
+
+Switches:
+  --dry-run............. Preview every enabled maintenance stage without persistent mutation. [default]
+  --apply............... Pass explicit mutation authorization only to enabled mutation-capable stages.
+  --toolkit-only........ Run only the toolkit maintenance stage.
+  --system-only......... Run system update and kernel cleanup stages only.
+  --health-only......... Run only verification and health reporting stages.
+  --help, -h............ Show contextual command help.
+  --version............. Show toolkit version information.
+
+Subcommands:
+  dev............... Target supported developer package managers.
+  developer......... Alias for dev.
+  developers........ Alias for dev.
+  npm............... Target npm global packages.
+  pipx.............. Target pipx applications.
+  pip............... Report pip policy; mutation remains disabled.
+  cargo............. Report cargo policy; mutation remains disabled.
+  go................ Report Go policy; mutation remains disabled.
+  gem............... Report RubyGems policy; mutation remains disabled.
+
+Discovery:
+  cc update <subcommand> switches
+~~~
+
 ## cc verify
 
 ~~~text
@@ -777,6 +1736,29 @@ Options:
   --apply     Repair executable permissions for tools/commands/*.
 ~~~
 
+### Switch discovery
+
+~~~text
+Command: cc verify
+
+Usage:
+  cc verify [subcommand] [switches]
+
+Verify repository structure, syntax, and command permissions.
+
+Switches:
+  --apply........... Repair command executable permissions only when executable verification is selected.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  all............... Run repository verification.
+  executable........ Inspect or repair command executable permissions.
+
+Discovery:
+  cc verify <subcommand> switches
+~~~
+
 ## cc version
 
 ~~~text
@@ -785,6 +1767,22 @@ Codename: Blackbeard
 Standard: 0.1.0
 Baseline: ubuntu-26.04
 Release : 2026-06-29
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc version
+
+Usage:
+  cc version
+
+Show toolkit version and baseline information.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
 ~~~
 
 ## cc workbench
@@ -802,4 +1800,31 @@ Examples:
   cc workbench prepare --apply
   cc workbench prepare --apply --host-id drivebench
   cc workbench status
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc workbench
+
+Usage:
+  cc workbench [subcommand] [switches]
+
+Inspect or prepare a live USB drive-qualification workbench.
+
+Switches:
+  --apply.............. Authorize supported workbench preparation; omission is dry-run. [default: dry-run]
+  --host-id ID......... Set the initialized workbench host identifier.
+  --repo URL........... Use URL as the toolkit repository source.
+  --target DIR......... Use DIR as the parent checkout directory.
+  --no-selftest........ Skip the post-preparation engineering selftest.
+  --help, -h........... Show contextual command help.
+  --version............ Show toolkit version information.
+
+Subcommands:
+  prepare........ Inspect or prepare the workbench.
+  status......... Show workbench status.
+
+Discovery:
+  cc workbench <subcommand> switches
 ~~~

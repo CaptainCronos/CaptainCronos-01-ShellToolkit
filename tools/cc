@@ -69,6 +69,7 @@ source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
 source "$TOOLKIT_ROOT/lib/cc-deps.sh"
 source "$TOOLKIT_ROOT/lib/cc-metadata.sh"
+source "$TOOLKIT_ROOT/lib/cc-help.sh"
 source "$TOOLKIT_ROOT/lib/cc-packages.sh"
 cc_context_init "$TOOLKIT_ROOT" "$ORIGINAL_PWD"
 
@@ -106,6 +107,8 @@ show_help() {
     echo "  cc repo"
     echo "  cc doctor"
     echo "  cc install --dry-run"
+    echo "  cc install switches"
+    echo "  cc kernel cleanup switches"
     echo "  cc update"
     echo
     echo "Toolkit root: $TOOLKIT_ROOT"
@@ -191,6 +194,36 @@ if [ ! -f "$command_path" ]; then
     echo
     show_help
     exit 1
+fi
+
+if [ "${1:-}" = switches ] && [ "$#" -eq 1 ]; then
+    cc_help_render_switches "$cmd"
+    exit 0
+fi
+if [[ "${2:-}" =~ ^(--help|-h)$ ]] && [ "$#" -eq 2 ]; then
+    subcommand_row="$(cc_contract_subcommand_row "$cmd" "$1")"
+    if [ -n "$subcommand_row" ]; then
+        IFS='|' read -r _ _ _ subcommand_context <<< "$subcommand_row"
+        cc_help_render_switches "$subcommand_context"
+        exit 0
+    fi
+fi
+if [ "${2:-}" = switches ] && [ "$#" -eq 2 ]; then
+    subcommand_row="$(cc_contract_subcommand_row "$cmd" "$1")"
+    if [ -z "$subcommand_row" ]; then
+        cc_help_context_error "$cmd" "Unknown subcommand: $1" || status=$?
+        exit "${status:-2}"
+    fi
+    IFS='|' read -r _ _ _ subcommand_context <<< "$subcommand_row"
+    cc_help_render_switches "$subcommand_context"
+    exit 0
+fi
+
+if cc_help_dispatch_preflight "$cmd" "$@"; then
+    :
+else
+    status=$?
+    exit "$status"
 fi
 
 check_command_deps "$command_path" "$cmd"

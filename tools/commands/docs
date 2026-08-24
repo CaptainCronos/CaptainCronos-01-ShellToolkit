@@ -16,6 +16,7 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-metadata.sh"
 
 ACTION="build"
 OUT_DIR="$PROJECT_ROOT/docs/generated"
@@ -95,22 +96,24 @@ write_output() {
 }
 
 generate_inventory() {
-    local cmd file version purpose
+    local cmd file version purpose contract class
     cc_load_version
     echo "# Captain Cronos Command Inventory"
     echo
     echo "Toolkit version: ${TOOLKIT_VERSION:-unknown} (${TOOLKIT_CODENAME:-unknown})"
     echo
-    echo "| Command | Version | Purpose |"
-    echo "|---|---|---|"
+    echo "| Command | Class | Version | Purpose |"
+    echo "|---|---|---|---|"
     while read -r cmd; do
         [ -n "$cmd" ] || continue
         file="$PROJECT_ROOT/tools/commands/$cmd"
         version="${TOOLKIT_VERSION:-unknown}"
         purpose="$(script_field "$file" "Purpose")"
+        contract="$(cc_contract_command_row "$cmd")"
+        IFS='|' read -r _ class _ <<< "$contract"
         [ -n "$version" ] || version="unknown"
         [ -n "$purpose" ] || purpose="unknown"
-        echo "| cc $cmd | $version | $purpose |"
+        echo "| cc $cmd | $class | $version | $purpose |"
     done < <(command_list)
 }
 
@@ -132,6 +135,12 @@ generate_reference() {
         echo "~~~text"
         bash "$PROJECT_ROOT/tools/cc" "$cmd" --help 2>&1 || true
         echo "~~~"
+        echo
+        echo "### Switch discovery"
+        echo
+        echo "~~~text"
+        bash "$PROJECT_ROOT/tools/cc" "$cmd" switches
+        echo "~~~"
     done < <(command_list)
 }
 
@@ -147,7 +156,7 @@ generate_lint() {
     local cmd file issues=0
     echo "# Documentation Lint Report"
     echo
-    echo "Source: tools/commands metadata and Bash syntax"
+    echo "Source: tools/commands headers, CLI contracts, and Bash syntax"
     echo
     while read -r cmd; do
         [ -n "$cmd" ] || continue
@@ -157,6 +166,12 @@ generate_lint() {
         grep -q '^# Purpose[[:space:]]*:' "$file" || { echo "WARN: cc $cmd missing Purpose header"; issues=$((issues + 1)); }
         bash -n "$file" 2>/dev/null || { echo "ERROR: cc $cmd has Bash syntax problem"; issues=$((issues + 1)); }
     done < <(command_list)
+    if ! cmp -s \
+        <(command_list) \
+        <(cc_contract_commands | cut -d '|' -f1 | LC_ALL=C sort); then
+        echo "ERROR: registered commands and CLI contracts differ"
+        issues=$((issues + 1))
+    fi
     echo
     echo "Issues: $issues"
     [ "$issues" -eq 0 ]

@@ -1,6 +1,6 @@
 # Documentation Lint Report
 
-Source: tools/commands metadata and Bash syntax
+Source: tools/commands headers, CLI contracts, and Bash syntax
 
 
 Issues: 0

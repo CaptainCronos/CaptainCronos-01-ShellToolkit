@@ -51,6 +51,36 @@ exactly once.
 - `cc repos status`
 - `cc release check`
 
+## Command and Switch Discovery
+
+Start with `cc help` to discover public commands. Use the canonical `switches`
+keyword to inspect one command without running it:
+
+```bash
+cc install switches
+cc system-update switches
+cc doctor switches
+cc kernel switches
+cc kernel cleanup switches
+cc env path switches
+```
+
+Namespace discovery lists available subcommands and shows how to inspect a
+narrower context. A command with no command-specific switches says so rather
+than showing an empty list. Switch descriptions identify preview/apply defaults,
+value requirements, and deliberate limitations where those distinctions affect
+operator safety.
+
+`switches` is read-only and is resolved before command dependencies or command
+implementation code. `--help` remains the fuller command-owned reference and may
+also include workflow notes and examples. Existing `-h` and namespace `help`
+forms remain supported where they were already valid.
+
+Unknown switches, unknown namespace actions, invalid positional arguments in
+argument-free contexts, and missing switch values now include contextual help.
+They remain errors: the renderer preserves usage status 2 and never authorizes a
+mutation.
+
 ## Interactive Shell Helpers
 
 The `cc` executable is the toolkit command dispatcher. It is not an alias for

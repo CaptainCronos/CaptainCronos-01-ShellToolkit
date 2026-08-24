@@ -33,9 +33,11 @@ Its job is to:
 1. Discover the active Shell Toolkit checkout as `TOOLKIT_ROOT`.
 2. Load `lib/cc-context.sh`, `lib/cc-common.sh`, and `lib/cc-deps.sh`.
 3. Initialize `TOOLKIT_ROOT`, `CURRENT_REPO`, and the compatibility alias `PROJECT_ROOT`.
-4. Discover command modules.
-5. Dispatch the requested command.
-6. Provide generated help output.
+4. Discover command modules and their public CLI contracts.
+5. Render read-only command or subcommand switch discovery before dependency or command execution.
+6. Validate obvious switch, value, subcommand, and positional usage errors.
+7. Dispatch valid invocations to the command module.
+8. Provide generated help output.
 
 The dispatcher should remain small. It should not contain the full implementation of each command.
 
@@ -89,6 +91,21 @@ registry to generate its command listing. The listing derives one dotted-leader
 endpoint from the longest registered command, preserving every command and
 description without per-command padding or truncation.
 
+Public switch and subcommand contracts live in `lib/cc-metadata.sh`. This is the
+authoritative discovery layer consumed by `tools/cc`, `lib/cc-help.sh`, generated
+command references, and contract tests. It records command classification,
+usage, positional policy, subcommands and aliases, switch arity, defaults, and
+bounded safety descriptions. Command scripts still implement parsing and
+behavior; do not duplicate discovery text in a second registry.
+
+`tests/command-switches.sh` protects this boundary. It requires one contract per
+registered command, switch discovery for every command and namespace entry,
+unique switch rows, source presence for advertised switches, and focused
+parser/metadata fixtures for important aliases and value-taking switches. Bash
+does not provide reliable general static parser introspection, so this is
+deliberately described as focused drift protection rather than a proof for every
+possible parser control flow.
+
 ---
 
 ## Command Behavior
@@ -115,11 +132,36 @@ Batch repository commands should remain conservative. Mutating `cc repos` action
 
 ## Discovery Model
 
-Current target behavior:
+Operator discovery proceeds from broad to narrow:
+
+```text
+cc help
+cc <command> switches
+cc <command> <subcommand> switches
+```
+
+`switches` is the canonical read-only discovery keyword. The dispatcher handles
+it before dependency checking and before command execution, so it cannot fall
+through to preview or apply code. Namespace output includes namespace switches,
+available subcommands and aliases, and the nested discovery form. Commands with
+no command-specific switches say so explicitly.
+
+Top-level `--help` and `-h` remain command-owned to preserve detailed existing
+help. Exact nested `--help` and `-h` requests use the contextual renderer where
+the underlying namespace did not previously provide narrow help. The word
+`help` remains supported where an existing namespace already accepted it.
+
+Before dispatch, known contracts distinguish unknown switches, unknown
+subcommands, invalid positionals in declared argument-free contexts, and missing
+switch values. Errors render the narrowest relevant context and then preserve
+usage status 2. Rendering never converts a failed invocation to success.
+
+Current dispatch behavior:
 
 1. `cc` searches `tools/commands/`.
-2. If a matching command exists, it executes it.
-3. If no command exists, `cc` prints an error and generated help.
+2. It resolves discovery or validates the registered CLI contract.
+3. If a matching command exists and validation succeeds, it executes it.
+4. If no command exists, `cc` prints an error and generated global help.
 
 Future plugin behavior:
 
