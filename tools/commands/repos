@@ -16,12 +16,13 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-environment.sh"
 
 ROOT="${CAPTAIN_CRONOS_GIT_ROOT:-$HOME/GitHub}"
 ACTION="status"
 APPLY=0
 OUT=""
-BUNDLE_DIR="${CAPTAIN_CRONOS_REPO_BUNDLE_DIR:-$HOME/.captaincronos/repo-bundles}"
+BUNDLE_DIR="${CAPTAIN_CRONOS_REPO_BUNDLE_DIR:-$(cc_env_bundle_dir)}"
 MESSAGE=""
 ACTION_PASSES=0
 ACTION_WARNINGS=0

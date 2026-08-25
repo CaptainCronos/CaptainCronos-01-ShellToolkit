@@ -30,6 +30,7 @@ Toolkit version: 1.3.0-beta1 (Blackbeard)
 | cc install | flat-with-switches | 1.3.0-beta1 | Install the active toolkit launcher into ~/bin. |
 | cc kernel | namespace | 1.3.0-beta1 | Inspect and safely manage installed kernels. |
 | cc kernel-cleanup | compatibility-wrapper | 1.3.0-beta1 | Compatibility entry point for safe kernel cleanup review. |
+| cc maintenance | namespace-with-switches | 1.3.0-beta1 | Inspect persistent toolkit resource ownership and retention. |
 | cc monthly-health | flat-with-switches | 1.3.0-beta1 | Generate a monthly host health and maintenance report. |
 | cc monthly-health-timer | namespace | 1.3.0-beta1 | Retire or inspect the standalone monthly health user timer. |
 | cc platform | namespace | 1.3.0-beta1 | Show detected operating platform and host capabilities. |

@@ -34,6 +34,11 @@ Focused shell tests supplement `cc selftest`:
   path and symlink confinement, custom `TMPDIR`, and direct validation-command
   cleanup. Its SIGKILL fixture explicitly confirms that uncatchable termination
   can leave residue only inside the disposable test root.
+- `retention.sh` validates empty/missing persistent trees, reports, logs,
+  recovery backups, authoritative assets, curated history, bundles, reserved
+  cache, unknown ownership, safe accounting, oldest/newest dates, symlink
+  non-traversal, inspection and cleanup-preview zero-write fingerprints,
+  disabled apply, contextual help, deterministic TSV, and ANSI-free output.
 - `safety-contracts.sh` validates default-safe and explicit-apply behavior for
   launcher/full installation, toolkit update, system update, the complete update
   orchestrator, and monthly-health previews. Mutation paths run only through

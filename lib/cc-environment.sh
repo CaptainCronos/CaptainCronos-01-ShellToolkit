@@ -69,6 +69,14 @@ cc_env_log_dir() {
     echo "$(cc_env_host_home)/logs"
 }
 
+cc_env_backup_dir() {
+    echo "$(cc_env_home)/backups"
+}
+
+cc_env_bundle_dir() {
+    echo "$(cc_env_home)/repo-bundles"
+}
+
 cc_env_plugin_dir() {
     echo "$(cc_env_host_home)/plugins"
 }
@@ -136,11 +144,13 @@ cc_env_export() {
     CC_ASSET_DIR="$(cc_env_asset_dir)"
     CC_CACHE_DIR="$(cc_env_cache_dir)"
     CC_LOG_DIR="$(cc_env_log_dir)"
+    CC_BACKUP_DIR="$(cc_env_backup_dir)"
+    CC_BUNDLE_DIR="$(cc_env_bundle_dir)"
     CC_PLUGIN_DIR="$(cc_env_plugin_dir)"
     CC_ROLE="$(cc_env_role)"
     CC_PROFILE="$(cc_env_profile)"
     export CC_HOME CC_HOST_ID CC_HOST_HOME CC_CONFIG CC_REPORT_DIR CC_ASSET_DIR
-    export CC_CACHE_DIR CC_LOG_DIR CC_PLUGIN_DIR CC_ROLE CC_PROFILE
+    export CC_CACHE_DIR CC_LOG_DIR CC_BACKUP_DIR CC_BUNDLE_DIR CC_PLUGIN_DIR CC_ROLE CC_PROFILE
 }
 
 cc_env_summary() {
@@ -153,5 +163,8 @@ cc_env_summary() {
     printf '%-16s %s\n' "Config:" "$CC_CONFIG"
     printf '%-16s %s\n' "Reports:" "$CC_REPORT_DIR"
     printf '%-16s %s\n' "Assets:" "$CC_ASSET_DIR"
+    printf '%-16s %s\n' "Logs:" "$CC_LOG_DIR"
+    printf '%-16s %s\n' "Backups:" "$CC_BACKUP_DIR"
+    printf '%-16s %s\n' "Bundles:" "$CC_BUNDLE_DIR"
     printf '%-16s %s\n' "Plugins:" "$CC_PLUGIN_DIR"
 }

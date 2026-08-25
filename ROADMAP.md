@@ -18,6 +18,22 @@ configuration or installs remote browser archives; those capabilities are
 deferred rather than expanded during RC stabilization. Focused disposable-home
 and mocked-adapter tests cover the complete call chain.
 
+## v1.3 Persistent Resource Retention
+
+Status: **Inspection architecture complete**
+
+Persistent producers are cataloged by subsystem, lifecycle class, canonical or
+exact root, retention policy, and cleanup eligibility. `cc maintenance` provides
+bounded inventory, status, policy explanation, and a zero-candidate cleanup
+preview. Monthly health includes concise persistent-resource status. Active
+reports and operational logs now use the existing host-scoped environment
+roots; installer backups and user-requested repository bundles retain their
+global recovery/export homes.
+
+Deletion is intentionally deferred. No resource class currently has both an
+objective retention rule and sufficient recovery/ownership proof, so v1.3 keeps
+all policies at retain or user-managed and exposes no cleanup `--apply` path.
+
 ## Package Management Standardization
 
 Status: **Complete**

@@ -18,9 +18,10 @@ cd "$PROJECT_ROOT" || exit 1
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-dev-updates.sh"
 source "$PROJECT_ROOT/lib/cc-packages.sh"
+source "$PROJECT_ROOT/lib/cc-environment.sh"
 
 cc_load_version
-LOG="${LOG:-$HOME/upgrade.log}"
+LOG="${LOG:-$(cc_env_log_dir)/system-update.log}"
 MODE="dry-run"
 MODE_SET=""
 FAILED=0
@@ -77,10 +78,14 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$MODE" = apply ]; then
+    umask 077
+    mkdir -p "$(dirname "$LOG")"
+    chmod 700 "$(dirname "$LOG")"
     if ! : > "$LOG"; then
         cc_error "Unable to initialize update log: $LOG"
         exit 1
     fi
+    chmod 600 "$LOG"
 fi
 
 say() {

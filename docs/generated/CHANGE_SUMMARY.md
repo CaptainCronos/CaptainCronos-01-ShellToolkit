@@ -14,6 +14,15 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Read-only `cc maintenance` persistent-resource status, inventory, retention,
+  and disabled-cleanup preview with stable TSV output and contextual switches.
+- Shared persistent ownership catalog and bounded accounting for reports, logs,
+  assets/history, installer backups, repository bundles, reserved cache,
+  plugins, optional monthly-health units, legacy artifacts, and unclassified
+  toolkit-home entries.
+- Disposable retention fixtures covering classification, accounting, policy,
+  zero-write behavior, symlink non-traversal, disabled apply, and presentation.
+
 - Shared managed-PATH policy and disposable-home regression coverage for legacy
   normalization, repeated sourcing, shell ordering, and startup-file safety.
 - Focused terminal-presentation fixtures for semantic colors, TTY detection,
@@ -59,6 +68,13 @@ The format follows a simple milestone-based structure until the project reaches 
 - Prompt Engine validation in `install/verify.sh` and `cc selftest`.
 
 ### Changed
+
+- Monthly-health reports and operational update/kernel logs now resolve through
+  the existing host-scoped report/log environment roots; private report and log
+  modes remain 0600 inside mode-0700 directories.
+- Monthly health now reports concise persistent-resource status without cleanup.
+- Installer backup and repository bundle defaults now resolve through central
+  environment helpers while preserving their existing global locations.
 
 - `cc env path --fix` now atomically installs one canonical idempotent PATH
   block, removes only recognized legacy writers, preserves ambiguous user

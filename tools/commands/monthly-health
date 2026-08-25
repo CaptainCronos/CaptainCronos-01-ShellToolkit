@@ -16,6 +16,10 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-environment.sh"
+cc_env_export
+source "$PROJECT_ROOT/lib/cc-config.sh"
+source "$PROJECT_ROOT/lib/cc-report.sh"
 source "$PROJECT_ROOT/lib/cc-kernel.sh"
 source "$PROJECT_ROOT/lib/cc-network.sh"
 source "$PROJECT_ROOT/lib/cc-services.sh"
@@ -24,7 +28,7 @@ source "$PROJECT_ROOT/lib/cc-results.sh"
 OUTPUT="file"
 JOURNAL_SINCE="${JOURNAL_SINCE:-24 hours ago}"
 TOP_N="${TOP_N:-5}"
-REPORT_DIR="$HOME/.captaincronos/reports/monthly-health"
+REPORT_DIR="$(cc_report_root)/monthly-health"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 REPORT_FILE="$REPORT_DIR/monthly-health-$STAMP.log"
 LATEST_LINK="$REPORT_DIR/latest.log"
@@ -39,7 +43,7 @@ Kernel health, platform, boot storage, and maintenance fields come from the
 shared semantic kernel snapshot; no kernel cleanup is performed.
 
 Default output:
-  ~/.captaincronos/reports/monthly-health/monthly-health-YYYYMMDD-HHMMSS.log
+  CC_REPORT_DIR/monthly-health/monthly-health-YYYYMMDD-HHMMSS.log
 
 Environment:
   JOURNAL_SINCE="7 days ago" cc monthly-health
@@ -350,6 +354,11 @@ print_logs() {
     fi
 }
 
+print_persistent_resources() {
+    section "Persistent Toolkit Resources"
+    bash "$PROJECT_ROOT/tools/cc" maintenance status 2>&1 || return "$CC_RESULT_WARN_RC"
+}
+
 print_footer() {
     section "Report Summary"
     printf 'Overall report result: '
@@ -374,6 +383,7 @@ generate_report() {
     run_health_section "Networking and security" print_security_network
     run_health_section "Desktop and GPU" print_desktop_gpu
     run_health_section "Recent logs" print_logs
+    run_health_section "Persistent resources" print_persistent_resources
     print_footer
     cc_result_exit_status
 }

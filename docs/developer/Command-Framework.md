@@ -128,6 +128,13 @@ Commands should not duplicate common logging, version, dependency, or repository
 
 Batch repository commands should remain conservative. Mutating `cc repos` actions are dry-run by default and require `--apply` before writing to repositories or remotes. `cc repos push` skips dirty repositories, skips repositories without `origin`, reports ahead/behind state, and never force pushes. `cc repos publish` is the strict main-branch release path: after confirming a clean working tree, branch `main`, and an `origin` remote, it runs `git push origin main`.
 
+Cross-subsystem persistent ownership belongs to `cc maintenance`, not to a
+report, asset, environment, or repository command. Its `status`, `inventory`,
+`retention`, and `cleanup` contexts participate in central switch discovery.
+For v1.3, cleanup is a zero-candidate preview and `--apply` is intentionally
+absent; adding deletion later requires ownership, recoverability, objective
+policy, candidate parity, containment, authorization, and fixture proof.
+
 ---
 
 ## Discovery Model

@@ -44,7 +44,7 @@ cc_infer_category() {
         verify|doctor) echo "Diagnostics" ;;
         drives|smart) echo "Storage" ;;
         kernel|kernel-cleanup) echo "Maintenance" ;;
-        dev-update|system-update|update|monthly-health|monthly-health-timer) echo "Maintenance" ;;
+        dev-update|system-update|update|monthly-health|monthly-health-timer|maintenance) echo "Maintenance" ;;
         *) echo "General" ;;
     esac
 }
@@ -119,6 +119,7 @@ init|interactive|cc init [switches]|Initialize a portable host identity, optiona
 install|flat-with-switches|cc install [switches]|Install or update only the active cc launcher.|none
 kernel|namespace|cc kernel <subcommand> [switches]|Inspect kernel state, artifacts, health, dependencies, and cleanup candidates.|namespace
 kernel-cleanup|compatibility-wrapper|cc kernel-cleanup [switches]|Compatibility entry point for cc kernel cleanup.|none
+maintenance|namespace-with-switches|cc maintenance [subcommand] [switches]|Inspect persistent toolkit resource ownership and retention.|namespace
 monthly-health|flat-with-switches|cc monthly-health [switches]|Generate a host health and maintenance report without kernel cleanup.|none
 monthly-health-timer|namespace|cc monthly-health-timer <subcommand>|Manage the optional user-scoped monthly-health timer.|namespace
 platform|namespace|cc platform [summary|capabilities]|Show platform identity and capabilities.|namespace
@@ -186,6 +187,10 @@ kernel/cleanup|--dry-run|0|Preview obsolete-kernel package removal without mutat
 kernel/cleanup|--apply|0|Explicitly authorize removal of eligible packages; protected kernels remain excluded.
 kernel-cleanup|--dry-run|0|Preview obsolete-kernel package removal without mutation. [default]
 kernel-cleanup|--apply|0|Delegate explicit removal authorization to cc kernel cleanup.
+maintenance|--format FORMAT|1|Render inventory as a readable table or stable TSV. [default: table]
+maintenance|--dry-run|0|Show the disabled cleanup plan without mutation.
+maintenance/inventory|--format FORMAT|1|Render inventory as a readable table or stable TSV. [default: table]
+maintenance/cleanup|--dry-run|0|Explicitly request the read-only cleanup preview; cleanup remains disabled.
 monthly-health|--stdout|0|Write the report to standard output instead of a report file.
 monthly-health|--file|0|Write the report file under the configured report directory. [default]
 release|--apply|0|Accepted for workflow compatibility; release automation still does not bump, tag, or push.
@@ -316,6 +321,10 @@ kernel|health|Evaluate package and artifact consistency read-only.|kernel/health
 kernel|cleanup|Preview or apply protected obsolete-kernel cleanup.|kernel/cleanup
 kernel|deps|Show kernel-management dependencies.|kernel/deps
 kernel|dependencies|Alias for deps.|kernel/deps
+maintenance|status|Summarize persistent resource accounting and cleanup state.|maintenance/status
+maintenance|inventory|Inventory persistent resources by subsystem, class, policy, and root.|maintenance/inventory
+maintenance|retention|Explain retention classes, ownership rules, and decision gates.|maintenance/retention
+maintenance|cleanup|Preview the disabled cleanup policy; no apply interface exists.|maintenance/cleanup
 monthly-health-timer|status|Show optional user timer state.|monthly-health-timer/status
 monthly-health-timer|retire|Retire the standalone timer configuration.|monthly-health-timer/retire
 monthly-health-timer|run-once|Run monthly health once.|monthly-health-timer/run-once

@@ -62,7 +62,7 @@ print_security_network() { echo network-ok; }
 print_desktop_gpu() { return 20; }
 print_logs() { echo logs-ok; }
 if monthly_health_main --file; then exit 91; fi
-report="$(find "$HOME/.captaincronos/reports/monthly-health" -type f -name "monthly-health-*.log" -print -quit)"
+report="$(find "$HOME/.captaincronos/hosts" -type f -name "monthly-health-*.log" -print -quit)"
 [ -n "$report" ]
 [ "$(stat -c %a "$report")" = 600 ]
 grep -Fq "Storage and SMART" "$report"

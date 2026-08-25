@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : maintenance
+# Version     : reads VERSION
+# Category    : Maintenance
+# Requires    : bash find stat date awk
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect persistent toolkit resource ownership and retention.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-environment.sh"
+source "$PROJECT_ROOT/lib/cc-retention.sh"
+
+ACTION="inventory"
+FORMAT="table"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc maintenance [status|inventory|retention|cleanup] [--format table|tsv] [--dry-run]
+
+Inspects persistent files created or managed by ShellToolkit. It never follows
+symlinks and never scans outside deterministic toolkit roots and exact legacy
+producer paths.
+
+Actions:
+  status     Show retained totals and whether any cleanup policy is enabled.
+  inventory  Show subsystem, class, location, accounting, policy, and ownership.
+  retention  Explain lifecycle classes, ownership rules, and decision gates.
+  cleanup    Preview retention cleanup policy. Cleanup is disabled in v1.3.
+
+Options:
+  --format FORMAT  Render inventory as table or stable TSV. [default: table]
+  --dry-run        Explicit read-only cleanup preview; equivalent to cleanup.
+
+Safety:
+  No action deletes files. --apply is intentionally unavailable because no
+  persistent resource class passed every deletion decision gate.
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h) usage; exit 0 ;;
+        --version) cc_version; exit 0 ;;
+        status|inventory|retention|cleanup) ACTION="$1"; shift ;;
+        --format)
+            shift
+            FORMAT="${1:-}"
+            case "$FORMAT" in table|tsv) ;; *) cc_error "Format must be table or tsv."; exit 2 ;; esac
+            shift
+            ;;
+        --dry-run) ACTION=cleanup; shift ;;
+        *) cc_error "Unknown maintenance argument: $1"; usage >&2; exit 2 ;;
+    esac
+done
+
+print_inventory_table() {
+    local id subsystem class location scan policy cleanup ownership metadata creator nature regenerable user_visible recovery
+    local total_count=0 total_bytes=0 warnings=0 symlinks=0
+    printf '%-18s %-21s %7s %10s %-10s %-10s %-12s %s\n' \
+        "Subsystem" "Class" "Count" "Size" "Oldest" "Newest" "Policy" "Cleanup"
+    printf '%-18s %-21s %7s %10s %-10s %-10s %-12s %s\n' \
+        "---------" "-----" "-----" "----" "------" "------" "------" "-------"
+    while IFS=$'\t' read -r id subsystem class location scan policy cleanup ownership; do
+        cc_retention_scan "$location" "$scan"
+        metadata="$(cc_retention_metadata "$id")"
+        IFS=$'\t' read -r creator nature regenerable user_visible recovery <<< "$metadata"
+        total_count=$((total_count + CC_RETENTION_COUNT))
+        total_bytes=$((total_bytes + CC_RETENTION_BYTES))
+        warnings=$((warnings + CC_RETENTION_WARNINGS))
+        symlinks=$((symlinks + CC_RETENTION_SYMLINKS))
+        printf '%-18s %-21s %7s %10s %-10s %-10s %-12s %s\n' \
+            "$subsystem" "$class" "$CC_RETENTION_COUNT" "$(cc_retention_human_bytes "$CC_RETENTION_BYTES")" \
+            "$CC_RETENTION_OLDEST" "$CC_RETENTION_NEWEST" "$policy" "$cleanup"
+        printf '  Resource: %s\n  Location: %s\n  Ownership: %s; creator=%s; nature=%s; regenerable=%s; user-visible=%s; recovery=%s\n' \
+            "$id" "$location" "$ownership" "$creator" "$nature" "$regenerable" "$user_visible" "$recovery"
+    done < <(cc_retention_catalog)
+    echo
+    printf '%-18s %s\n' "Retained files:" "$total_count"
+    printf '%-18s %s\n' "Retained size:" "$(cc_retention_human_bytes "$total_bytes")"
+    printf '%-18s %s\n' "Scan warnings:" "$warnings"
+    printf '%-18s %s\n' "Symlinks skipped:" "$symlinks"
+    printf '%-18s %s\n' "Cleanup eligible:" "0 (disabled)"
+}
+
+print_status() {
+    local line count bytes total_count=0 total_bytes=0 warnings=0 symlinks=0
+    while IFS= read -r line; do
+        [ "${line%%$'\t'*}" != resource ] || continue
+        IFS=$'\t' read -r _ _ _ _ count bytes _ _ _ _ _ _ _ _ _ _ row_warnings row_symlinks <<< "$line"
+        total_count=$((total_count + count))
+        total_bytes=$((total_bytes + bytes))
+        warnings=$((warnings + row_warnings))
+        symlinks=$((symlinks + row_symlinks))
+    done < <(cc_retention_inventory_tsv)
+    echo "Persistent Resource Status"
+    echo "--------------------------"
+    printf '%-20s %s\n' "Known files:" "$total_count"
+    printf '%-20s %s\n' "Known size:" "$(cc_retention_human_bytes "$total_bytes")"
+    printf '%-20s %s\n' "Scan warnings:" "$warnings"
+    printf '%-20s %s\n' "Symlinks skipped:" "$symlinks"
+    printf '%-20s %s\n' "Cleanup policy:" "disabled"
+    printf '%-20s %s\n' "Apply interface:" "not implemented"
+}
+
+print_retention() {
+    local class
+    echo "Persistent Resource Retention"
+    echo "-----------------------------"
+    for class in authoritative-state user-curated-state historical-record regenerable-cache recovery-artifact user-export unknown-external; do
+        printf '%-21s %s\n' "$class" "$(cc_retention_class_description "$class")"
+    done
+    echo
+    echo "Ownership rule: canonical CC_HOME/host roots or an exact producer path; HOME membership alone proves nothing."
+    echo "Policy default: retain. User-curated, authoritative, export, and unknown resources are never cleanup candidates."
+    echo "Recovery rule: installer backups remain retained until a minimum recovery-generation guarantee exists."
+    echo "Cache rule: the reserved cache root has no active producer and no cleanup policy."
+}
+
+print_cleanup_preview() {
+    echo "Persistent Resource Cleanup Preview"
+    echo "-----------------------------------"
+    echo "Mode: DRY RUN"
+    echo "Candidates: 0"
+    echo "Cleanup is disabled for v1.3: every catalog policy is retain or user-managed."
+    echo "No path would be removed. --apply is intentionally unavailable."
+}
+
+if [ "$FORMAT" = tsv ] && [ "$ACTION" != inventory ]; then
+    cc_error "--format applies only to maintenance inventory."
+    exit 2
+fi
+
+case "$ACTION" in
+    inventory)
+        if [ "$FORMAT" = tsv ]; then
+            cc_retention_inventory_tsv
+        else
+            cc_banner
+            echo "Persistent Resource Inventory"
+            echo "============================="
+            print_inventory_table
+        fi
+        ;;
+    status) cc_banner; print_status ;;
+    retention) cc_banner; print_retention ;;
+    cleanup) cc_banner; print_cleanup_preview ;;
+esac

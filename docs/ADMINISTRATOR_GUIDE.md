@@ -281,5 +281,36 @@ that the running kernel exposes EFI runtime services.
 ## Releases
 Run `cc release check` before every tagged release.
 
+## Persistent Resource Retention
+
+Use `cc maintenance inventory` to inspect every cataloged persistent resource.
+It reports subsystem, lifecycle class, location, count, size, oldest/newest
+dates, policy, cleanup state, ownership rule, scan warnings, and skipped
+symlinks. `cc maintenance inventory --format tsv` provides stable machine-readable
+output. `cc maintenance status` is the concise view used by monthly health, and
+`cc maintenance retention` explains the policy model.
+
+`cc maintenance cleanup` and `cc maintenance cleanup --dry-run` are identical
+read-only previews: v1.3 selects zero candidates. There is deliberately no
+`--apply` switch. Installer recovery generations are incomplete/partial and no
+minimum recovery guarantee exists; report comparison value has no objective
+expiry; asset history is curated; bundles are explicit user exports; and legacy
+or unclassified paths lack deletion-grade ownership proof.
+
+Canonical host-scoped reports, assets, logs, cache, and plugins live below
+`~/.captaincronos/hosts/<host-id>/`. Installer backups and repository bundles
+remain global under `~/.captaincronos/`. Existing legacy reports, assets,
+`~/upgrade.log`, and `~/kernel-cleanup.log` are inventoried conservatively but
+never deleted. Inventory does not follow symlinks or scan arbitrary home paths.
+Optional monthly-health service/timer files are inventoried by exact name, but
+their existing `cc monthly-health-timer retire` workflow remains their sole
+lifecycle owner; retention cleanup does not touch them.
+
+Monthly health includes only a concise retention status and never cleans
+persistent resources. Doctor does not treat ordinary historical accumulation as
+a failure; no new retention doctor gate or policy configuration is introduced.
+
 ## Backups
-Preserve both ~/.captaincronos/assets and ~/.captaincronos/reports as part of system backups.
+Preserve `~/.captaincronos/` as part of system backups. Asset records and
+history are authoritative or curated, installer generations provide recovery,
+and explicit repository bundles remain operator-managed exports.

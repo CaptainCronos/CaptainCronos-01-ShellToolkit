@@ -1001,6 +1001,57 @@ Switches:
   --version......... Show toolkit version information.
 ~~~
 
+## cc maintenance
+
+~~~text
+Usage:
+  cc maintenance [status|inventory|retention|cleanup] [--format table|tsv] [--dry-run]
+
+Inspects persistent files created or managed by ShellToolkit. It never follows
+symlinks and never scans outside deterministic toolkit roots and exact legacy
+producer paths.
+
+Actions:
+  status     Show retained totals and whether any cleanup policy is enabled.
+  inventory  Show subsystem, class, location, accounting, policy, and ownership.
+  retention  Explain lifecycle classes, ownership rules, and decision gates.
+  cleanup    Preview retention cleanup policy. Cleanup is disabled in v1.3.
+
+Options:
+  --format FORMAT  Render inventory as table or stable TSV. [default: table]
+  --dry-run        Explicit read-only cleanup preview; equivalent to cleanup.
+
+Safety:
+  No action deletes files. --apply is intentionally unavailable because no
+  persistent resource class passed every deletion decision gate.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc maintenance
+
+Usage:
+  cc maintenance [subcommand] [switches]
+
+Inspect persistent toolkit resource ownership and retention.
+
+Switches:
+  --format FORMAT........ Render inventory as a readable table or stable TSV. [default: table]
+  --dry-run.............. Show the disabled cleanup plan without mutation.
+  --help, -h............. Show contextual command help.
+  --version.............. Show toolkit version information.
+
+Subcommands:
+  status........... Summarize persistent resource accounting and cleanup state.
+  inventory........ Inventory persistent resources by subsystem, class, policy, and root.
+  retention........ Explain retention classes, ownership rules, and decision gates.
+  cleanup.......... Preview the disabled cleanup policy; no apply interface exists.
+
+Discovery:
+  cc maintenance <subcommand> switches
+~~~
+
 ## cc monthly-health
 
 ~~~text
@@ -1012,7 +1063,7 @@ Kernel health, platform, boot storage, and maintenance fields come from the
 shared semantic kernel snapshot; no kernel cleanup is performed.
 
 Default output:
-  ~/.captaincronos/reports/monthly-health/monthly-health-YYYYMMDD-HHMMSS.log
+  CC_REPORT_DIR/monthly-health/monthly-health-YYYYMMDD-HHMMSS.log
 
 Environment:
   JOURNAL_SINCE="7 days ago" cc monthly-health

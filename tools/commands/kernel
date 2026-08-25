@@ -18,6 +18,7 @@ cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-deps.sh"
 source "$PROJECT_ROOT/lib/cc-kernel.sh"
+source "$PROJECT_ROOT/lib/cc-environment.sh"
 
 usage() {
     cat <<'EOF_HELP'
@@ -352,9 +353,13 @@ kernel_cleanup() {
         mapfile -t packages < <(printf '%s\n' "${packages[@]}" | sort -u)
     fi
 
-    KERNEL_LOG="${LOG:-$HOME/kernel-cleanup.log}"
+    KERNEL_LOG="${LOG:-$(cc_env_log_dir)/kernel-cleanup.log}"
     if [ "$KERNEL_APPLY" -eq 1 ]; then
+        umask 077
+        mkdir -p "$(dirname "$KERNEL_LOG")"
+        chmod 700 "$(dirname "$KERNEL_LOG")"
         : >> "$KERNEL_LOG"
+        chmod 600 "$KERNEL_LOG"
     fi
     kernel_cleanup_log "Kernel cleanup review"
     kernel_cleanup_log "Running kernel: $running"

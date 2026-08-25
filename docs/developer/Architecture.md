@@ -67,6 +67,18 @@ bash/                    Active source versions of shell files
 
 The baseline represents factory/reference state. Defaults represent approved toolkit state. Backups represent user recovery state.
 
+Persistent runtime state is host-scoped where identity matters:
+
+```text
+~/.captaincronos/hosts/<host-id>/{reports,assets,logs,cache,plugins}
+```
+
+Global installer backups and repository bundle exports remain directly below
+`~/.captaincronos/`. `lib/cc-retention.sh` catalogs these deterministic roots
+for bounded, non-following accounting. Persistent resources are not temporary
+resources: they must never be registered with `cc-temp` after publication.
+The v1.3 retention model is inspection-only and exposes no deletion apply path.
+
 ---
 
 ## Program Management

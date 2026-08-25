@@ -134,6 +134,14 @@ if grep -Eq 'update-grub|grub.d|firefox|thunderbird|/opt/' "$TRACE_FILE"; then
     fail "routine apply reached a deferred bootloader/browser mutation"
 fi
 
+canonical_log="$system_home/.captaincronos/hosts/safety-host/logs/system-update.log"
+env "${common_env[@]}" HOME="$system_home" CC_HOME="$system_home/.captaincronos" CC_HOST_ID=safety-host \
+    bash "$PROJECT_ROOT/tools/commands/system-update" --apply >/dev/null \
+    || fail "system-update canonical-log apply failed"
+[ -f "$canonical_log" ] || fail "system-update did not use the canonical host log"
+[ "$(stat -c %a "$canonical_log")" = 600 ] || fail "system-update log was not private"
+[ "$(stat -c %a "$(dirname "$canonical_log")")" = 700 ] || fail "system-update log directory was not private"
+
 : > "$TRACE_FILE"
 flatpak_failure_output="$TEST_DIR/flatpak-failure.out"
 if env "${common_env[@]}" HOME="$system_home" LOG="$system_log" CC_MOCK_FLATPAK_STATUS=9 \

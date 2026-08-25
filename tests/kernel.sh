@@ -155,4 +155,14 @@ if printf '%s\n' "$mutations" | grep -Fq 6.8.0-10-generic; then
     fail 'apply attempted to purge the running kernel'
 fi
 
+kernel_home="$TEST_DIR/home"
+canonical_log="$kernel_home/.captaincronos/hosts/kernel-fixture/logs/kernel-cleanup.log"
+mkdir -p "$kernel_home"
+PATH="$BIN_DIR:$PATH" HOME="$kernel_home" CC_HOME="$kernel_home/.captaincronos" \
+    CC_HOST_ID=kernel-fixture KEEP_COUNT=2 \
+    bash "$PROJECT_ROOT/tools/commands/kernel" cleanup --apply >/dev/null
+[ -f "$canonical_log" ] || fail 'kernel cleanup did not use the canonical host log'
+[ "$(stat -c %a "$canonical_log")" = 600 ] || fail 'kernel cleanup log was not private'
+[ "$(stat -c %a "$(dirname "$canonical_log")")" = 700 ] || fail 'kernel cleanup log directory was not private'
+
 printf 'Kernel management tests: PASS\n'

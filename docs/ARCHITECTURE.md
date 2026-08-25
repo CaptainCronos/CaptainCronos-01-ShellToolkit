@@ -45,6 +45,7 @@ Important libraries:
 - `cc-yaml.sh` — compatibility API for existing asset YAML operations
 - `cc-metadata.sh` — command metadata and registry helpers
 - `cc-assets.sh` — local asset database helpers
+- `cc-retention.sh` — persistent ownership catalog and bounded storage accounting
 - `cc-prompt-engine.sh` — internal prompt template discovery, rendering, and formatting helpers
 
 ### Terminal Presentation Contract
@@ -341,10 +342,14 @@ their non-JSON behavior does not depend on jq.
 Historical reports are stored under:
 
 ```text
-~/.captaincronos/reports/
+~/.captaincronos/hosts/<host-id>/reports/
 ```
 
-Reports represent timestamped observations.
+Reports represent timestamped observations. Monthly-health reports remain mode
+0600 inside a mode-0700 directory and keep a `latest.log` symlink for operator
+convenience. Drive reports and qualification captures are historical records.
+The v1.3 policy retains all report history because no objective expiration rule
+has been established.
 
 ### Diagnostics and Progress
 
@@ -380,11 +385,54 @@ interruption, only the exact still-registered staging resource is eligible for
 removal. Test fixtures and caller-selected destinations are not toolkit cleanup
 roots.
 
+### Persistent Resource Ownership and Retention
+
+Persistent files intentionally outlive one command and therefore never enter
+the `cc-temp` registry. `lib/cc-retention.sh` defines the read-only ownership
+catalog used by `cc maintenance`. A path is deterministically classifiable only
+when it is under a canonical `CC_HOME`/host root or is an exact path or filename
+produced by a known command. Merely residing under `HOME` proves nothing.
+
+The lifecycle classes are authoritative state, user-curated state, historical
+record, regenerable cache, recovery artifact, user export, and unknown/external.
+Every v1.3 policy is preservation-first: `retain` or `user-managed`. Cleanup is
+disabled, there is no `--apply` interface, symlinks are counted but never
+followed, and scans are bounded to known roots without crossing filesystems.
+
+| Subsystem / producer | Canonical or exact location | Class | Accumulation | Policy | Cleanup |
+|---|---|---|---|---|---|
+| host initialization / configuration | `CC_HOME/config`, `CC_HOST_HOME/config` | authoritative state | replaced in place | retain | never |
+| `cc monthly-health --file` | `CC_REPORT_DIR/monthly-health/` | historical record | timestamped reports plus latest symlink | retain | disabled |
+| `cc drive-report`, `cc drive-qualify` | `CC_REPORT_DIR/drives/` | historical record | timestamped report directories | retain | disabled |
+| asset commands and drive workflows | `CC_ASSET_DIR/` | authoritative state | records replaced in place | retain | never |
+| asset history appenders | `CC_ASSET_DIR/.history/` | user-curated state | append-only logs | retain | never |
+| full installer / toolkit update | `CC_HOME/backups/` | recovery artifact | timestamped partial generations | retain | disabled |
+| `cc repos backup --apply` | `CC_HOME/repo-bundles/` | user export | timestamped Git bundles | user-managed | never |
+| system update apply | `CC_LOG_DIR/system-update.log` | historical record | replaced per apply | retain | disabled |
+| kernel cleanup apply | `CC_LOG_DIR/kernel-cleanup.log` | historical record | append-only | retain | disabled |
+| optional monthly-health timer | `~/.config/systemd/user/captaincronos-monthly-health.{service,timer}` | authoritative state | replaced in place | retain | owner command only |
+| host plugins | `CC_HOST_HOME/plugins/` | user-curated state | operator/plugin managed | user-managed | never |
+| reserved cache root | `CC_CACHE_DIR/` | regenerable cache | no active producer | retain | disabled |
+| helpme refresh backup | `~/.bash_functions.pre-helpme-refresh.*.bak` | recovery artifact | timestamped files | retain | disabled |
+| legacy reports/assets/logs and unclassified `CC_HOME` entries | exact legacy paths | unknown/external | unknown | retain | never |
+
+Caller-selected `cc repos inventory --out` files are user exports outside the
+catalog. Temporary report staging remains ephemeral and belongs exclusively to
+`cc-temp`. Release and verification transcripts are emitted to the caller or
+temporary fixtures; no active producer intentionally persists them.
+
+Repository outputs under `baseline/`, `defaults/`, and `docs/generated/` are
+version-controlled source/reference artifacts whose lifecycle belongs to Git
+and their engineering commands, not host retention. Installed shell files,
+`~/bin/cc`, and managed PATH content may contain user customization and are not
+claimed as deletion-owned. Workbench checkouts and caller-selected inventory
+exports are user-managed. Archived migration scripts are inactive producers.
+
 ### Assets
 Current lifecycle state is stored under:
 
 ```text
-~/.captaincronos/assets/
+~/.captaincronos/hosts/<host-id>/assets/
 ```
 
 Assets represent current inventory state.

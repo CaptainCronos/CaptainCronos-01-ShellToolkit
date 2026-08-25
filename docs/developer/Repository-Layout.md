@@ -82,6 +82,8 @@ Installer behavior should write to user locations such as:
 ~/.bash_functions
 ~/bin/cc
 ~/.captaincronos/backups/
+~/.captaincronos/repo-bundles/
+~/.captaincronos/hosts/<host-id>/{reports,assets,logs,cache,plugins}/
 ```
 
 Installer behavior should not change tracked repository permissions or content unless explicitly performing a development operation.
