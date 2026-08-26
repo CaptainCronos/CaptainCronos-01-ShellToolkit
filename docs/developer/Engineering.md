@@ -53,14 +53,48 @@ Most new functionality should be accessed through `cc` subcommands rather than c
 
 ## Verification Expectations
 
-Before a release or major pull point:
+Captain Cronos development uses a deliberate implementation/acceptance split:
+
+```text
+Codex:
+architecture + implementation + focused tests + changed-file checks + diff review
+
+Operator:
+ccvalidate full
+
+Codex returns only when operator validation reports a failure requiring diagnosis.
+
+Final repository completion:
+ccvalidate finish
+```
+
+This keeps broad mechanical validation local, reduces engineering-session
+consumption, makes acceptance deterministic, removes repeated manual Git
+completion steps, and preserves an explicit boundary around repository mutation.
+
+Use `ccvalidate fast` for inexpensive development feedback. Bare `ccvalidate`
+means `ccvalidate full`. Full mode orchestrates repository verification, the
+engineering selftest, documentation lint/freshness, strict audit, and Git diff
+checks. `ccvalidate release` provides full-equivalent coverage plus the release
+gate without rerunning checks already owned by that gate.
+
+The `fast`, `full`, and `release` modes are validation-only. Only the explicit
+`ccvalidate finish` mode may change Git state. It requires the ShellToolkit
+repository, an approved origin, a clean committed feature/fix/development
+branch, and fast-forward-only history. It validates before switching branches,
+updates and merges main with `--ff-only`, revalidates before pushing only
+`main -> origin/main`, verifies the remote commit, and then uses safe local
+branch deletion. It never stashes, resets, forces, rewrites history, resolves
+conflicts, or deletes a feature branch after a failed step.
+
+The function is maintained in `bash/bash_functions` and promoted verbatim to
+`defaults/v1/bash_functions`; installer and update workflows deploy that
+canonical source. Do not hand-edit only `~/.bash_functions`.
+
+Before a release or major pull point, the local operator runs:
 
 ```bash
-install/verify.sh
-cc doctor
-bash -n bash/bashrc
-bash -n bash/bash_aliases
-bash -n bash/bash_functions
+ccvalidate full
 ```
 
 The repository should be clean after install, update, and verification.

@@ -39,6 +39,13 @@ Focused shell tests supplement `cc selftest`:
   cache, unknown ownership, safe accounting, oldest/newest dates, symlink
   non-traversal, inspection and cleanup-preview zero-write fingerprints,
   disabled apply, contextual help, deterministic TSV, and ANSI-free output.
+- `ccvalidate.sh` validates bare/fast/full/release orchestration, failure
+  aggregation and continuation, help and ANSI-free output, repeated sourcing,
+  and the explicit finish workflow with disposable repositories and bare
+  remotes. It covers clean fast-forward success, post-push verification and
+  branch cleanup, plus main/dirty/staged/untracked/origin/repository/divergence/
+  conflict/validation/push/verification refusal boundaries. It never runs
+  finish against the real repository or remote.
 - `safety-contracts.sh` validates default-safe and explicit-apply behavior for
   launcher/full installation, toolkit update, system update, the complete update
   orchestrator, and monthly-health previews. Mutation paths run only through

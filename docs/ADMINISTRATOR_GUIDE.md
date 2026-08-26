@@ -281,6 +281,28 @@ that the running kernel exposes EFI runtime services.
 ## Releases
 Run `cc release check` before every tagged release.
 
+## Local Development Validation
+
+Use `ccvalidate fast` for inexpensive feedback and `ccvalidate full` for the
+normal local acceptance gate after implementation. Bare `ccvalidate` defaults
+to full. Use `ccvalidate release` for release-equivalent coverage plus the
+release-readiness gate. These three modes are read-only validation workflows.
+
+After reviewing a clean committed feature, fix, or development branch, run
+`ccvalidate finish` to perform the explicit ShellToolkit Git completion flow.
+It refuses main, dirty/staged/untracked work, missing or suspicious origins,
+uncommitted feature work, and any history that cannot fast-forward. It validates
+the feature before changing branches, updates and merges main with `--ff-only`,
+revalidates before pushing only main to origin/main, verifies the remote commit,
+and deletes the local feature branch with `git branch -d` only after success.
+
+If validation fails before the branch switch, nothing is pushed and the feature
+checkout is left untouched. If validation fails after a local merge, nothing is
+pushed or reset and the feature branch remains for operator review. The workflow
+never auto-stashes, force-pushes, rewrites history, resolves conflicts, deletes
+remote feature branches, or changes packages, kernels, bootloaders, browsers,
+services, PATH configuration, or unrelated repositories.
+
 ## Persistent Resource Retention
 
 Use `cc maintenance inventory` to inspect every cataloged persistent resource.

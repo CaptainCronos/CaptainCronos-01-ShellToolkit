@@ -53,7 +53,7 @@ chmod 700 "$TEST_DIR/bin/cc"
 resolved_cc="$(PATH="$TEST_DIR/bin:$PATH" command -v cc)"
 [ "$resolved_cc" = "$TEST_DIR/bin/cc" ] || fail "shell alias shadows the cc dispatcher"
 
-for helper in kedit suedit sukitty; do
+for helper in kedit suedit sukitty ccvalidate; do
     _cc_function_names | grep -Fxq "$helper" || fail "$helper is absent from helpme metadata"
 done
 

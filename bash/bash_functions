@@ -428,6 +428,386 @@ EOF_HELP
 # GIT / GITHUB HELPERS
 # =============================
 
+unalias ccvalidate 2>/dev/null || true
+
+_ccvalidate_usage() {
+    cat <<'EOF_HELP'
+Captain Cronos Local Validation
+===============================
+
+Usage:
+  ccvalidate [full]
+  ccvalidate fast
+  ccvalidate release
+  ccvalidate finish
+  ccvalidate help
+
+Modes:
+  fast     Run inexpensive development checks.
+  full     Run broad local acceptance validation (the default).
+  release  Run full-equivalent coverage plus the release-readiness gate.
+  finish   Validate, fast-forward main, revalidate, push main, verify the
+           remote commit, and safely delete the local feature branch.
+
+Safety:
+  fast, full, and release are validation-only. Only finish may mutate Git,
+  and only after strict repository, branch, remote, and cleanliness checks.
+EOF_HELP
+}
+
+_ccvalidate_git() {
+    if [ "${CCVALIDATE_TEST_MODE:-0}" = 1 ] && [ -n "${CCVALIDATE_GIT_BIN:-}" ]; then
+        "$CCVALIDATE_GIT_BIN" "$@"
+    else
+        command git "$@"
+    fi
+}
+
+_ccvalidate_cc() {
+    if [ "${CCVALIDATE_TEST_MODE:-0}" = 1 ] && [ -n "${CCVALIDATE_CC_BIN:-}" ]; then
+        "$CCVALIDATE_CC_BIN" "$@"
+    else
+        command cc "$@"
+    fi
+}
+
+_ccvalidate_status_line() {
+    local label="$1" status="$2" detail="${3:-}" dots dot_count width=42
+    dot_count=$((width - ${#label}))
+    [ "$dot_count" -ge 3 ] || dot_count=3
+    printf -v dots '%*s' "$dot_count" ''
+    dots="${dots// /.}"
+    printf '%s' "$label"
+    printf '%s' "$dots"
+    if [ -n "$detail" ]; then
+        printf ' %s  %s\n' "$status" "$detail"
+    else
+        printf ' %s\n' "$status"
+    fi
+}
+
+_ccvalidate_reset_results() {
+    CCVALIDATE_PASS=0
+    CCVALIDATE_WARN=0
+    CCVALIDATE_FAIL=0
+    CCVALIDATE_SKIP=0
+}
+
+_ccvalidate_record() {
+    local label="$1" status="$2" detail="${3:-}"
+    case "$status" in
+        PASS) CCVALIDATE_PASS=$((CCVALIDATE_PASS + 1)) ;;
+        WARN) CCVALIDATE_WARN=$((CCVALIDATE_WARN + 1)) ;;
+        FAIL) CCVALIDATE_FAIL=$((CCVALIDATE_FAIL + 1)) ;;
+        SKIP) CCVALIDATE_SKIP=$((CCVALIDATE_SKIP + 1)) ;;
+        *) return 2 ;;
+    esac
+    _ccvalidate_status_line "$label" "$status" "$detail"
+}
+
+_ccvalidate_summary() {
+    local overall=PASS
+    if [ "$CCVALIDATE_FAIL" -gt 0 ]; then
+        overall=FAIL
+    elif [ "$CCVALIDATE_WARN" -gt 0 ]; then
+        overall=WARN
+    elif [ "$CCVALIDATE_PASS" -eq 0 ]; then
+        overall=SKIP
+    fi
+    echo
+    printf '%-16s %s\n' 'Overall Status:' "$overall"
+    [ "$CCVALIDATE_FAIL" -eq 0 ]
+}
+
+_ccvalidate_run_stage() {
+    local label="$1" output rc=0
+    shift
+    output="$(mktemp "${TMPDIR:-/tmp}/ccvalidate.XXXXXX")" || {
+        _ccvalidate_record "$label" FAIL 'could not create capture file'
+        return 1
+    }
+    if "$@" >"$output" 2>&1; then
+        _ccvalidate_record "$label" PASS
+    else
+        rc=$?
+        _ccvalidate_record "$label" FAIL "exit $rc"
+        sed 's/^/  | /' "$output"
+    fi
+    rm -f -- "$output"
+    return "$rc"
+}
+
+_ccvalidate_validation() {
+    local mode="$1" repo_root
+    if ! repo_root="$(_ccvalidate_git rev-parse --show-toplevel 2>/dev/null)"; then
+        printf 'ccvalidate: not inside a Git repository.\n' >&2
+        return 1
+    fi
+    cd "$repo_root" || return 1
+
+    echo 'Captain Cronos Local Validation'
+    echo '==============================='
+    echo
+    printf 'Mode: %s\n\n' "$mode"
+    _ccvalidate_reset_results
+
+    case "$mode" in
+        fast)
+            _ccvalidate_run_stage 'Repository verification' _ccvalidate_cc verify || true
+            _ccvalidate_run_stage 'Strict command audit' _ccvalidate_cc audit --strict || true
+            _ccvalidate_run_stage 'Documentation lint' _ccvalidate_cc docs lint || true
+            _ccvalidate_run_stage 'Git diff check' _ccvalidate_git diff --check || true
+            ;;
+        full)
+            _ccvalidate_run_stage 'Repository verification' _ccvalidate_cc verify || true
+            _ccvalidate_run_stage 'Engineering selftest' _ccvalidate_cc selftest || true
+            _ccvalidate_run_stage 'Documentation lint' _ccvalidate_cc docs lint || true
+            _ccvalidate_run_stage 'Generated documentation' _ccvalidate_cc docs check || true
+            _ccvalidate_run_stage 'Strict command audit' _ccvalidate_cc audit --strict || true
+            _ccvalidate_run_stage 'Git diff check' _ccvalidate_git diff --check || true
+            ;;
+        release)
+            # The release gate already owns verify, audit, documentation,
+            # repository-wide syntax, and ShellCheck. Add only full-suite
+            # coverage it does not own so expensive checks are not duplicated.
+            _ccvalidate_run_stage 'Engineering selftest' _ccvalidate_cc selftest || true
+            _ccvalidate_run_stage 'Git diff check' _ccvalidate_git diff --check || true
+            _ccvalidate_run_stage 'Release-readiness gate' _ccvalidate_cc release check || true
+            ;;
+    esac
+
+    _ccvalidate_summary
+}
+
+_ccvalidate_expected_name() {
+    if [ "${CCVALIDATE_TEST_MODE:-0}" = 1 ] && [ -n "${CCVALIDATE_EXPECTED_REPOSITORY_NAME:-}" ]; then
+        printf '%s\n' "$CCVALIDATE_EXPECTED_REPOSITORY_NAME"
+    else
+        printf '%s\n' 'CaptainCronos-01-ShellToolkit'
+    fi
+}
+
+_ccvalidate_origin_allowed() {
+    local url="$1"
+    if [ "${CCVALIDATE_TEST_MODE:-0}" = 1 ] && [ -n "${CCVALIDATE_EXPECTED_ORIGIN:-}" ]; then
+        [ "$url" = "$CCVALIDATE_EXPECTED_ORIGIN" ]
+        return
+    fi
+    case "$url" in
+        git@github.com:CaptainCronos/CaptainCronos-01-ShellToolkit.git|\
+        ssh://git@github.com/CaptainCronos/CaptainCronos-01-ShellToolkit.git|\
+        https://github.com/CaptainCronos/CaptainCronos-01-ShellToolkit|\
+        https://github.com/CaptainCronos/CaptainCronos-01-ShellToolkit.git) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+_ccvalidate_branch_allowed() {
+    case "$1" in
+        feature/*|fix/*|bugfix/*|hotfix/*|dev/*|docs/*|refactor/*|test/*|chore/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+_ccvalidate_finish_stop() {
+    echo
+    printf '%s\n' 'STOP: automatic recovery is disabled; local state is preserved for operator review.'
+    if _ccvalidate_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        printf 'Current branch: %s\n' "$(_ccvalidate_git branch --show-current 2>/dev/null || printf 'detached HEAD')"
+        printf 'Current HEAD:   %s\n' "$(_ccvalidate_git rev-parse --verify HEAD 2>/dev/null || printf 'unavailable')"
+        if [ -n "${branch:-}" ] && _ccvalidate_git show-ref --verify --quiet "refs/heads/$branch"; then
+            printf 'Feature branch: %s (retained)\n' "$branch"
+        fi
+    fi
+    _ccvalidate_summary
+    return 1
+}
+
+_ccvalidate_finish_command() {
+    local label="$1"
+    shift
+    _ccvalidate_run_stage "$label" "$@"
+}
+
+_ccvalidate_finish() {
+    local repo_root expected_name branch feature_head origin_url push_url ahead
+    local remote_head tracking_head local_head
+
+    echo 'Captain Cronos Finish Workflow'
+    echo '=============================='
+    echo
+    _ccvalidate_reset_results
+
+    if ! repo_root="$(_ccvalidate_git rev-parse --show-toplevel 2>/dev/null)"; then
+        _ccvalidate_record 'Repository context' FAIL 'not inside a Git repository'
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    expected_name="$(_ccvalidate_expected_name)"
+    if [ "$(basename "$repo_root")" != "$expected_name" ] ||
+       [ ! -f "$repo_root/manifest.yml" ] || [ ! -f "$repo_root/tools/cc" ] ||
+       [ ! -f "$repo_root/bash/bash_functions" ]; then
+        _ccvalidate_record 'Repository context' FAIL "expected $expected_name"
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    cd "$repo_root" || return 1
+    _ccvalidate_record 'Repository context' PASS "$repo_root"
+
+    branch="$(_ccvalidate_git branch --show-current 2>/dev/null)"
+    if [ -n "$branch" ] && [ "$branch" != main ] && _ccvalidate_branch_allowed "$branch" &&
+       _ccvalidate_git show-ref --verify --quiet "refs/heads/$branch"; then
+        _ccvalidate_record 'Feature branch' PASS "$branch"
+    else
+        _ccvalidate_record 'Feature branch' FAIL "${branch:-detached HEAD}"
+    fi
+
+    if _ccvalidate_git diff --quiet --ignore-submodules --; then
+        _ccvalidate_record 'Working tree' PASS
+    else
+        _ccvalidate_record 'Working tree' FAIL 'unstaged changes present'
+    fi
+    if _ccvalidate_git diff --cached --quiet --ignore-submodules --; then
+        _ccvalidate_record 'Index' PASS
+    else
+        _ccvalidate_record 'Index' FAIL 'staged changes present'
+    fi
+    if [ -z "$(_ccvalidate_git ls-files --others --exclude-standard)" ]; then
+        _ccvalidate_record 'Untracked files' PASS
+    else
+        _ccvalidate_record 'Untracked files' FAIL 'untracked files present'
+    fi
+
+    origin_url="$(_ccvalidate_git remote get-url origin 2>/dev/null || true)"
+    push_url="$(_ccvalidate_git remote get-url --push origin 2>/dev/null || true)"
+    if [ -n "$origin_url" ] && [ "$push_url" = "$origin_url" ] && _ccvalidate_origin_allowed "$origin_url"; then
+        _ccvalidate_record 'Origin remote' PASS "$origin_url"
+    else
+        _ccvalidate_record 'Origin remote' FAIL "${origin_url:-missing or suspicious}"
+    fi
+
+    if _ccvalidate_git show-ref --verify --quiet refs/heads/main; then
+        _ccvalidate_record 'Main branch' PASS
+    else
+        _ccvalidate_record 'Main branch' FAIL 'local main is missing'
+    fi
+
+    feature_head="$(_ccvalidate_git rev-parse --verify HEAD 2>/dev/null || true)"
+    ahead=0
+    if [ -n "$feature_head" ] && _ccvalidate_git show-ref --verify --quiet refs/heads/main; then
+        ahead="$(_ccvalidate_git rev-list --count "main..$feature_head" 2>/dev/null || printf '0')"
+    fi
+    if [ "$ahead" -gt 0 ] 2>/dev/null; then
+        _ccvalidate_record 'Committed feature work' PASS "$ahead commit(s)"
+    else
+        _ccvalidate_record 'Committed feature work' FAIL 'no committed work beyond main'
+    fi
+
+    if [ -n "$feature_head" ] && _ccvalidate_git merge-base --is-ancestor main "$feature_head" 2>/dev/null; then
+        _ccvalidate_record 'Fast-forward candidate' PASS
+    else
+        _ccvalidate_record 'Fast-forward candidate' FAIL 'main and feature require a non-fast-forward merge'
+    fi
+
+    if [ "$CCVALIDATE_FAIL" -gt 0 ]; then
+        _ccvalidate_finish_stop
+        return 1
+    fi
+
+    if (ccvalidate full); then
+        _ccvalidate_record 'Feature validation' PASS
+    else
+        _ccvalidate_record 'Feature validation' FAIL
+        _ccvalidate_finish_stop
+        return 1
+    fi
+
+    if ! _ccvalidate_finish_command 'Switch to main' _ccvalidate_git switch main; then
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    if ! _ccvalidate_finish_command 'Update main (ff-only)' _ccvalidate_git pull --ff-only origin main; then
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    if ! _ccvalidate_git merge-base --is-ancestor main "$feature_head" 2>/dev/null; then
+        _ccvalidate_record 'Main fast-forward' FAIL 'updated main diverged from feature'
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    _ccvalidate_record 'Main fast-forward' PASS
+
+    if ! _ccvalidate_finish_command 'Merge feature (ff-only)' _ccvalidate_git merge --ff-only "$branch"; then
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    if [ "$(_ccvalidate_git rev-parse HEAD)" != "$feature_head" ]; then
+        _ccvalidate_record 'Merged commit verification' FAIL 'local main did not reach feature HEAD'
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    _ccvalidate_record 'Merged commit verification' PASS "$feature_head"
+
+    if (ccvalidate release); then
+        _ccvalidate_record 'Post-merge validation' PASS
+    else
+        _ccvalidate_record 'Post-merge validation' FAIL
+        _ccvalidate_finish_stop
+        return 1
+    fi
+
+    if ! _ccvalidate_finish_command 'Push origin/main' _ccvalidate_git push origin main:main; then
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    local_head="$(_ccvalidate_git rev-parse refs/heads/main)"
+    remote_head="$(_ccvalidate_git ls-remote --exit-code --heads origin refs/heads/main 2>/dev/null | awk 'NR == 1 {print $1}')"
+    tracking_head="$(_ccvalidate_git rev-parse --verify refs/remotes/origin/main 2>/dev/null || true)"
+    if [ -n "$remote_head" ] && [ "$remote_head" = "$local_head" ] &&
+       [ "$tracking_head" = "$local_head" ]; then
+        _ccvalidate_record 'Remote verification' PASS "$remote_head"
+    else
+        _ccvalidate_record 'Remote verification' FAIL \
+            "local=$local_head origin/main=${tracking_head:-unavailable} remote=${remote_head:-unavailable}"
+        _ccvalidate_finish_stop
+        return 1
+    fi
+
+    if ! _ccvalidate_finish_command 'Feature cleanup' _ccvalidate_git branch -d "$branch"; then
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    echo
+    _ccvalidate_git status
+    _ccvalidate_summary
+}
+
+# @name ccvalidate
+# @group Engineering
+# @desc Run local acceptance checks or explicitly finish a validated feature branch.
+# @usage ccvalidate [fast|full|release|finish|help]
+# @example ccvalidate full
+# @example ccvalidate finish
+ccvalidate() {
+    local mode="${1:-full}"
+    local CCVALIDATE_PASS=0 CCVALIDATE_WARN=0 CCVALIDATE_FAIL=0 CCVALIDATE_SKIP=0
+    if [ "$#" -gt 1 ]; then
+        printf 'ccvalidate: too many arguments.\n' >&2
+        _ccvalidate_usage >&2
+        return 2
+    fi
+    case "$mode" in
+        help|--help|-h) _ccvalidate_usage ;;
+        fast|full|release) (_ccvalidate_validation "$mode") ;;
+        finish) _ccvalidate_finish ;;
+        *)
+            printf 'ccvalidate: unknown mode: %s\n' "$mode" >&2
+            _ccvalidate_usage >&2
+            return 2
+            ;;
+    esac
+}
+
 _cc_gitflow_help() {
     cat <<'EOF_HELP'
 Captain Cronos Git Assistant v1.2

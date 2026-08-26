@@ -22,6 +22,10 @@ The format follows a simple milestone-based structure until the project reaches 
   toolkit-home entries.
 - Disposable retention fixtures covering classification, accounting, policy,
   zero-write behavior, symlink non-traversal, disabled apply, and presentation.
+- Canonical `ccvalidate` shell workflow for fast, full, and release validation,
+  plus explicitly authorized fast-forward completion of a feature branch.
+- Disposable Git and bare-remote fixtures covering validation aggregation,
+  finish success, refusal boundaries, push verification, and safe branch cleanup.
 
 - Shared managed-PATH policy and disposable-home regression coverage for legacy
   normalization, repeated sourcing, shell ordering, and startup-file safety.
