@@ -114,6 +114,22 @@ assert_contains "$TEST_DIR/cleanup.txt" 'No path would be removed' 'cleanup prev
 cmp -s "$TEST_DIR/cleanup.txt" "$TEST_DIR/cleanup-explicit.txt" || fail 'implicit and explicit dry-run plans differed'
 [ -f "$TEST_DIR/external/outside.txt" ] || fail 'inventory followed or modified an external symlink'
 
+# Shared report publication creates private directories; active drive producers
+# establish a private umask for subsequently redirected report files.
+report_root="$TEST_DIR/private-reports"
+bash -c '
+set -euo pipefail
+source "$1/lib/cc-report.sh"
+umask 077
+CC_REPORT_DIR="$2"
+directory="$(cc_report_make_dir drives fixture)"
+cc_report_write_metadata "$directory/metadata.txt" "Fixture"
+[ "$(stat -c %a "$directory")" = 700 ]
+[ "$(stat -c %a "$directory/metadata.txt")" = 600 ]
+' bash "$PROJECT_ROOT" "$report_root" || fail 'private drive-report modes were not preserved'
+grep -Fq 'umask 077' "$PROJECT_ROOT/tools/commands/drive-report" || fail 'drive-report lacks a private umask'
+grep -Fq 'umask 077' "$PROJECT_ROOT/tools/commands/drive-qualify" || fail 'drive-qualify lacks a private umask'
+
 # Replacing the configured ownership root with a symlink cannot redirect scans.
 SYMLINK_HOME="$TEST_DIR/symlink-home"
 mkdir -p "$SYMLINK_HOME"

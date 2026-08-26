@@ -26,6 +26,7 @@ source "$PROJECT_ROOT/lib/cc-storage.sh"
 source "$PROJECT_ROOT/lib/cc-report.sh"
 
 DEVICE=""
+umask 077
 
 usage() {
     cat <<'EOF_HELP'

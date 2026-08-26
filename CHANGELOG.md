@@ -71,6 +71,8 @@ The format follows a simple milestone-based structure until the project reaches 
 - Monthly health now reports concise persistent-resource status without cleanup.
 - Installer backup and repository bundle defaults now resolve through central
   environment helpers while preserving their existing global locations.
+- Drive reports and qualification captures now use private 0700/0600 creation,
+  and read-only qualification status no longer creates an empty report directory.
 
 - `cc env path --fix` now atomically installs one canonical idempotent PATH
   block, removes only recognized legacy writers, preserves ambiguous user

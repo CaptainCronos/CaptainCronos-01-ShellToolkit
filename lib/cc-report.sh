@@ -54,6 +54,7 @@ cc_report_make_dir() {
     stamp="$(cc_report_timestamp)"
     dir="$(cc_report_root)/$category/${name}-${stamp}"
     mkdir -p "$dir"
+    chmod 700 "$dir"
     echo "$dir"
 }
 

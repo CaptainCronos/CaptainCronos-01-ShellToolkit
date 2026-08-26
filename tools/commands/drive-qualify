@@ -26,6 +26,7 @@ source "$PROJECT_ROOT/lib/cc-report.sh"
 DEVICE=""
 MODE="start"
 START_LONG="no"
+umask 077
 
 usage() {
     cat <<'EOF_HELP'
@@ -63,7 +64,10 @@ cc_storage_require_smartctl || exit $?
 cc_storage_require_device "$DEVICE" || exit $?
 
 safe_name="$(cc_storage_device_basename "$DEVICE")"
-qual_dir="$(cc_report_make_dir "drives/qualification" "$safe_name")"
+qual_dir=""
+case "$MODE" in
+    start|complete) qual_dir="$(cc_report_make_dir "drives/qualification" "$safe_name")" ;;
+esac
 
 latest_asset_for_device() {
     local dev="$1" file

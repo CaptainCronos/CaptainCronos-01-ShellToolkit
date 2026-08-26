@@ -348,8 +348,9 @@ Historical reports are stored under:
 Reports represent timestamped observations. Monthly-health reports remain mode
 0600 inside a mode-0700 directory and keep a `latest.log` symlink for operator
 convenience. Drive reports and qualification captures are historical records.
-The v1.3 policy retains all report history because no objective expiration rule
-has been established.
+They contain device, serial, host, and health data, so new drive report files
+are mode 0600 inside mode-0700 directories. The v1.3 policy retains all report
+history because no objective expiration rule has been established.
 
 ### Diagnostics and Progress
 
