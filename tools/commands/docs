@@ -133,15 +133,33 @@ generate_reference() {
         echo "## cc $cmd"
         echo
         echo "~~~text"
-        bash "$PROJECT_ROOT/tools/cc" "$cmd" --help 2>&1 || true
+        if ! docs_reference_cc "$cmd" --help 2>&1; then
+            printf 'Failed to render help for cc %s.\n' "$cmd" >&2
+            return 1
+        fi
         echo "~~~"
         echo
         echo "### Switch discovery"
         echo
         echo "~~~text"
-        bash "$PROJECT_ROOT/tools/cc" "$cmd" switches
+        if ! docs_reference_cc "$cmd" switches; then
+            printf 'Failed to render switch discovery for cc %s.\n' "$cmd" >&2
+            return 1
+        fi
         echo "~~~"
     done < <(command_list)
+}
+
+docs_reference_cc() {
+    (
+        # Generated command documentation is a repository artifact. Do not let
+        # caller shell hooks, user program mappings, locale, or color settings
+        # alter the captured help text or toolkit-root selection.
+        unset BASH_ENV ENV CC_PROGRAMS_CONFIG CAPTAIN_CRONOS_REPO
+        export LC_ALL=C TERM=dumb NO_COLOR=1 CC_COLOR_MODE=never
+        export CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT"
+        bash "$PROJECT_ROOT/tools/cc" "$@"
+    )
 }
 
 generate_changelog() {
@@ -190,12 +208,12 @@ generate_index() {
 
 generate_all_into() {
     local destination="$1"
-    mkdir -p "$destination"
-    generate_inventory >"$destination/COMMAND_INVENTORY.md"
-    generate_reference >"$destination/COMMAND_REFERENCE.md"
-    generate_changelog >"$destination/CHANGE_SUMMARY.md"
-    generate_lint >"$destination/DOCS_LINT.md"
-    generate_index >"$destination/README.md"
+    mkdir -p "$destination" || return 1
+    generate_inventory >"$destination/COMMAND_INVENTORY.md" || return 1
+    generate_reference >"$destination/COMMAND_REFERENCE.md" || return 1
+    generate_changelog >"$destination/CHANGE_SUMMARY.md" || return 1
+    generate_lint >"$destination/DOCS_LINT.md" || return 1
+    generate_index >"$destination/README.md" || return 1
 }
 
 check_freshness() {

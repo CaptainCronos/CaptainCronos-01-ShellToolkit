@@ -508,15 +508,22 @@ tree before release activity.
 
 Local acceptance is orchestrated by the canonical `ccvalidate` function from
 `bash/bash_functions`, promoted unchanged through `defaults/v1/bash_functions`.
-Its `fast`, `full`, and `release` modes are validation-only. Release mode adds
-only the full-suite coverage absent from `cc release check`, avoiding duplicate
-repository-wide gates. The explicit `finish` mode is the sole Git-mutation
+Its `fast`, `full`, and `release` modes are validation-only. Full mode relies on
+the selftest's default release gate rather than repeating its verify, audit, and
+documentation stages. Release mode delegates that internal gate and invokes it
+once as an explicit final stage. The explicit `finish` mode is the sole Git-mutation
 boundary: it validates a clean committed development branch, permits only
 fast-forward main update/merge and `main -> origin/main` push, verifies the
 remote commit, and deletes the local feature branch only after verification.
 Any pre-switch validation failure leaves the feature checkout untouched; any
 post-merge failure leaves local main and the feature branch intact for review
 without pushing or resetting.
+
+Generated command references execute repository help under a canonical root,
+C locale, ANSI-disabled presentation, and without caller shell hooks or custom
+program mappings. Help bypasses runtime dependency checks, while every help and
+switch-rendering failure propagates through aggregate generation. A failed or
+partial render is therefore a generation error, never a stale-document result.
 
 ## Design Rules
 

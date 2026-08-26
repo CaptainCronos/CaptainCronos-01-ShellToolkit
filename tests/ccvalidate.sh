@@ -44,6 +44,7 @@ cat >"$TEST_DIR/bin/cc-fixture" <<'EOF_CC'
 #!/usr/bin/env bash
 set -u
 printf '%s|%s\n' "$(git branch --show-current 2>/dev/null || true)" "$*" >>"$CCVALIDATE_CC_LOG"
+[ "${CC_SELFTEST_SKIP_RELEASE_CHECK:-0}" != 1 ] || : >"$CCVALIDATE_RELEASE_DELEGATED_MARKER"
 case "${CCVALIDATE_FAIL_MATCH:-}" in
     "") ;;
     *)
@@ -77,6 +78,7 @@ export CCVALIDATE_CC_BIN="$TEST_DIR/bin/cc-fixture"
 export CCVALIDATE_GIT_BIN="$TEST_DIR/bin/git-fixture"
 export CCVALIDATE_CC_LOG="$TEST_DIR/cc.log"
 export CCVALIDATE_GIT_LOG="$TEST_DIR/git.log"
+export CCVALIDATE_RELEASE_DELEGATED_MARKER="$TEST_DIR/release-delegated"
 export TMPDIR="$TEST_DIR/tmp"
 
 alias functions=: funcs=: showfunc=:
@@ -91,6 +93,21 @@ if ! source "$PROJECT_ROOT/bash/bash_functions"; then
     fail 'could not source shell functions repeatedly'
 fi
 declare -F ccvalidate >/dev/null || fail 'ccvalidate was not defined after repeated sourcing'
+
+default_selftest_count="$(bash -c '
+    source "$1/tools/commands/selftest"
+    SELFTEST_TOTAL=0
+    selftest_suite selftest_count
+    printf "%s\n" "$SELFTEST_TOTAL"
+' bash "$PROJECT_ROOT")"
+delegated_selftest_count="$(CC_SELFTEST_SKIP_RELEASE_CHECK=1 bash -c '
+    source "$1/tools/commands/selftest"
+    SELFTEST_TOTAL=0
+    selftest_suite selftest_count
+    printf "%s\n" "$SELFTEST_TOTAL"
+' bash "$PROJECT_ROOT")"
+[ "$default_selftest_count" -eq $((delegated_selftest_count + 1)) ] ||
+    fail 'release delegation changed default selftest authority or test accounting'
 
 new_fixture() {
     local name="$1" repo origin
@@ -136,11 +153,8 @@ validation_status="$(git_in "$validation_repo" status --porcelain)"
 
 run_validation "$validation_repo" "$TEST_DIR/bare.out"
 assert_contains "$TEST_DIR/bare.out" 'Mode: full' 'bare ccvalidate did not default to full'
-assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|verify' 'full mode omitted verify'
 assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'full mode omitted selftest'
-assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|docs lint' 'full mode omitted docs lint'
-assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|docs check' 'full mode omitted docs check'
-assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|audit --strict' 'full mode omitted strict audit'
+[ "$(wc -l <"$CCVALIDATE_CC_LOG")" -eq 1 ] || fail 'full mode duplicated selftest-owned acceptance gates'
 
 run_validation "$validation_repo" "$TEST_DIR/fast.out" fast
 assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|verify' 'fast mode omitted verify'
@@ -151,23 +165,27 @@ if grep -Fq '|selftest' "$CCVALIDATE_CC_LOG"; then
 fi
 
 run_validation "$validation_repo" "$TEST_DIR/full.out" full
-[ "$(wc -l <"$CCVALIDATE_CC_LOG")" -eq 5 ] || fail 'full mode command coverage changed unexpectedly'
+[ "$(wc -l <"$CCVALIDATE_CC_LOG")" -eq 1 ] || fail 'full mode duplicated selftest-owned acceptance gates'
+[ ! -e "$CCVALIDATE_RELEASE_DELEGATED_MARKER" ] || fail 'full mode incorrectly delegated its authoritative release test'
 
+rm -f "$CCVALIDATE_RELEASE_DELEGATED_MARKER"
 run_validation "$validation_repo" "$TEST_DIR/release.out" release
 assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'release mode omitted selftest coverage'
 assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|release check' 'release mode omitted the release gate'
 [ "$(wc -l <"$CCVALIDATE_CC_LOG")" -eq 2 ] || fail 'release mode duplicated checks owned by the release gate'
+[ -f "$CCVALIDATE_RELEASE_DELEGATED_MARKER" ] || fail 'release mode did not delegate the nested selftest release gate'
 
-export CCVALIDATE_FAIL_MATCH=verify
+export CCVALIDATE_FAIL_MATCH=selftest
 : >"$CCVALIDATE_CC_LOG"
+: >"$CCVALIDATE_GIT_LOG"
 # shellcheck disable=SC2016
 assert_failure 'required validation failure returned zero' \
-    bash -c 'cd "$1"; source "$2/bash/bash_functions"; ccvalidate fast' bash "$validation_repo" "$PROJECT_ROOT" \
+    bash -c 'cd "$1"; source "$2/bash/bash_functions"; ccvalidate full' bash "$validation_repo" "$PROJECT_ROOT" \
     >"$TEST_DIR/failure.out" 2>&1
 unset CCVALIDATE_FAIL_MATCH
-assert_contains "$TEST_DIR/failure.out" 'Repository verification' 'failure result was not rendered'
+assert_contains "$TEST_DIR/failure.out" 'Engineering selftest' 'failure result was not rendered'
 assert_contains "$TEST_DIR/failure.out" 'Overall Status:  FAIL' 'aggregate failure was not reported'
-assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|docs lint' 'independent checks did not continue after failure'
+assert_contains "$CCVALIDATE_GIT_LOG" 'diff --check' 'independent checks did not continue after failure'
 
 ccvalidate help >"$TEST_DIR/help.out"
 ccvalidate --help >>"$TEST_DIR/help.out"
@@ -311,11 +329,18 @@ run_finish_failure "$diverged_repo" "$TEST_DIR/refuse-diverged-main.out"
 assert_contains "$TEST_DIR/refuse-diverged-main.out" 'updated main diverged from feature' 'updated-main divergence was not reported'
 
 feature_fail_repo="$(new_fixture finish-feature-validation-fail)"
+feature_fail_head="$(git_in "$feature_fail_repo" rev-parse HEAD)"
+feature_fail_main="$(git_in "$feature_fail_repo" rev-parse main)"
+feature_fail_origin="$(git_in "$feature_fail_repo" remote get-url origin)"
+feature_fail_remote="$(git_in "$feature_fail_origin" rev-parse refs/heads/main)"
 export CCVALIDATE_FAIL_BRANCH='feature/work'
 export CCVALIDATE_FAIL_BRANCH_COMMAND='selftest'
 run_finish_failure "$feature_fail_repo" "$TEST_DIR/feature-validation-fail.out"
 unset CCVALIDATE_FAIL_BRANCH CCVALIDATE_FAIL_BRANCH_COMMAND
 [ "$(git_in "$feature_fail_repo" branch --show-current)" = feature/work ] || fail 'feature validation failure switched branches'
+[ "$(git_in "$feature_fail_repo" rev-parse HEAD)" = "$feature_fail_head" ] || fail 'feature validation failure changed feature HEAD'
+[ "$(git_in "$feature_fail_repo" rev-parse main)" = "$feature_fail_main" ] || fail 'feature validation failure changed main'
+[ "$(git_in "$feature_fail_origin" rev-parse refs/heads/main)" = "$feature_fail_remote" ] || fail 'feature validation failure pushed origin/main'
 assert_contains "$TEST_DIR/feature-validation-fail.out" 'Feature validation' 'feature validation failure was not reported'
 
 post_fail_repo="$(new_fixture finish-post-validation-fail)"

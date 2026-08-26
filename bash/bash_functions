@@ -559,24 +559,26 @@ _ccvalidate_validation() {
             _ccvalidate_run_stage 'Git diff check' _ccvalidate_git diff --check || true
             ;;
         full)
-            _ccvalidate_run_stage 'Repository verification' _ccvalidate_cc verify || true
+            # The authoritative selftest includes the release gate, which in
+            # turn owns verify, audit, docs, syntax, and ShellCheck coverage.
             _ccvalidate_run_stage 'Engineering selftest' _ccvalidate_cc selftest || true
-            _ccvalidate_run_stage 'Documentation lint' _ccvalidate_cc docs lint || true
-            _ccvalidate_run_stage 'Generated documentation' _ccvalidate_cc docs check || true
-            _ccvalidate_run_stage 'Strict command audit' _ccvalidate_cc audit --strict || true
             _ccvalidate_run_stage 'Git diff check' _ccvalidate_git diff --check || true
             ;;
         release)
-            # The release gate already owns verify, audit, documentation,
-            # repository-wide syntax, and ShellCheck. Add only full-suite
-            # coverage it does not own so expensive checks are not duplicated.
-            _ccvalidate_run_stage 'Engineering selftest' _ccvalidate_cc selftest || true
+            # Delegate the release gate out of selftest so this orchestration
+            # can run and report it exactly once as the final release stage.
+            _ccvalidate_run_stage 'Engineering selftest' \
+                _ccvalidate_selftest_without_release || true
             _ccvalidate_run_stage 'Git diff check' _ccvalidate_git diff --check || true
             _ccvalidate_run_stage 'Release-readiness gate' _ccvalidate_cc release check || true
             ;;
     esac
 
     _ccvalidate_summary
+}
+
+_ccvalidate_selftest_without_release() {
+    CC_SELFTEST_SKIP_RELEASE_CHECK=1 _ccvalidate_cc selftest
 }
 
 _ccvalidate_expected_name() {

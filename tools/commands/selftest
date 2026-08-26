@@ -297,9 +297,9 @@ selftest_suite() {
     "$runner" "Report library" reporting check_library cc-report.sh
     "$runner" "Prompt engine library" prompt check_library cc-prompt-engine.sh
     "$runner" "Prompt engine render" prompt check_prompt_engine
-    "$runner" "Strict command audit" engineering bash "$PROJECT_ROOT/tools/cc" audit --strict
-    "$runner" "Documentation lint" documentation bash "$PROJECT_ROOT/tools/cc" docs lint
-    "$runner" "Release check" engineering bash "$PROJECT_ROOT/tools/cc" release check
+    if [ "${CC_SELFTEST_SKIP_RELEASE_CHECK:-0}" != 1 ]; then
+        "$runner" "Release check" engineering bash "$PROJECT_ROOT/tools/cc" release check
+    fi
     "$runner" "Registry load" registry bash "$PROJECT_ROOT/tools/cc" registry
     "$runner" "About load" core bash "$PROJECT_ROOT/tools/cc" about
     "$runner" "Roadmap load" documentation bash "$PROJECT_ROOT/tools/cc" roadmap

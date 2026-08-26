@@ -226,6 +226,14 @@ else
     exit "$status"
 fi
 
-check_command_deps "$command_path" "$cmd"
+case "${1:-}" in
+    --help|-h|--version)
+        # Documentation and operator help must not depend on runtime-only
+        # command capabilities. The command still owns and renders its usage.
+        ;;
+    *)
+        check_command_deps "$command_path" "$cmd"
+        ;;
+esac
 
 bash "$command_path" "$@"

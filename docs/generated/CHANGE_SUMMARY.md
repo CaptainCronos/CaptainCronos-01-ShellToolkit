@@ -73,6 +73,11 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- Generated command references now isolate caller-specific shell/program
+  settings, bypass runtime dependency gates for help, and fail generation
+  instead of misreporting incomplete help as stale committed documentation.
+- Local full/release validation now executes each authoritative release gate
+  once instead of repeating release-owned verification and documentation work.
 - Monthly-health reports and operational update/kernel logs now resolve through
   the existing host-scoped report/log environment roots; private report and log
   modes remain 0600 inside mode-0700 directories.

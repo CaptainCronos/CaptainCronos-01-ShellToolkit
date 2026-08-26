@@ -60,6 +60,8 @@ Focused shell tests supplement `cc selftest`:
 - `rc-integrity.sh` verifies release forbidden-content searches without
   requiring optional ripgrep and rejects false PASS results when forbidden
   maturity, documentation, or predictable temporary-path content is present.
+  It also proves generated command references ignore caller shell hooks and
+  program mappings instead of misreporting partial help output as stale.
 - `dependencies.sh` validates semantic capability resolution, literal executable
   hints, and the `system-update` package-manager dependency regression.
 - `package-management.sh` validates semantic package operations.

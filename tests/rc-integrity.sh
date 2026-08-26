@@ -77,6 +77,20 @@ bash "$PROJECT_ROOT/tools/commands/docs" build --apply --out "$docs_fixture" >/d
 bash "$PROJECT_ROOT/tools/commands/docs" check --out "$docs_fixture" >/dev/null \
     || fail "fresh generated documents were rejected"
 
+# Generated help is a repository artifact, not a reflection of caller-specific
+# program mappings. A broken inherited mapping must neither contaminate the
+# reference nor be converted into a false stale-document result.
+polluted_docs="$TEST_DIR/generated-polluted-environment"
+CC_PROGRAMS_CONFIG="$TEST_DIR/does-not-exist" \
+    bash "$PROJECT_ROOT/tools/commands/docs" reference --apply --out "$polluted_docs" >/dev/null \
+    || fail "reference generation depended on caller program configuration"
+cmp -s "$docs_fixture/COMMAND_REFERENCE.md" "$polluted_docs/COMMAND_REFERENCE.md" \
+    || fail "caller program configuration changed generated command help"
+printf 'export CC_PROGRAMS_CONFIG=%q\n' "$TEST_DIR/does-not-exist" >"$TEST_DIR/bash-env"
+BASH_ENV="$TEST_DIR/bash-env" \
+    bash "$PROJECT_ROOT/tools/commands/docs" check --out "$docs_fixture" >/dev/null \
+    || fail "caller shell hook changed generated documentation freshness"
+
 LC_ALL=C bash "$PROJECT_ROOT/tools/commands/docs" inventory >"$TEST_DIR/inventory-c"
 LC_ALL=en_US.utf8 bash "$PROJECT_ROOT/tools/commands/docs" inventory >"$TEST_DIR/inventory-en"
 cmp -s "$TEST_DIR/inventory-c" "$TEST_DIR/inventory-en" \

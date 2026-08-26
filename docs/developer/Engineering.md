@@ -73,10 +73,17 @@ consumption, makes acceptance deterministic, removes repeated manual Git
 completion steps, and preserves an explicit boundary around repository mutation.
 
 Use `ccvalidate fast` for inexpensive development feedback. Bare `ccvalidate`
-means `ccvalidate full`. Full mode orchestrates repository verification, the
-engineering selftest, documentation lint/freshness, strict audit, and Git diff
-checks. `ccvalidate release` provides full-equivalent coverage plus the release
-gate without rerunning checks already owned by that gate.
+means `ccvalidate full`. Full mode runs the authoritative engineering selftest,
+whose default suite includes the release gate, followed by the independent Git
+diff check. Release mode delegates the release test out of that selftest run and
+then invokes `cc release check` explicitly, so the same broad coverage and final
+release gate execute without running identical expensive checks twice.
+
+Generated command references use the repository dispatcher and canonical
+metadata under a fixed locale/color context. Help rendering bypasses
+runtime-only dependency gates, ignores caller-specific program mappings and
+shell startup hooks, and propagates generation failures instead of treating
+partial help output as a stale committed document.
 
 The `fast`, `full`, and `release` modes are validation-only. Only the explicit
 `ccvalidate finish` mode may change Git state. It requires the ShellToolkit
