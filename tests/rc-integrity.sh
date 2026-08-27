@@ -95,7 +95,11 @@ CC_PROGRAMS_CONFIG="$TEST_DIR/does-not-exist" \
     || fail "switch discovery depended on caller program configuration"
 cmp -s "$normal_switches" "$polluted_switches" \
     || fail "caller program configuration changed drive-inventory switches"
-printf 'export CC_PROGRAMS_CONFIG=%q\n' "$TEST_DIR/does-not-exist" >"$TEST_DIR/bash-env"
+cat >"$TEST_DIR/bash-env" <<EOF_HOOK
+export CC_PROGRAMS_CONFIG=$(printf '%q' "$TEST_DIR/does-not-exist")
+bash() { printf 'caller bash hook\n' >&2; return 77; }
+export -f bash
+EOF_HOOK
 BASH_ENV="$TEST_DIR/bash-env" \
     bash "$PROJECT_ROOT/tools/commands/docs" check --out "$docs_fixture" >/dev/null \
     || fail "caller shell hook changed generated documentation freshness"

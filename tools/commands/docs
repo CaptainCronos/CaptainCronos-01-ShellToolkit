@@ -151,14 +151,22 @@ generate_reference() {
 }
 
 docs_reference_cc() {
+    local reference_path reference_home
+    reference_path="$PATH"
+    reference_home="${HOME:-}"
     (
         # Generated command documentation is a repository artifact. Do not let
-        # caller shell hooks, user program mappings, locale, or color settings
-        # alter the captured help text or toolkit-root selection.
-        unset BASH_ENV ENV CC_PROGRAMS_CONFIG CAPTAIN_CRONOS_REPO
-        export LC_ALL=C TERM=dumb NO_COLOR=1 CC_COLOR_MODE=never
-        export CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT"
-        bash "$PROJECT_ROOT/tools/cc" "$@"
+        # caller shell hooks, exported functions, user program mappings,
+        # locale, or color settings alter captured help text or root selection.
+        local function_name
+        while IFS= read -r function_name; do
+            unset -f "$function_name"
+        done < <(compgen -A function)
+        command env -i \
+            PATH="$reference_path" HOME="$reference_home" \
+            LC_ALL=C TERM=dumb NO_COLOR=1 CC_COLOR_MODE=never \
+            CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT" \
+            bash "$PROJECT_ROOT/tools/cc" "$@"
     )
 }
 
