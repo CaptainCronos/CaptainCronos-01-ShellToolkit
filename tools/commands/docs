@@ -13,6 +13,18 @@
 
 set -euo pipefail
 
+# A caller's BASH_ENV can import exported functions before this script starts,
+# so sanitizing only individual capture children is too late: generation itself
+# invokes Bash for syntax checks. Re-exec once with an explicit environment.
+if [ "${CC_DOCS_SANITIZED:-0}" != 1 ]; then
+    docs_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
+    /usr/bin/env -i \
+        PATH="${PATH:-}" HOME="${HOME:-}" TMPDIR="${TMPDIR:-}" \
+        LC_ALL=C TERM=dumb NO_COLOR=1 CC_COLOR_MODE=never \
+        CC_DOCS_SANITIZED=1 bash "$docs_script" "$@"
+    exit $?
+fi
+
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
