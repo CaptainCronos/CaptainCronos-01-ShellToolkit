@@ -196,6 +196,13 @@ if [ ! -f "$command_path" ]; then
     exit 1
 fi
 
+# Metadata/help rendering is repository-owned output.  Isolate it from
+# caller-specific program mappings and shell startup hooks, including when
+# switch discovery is invoked directly by a nested validation fixture.
+if [ "${1:-}" = switches ] || [[ "${2:-}" =~ ^(--help|-h|switches)$ ]]; then
+    unset BASH_ENV ENV CC_PROGRAMS_CONFIG CAPTAIN_CRONOS_REPO
+fi
+
 if [ "${1:-}" = switches ] && [ "$#" -eq 1 ]; then
     cc_help_render_switches "$cmd"
     exit 0

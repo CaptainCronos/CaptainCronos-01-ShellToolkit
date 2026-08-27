@@ -86,6 +86,15 @@ CC_PROGRAMS_CONFIG="$TEST_DIR/does-not-exist" \
     || fail "reference generation depended on caller program configuration"
 cmp -s "$docs_fixture/COMMAND_REFERENCE.md" "$polluted_docs/COMMAND_REFERENCE.md" \
     || fail "caller program configuration changed generated command help"
+normal_switches="$TEST_DIR/drive-inventory-switches-normal"
+polluted_switches="$TEST_DIR/drive-inventory-switches-polluted"
+bash "$PROJECT_ROOT/tools/cc" drive-inventory switches >"$normal_switches" \
+    || fail "baseline switch discovery failed"
+CC_PROGRAMS_CONFIG="$TEST_DIR/does-not-exist" \
+    bash "$PROJECT_ROOT/tools/cc" drive-inventory switches >"$polluted_switches" \
+    || fail "switch discovery depended on caller program configuration"
+cmp -s "$normal_switches" "$polluted_switches" \
+    || fail "caller program configuration changed drive-inventory switches"
 printf 'export CC_PROGRAMS_CONFIG=%q\n' "$TEST_DIR/does-not-exist" >"$TEST_DIR/bash-env"
 BASH_ENV="$TEST_DIR/bash-env" \
     bash "$PROJECT_ROOT/tools/commands/docs" check --out "$docs_fixture" >/dev/null \
