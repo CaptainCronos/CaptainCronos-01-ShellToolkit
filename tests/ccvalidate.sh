@@ -441,9 +441,36 @@ if grep -E '\|push .*feature|\|push .*tags|\|push .*force' "$CCVALIDATE_GIT_LOG"
     fail 'publish attempted a non-main, tag, or force push'
 fi
 
+# A post-merge validation repair legitimately advances local main beyond the
+# recorded feature tip.  Publication pushes and verifies the repaired main,
+# then proves the unchanged feature tip is merged before safe -d cleanup.
+publish_repair_repo="$(new_fixture publish-repaired-main)"
+publish_repair_origin="$(git_in "$publish_repair_repo" remote get-url origin)"
+make_interrupted_finish "$publish_repair_repo" "$TEST_DIR/publish-repair-interrupted.out"
+publish_repair_feature="$(git_in "$publish_repair_repo" rev-parse feature/work)"
+printf 'post-merge repair\n' >"$publish_repair_repo/repair.txt"
+commit_all "$publish_repair_repo" 'fix: post-merge validation repair'
+publish_repair_main="$(git_in "$publish_repair_repo" rev-parse main)"
+[ "$publish_repair_main" != "$publish_repair_feature" ] || fail 'repair did not advance main beyond the feature tip'
+set_fixture_contract "$publish_repair_repo"
+: >"$CCVALIDATE_CC_LOG"
+: >"$CCVALIDATE_GIT_LOG"
+(cd "$publish_repair_repo" && ccvalidate publish) >"$TEST_DIR/publish-repair.out" 2>&1 \
+    || fail 'publish rejected a repaired-main continuation'
+[ "$(git_in "$publish_repair_origin" rev-parse refs/heads/main)" = "$publish_repair_main" ] \
+    || fail 'repaired-main publish did not publish repair commit'
+if git_in "$publish_repair_repo" show-ref --verify --quiet refs/heads/feature/work; then
+    fail 'repaired-main publish retained the unchanged merged feature branch'
+fi
+assert_contains "$CCVALIDATE_GIT_LOG" 'push origin refs/heads/main:refs/heads/main' \
+    'repaired-main publish used an unexpected main refspec'
+assert_contains "$CCVALIDATE_GIT_LOG" 'branch -d feature/work' \
+    'repaired-main publish did not use safe feature cleanup'
+
 # Repetition after publication is safe: validate and verify, but do not push or
 # recreate commits/refs. Unknown cleanup ownership is reported conservatively.
 published_refs="$(git_in "$publish_repo" show-ref)"
+set_fixture_contract "$publish_repo"
 : >"$CCVALIDATE_GIT_LOG"
 (cd "$publish_repo" && ccvalidate publish) >"$TEST_DIR/publish-repeat.out" 2>&1 ||
     fail 'repeated publish was not idempotent'
