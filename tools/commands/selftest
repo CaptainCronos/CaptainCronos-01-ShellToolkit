@@ -27,6 +27,7 @@ RESULTS=""
 SELFTEST_TOTAL=0
 SELFTEST_TEMP=""
 SELFTEST_LAST_STATUS=0
+SELFTEST_SKIP_RELEASE_CHECK=0
 
 usage() {
     cat <<'EOF_HELP'
@@ -297,7 +298,8 @@ selftest_suite() {
     "$runner" "Report library" reporting check_library cc-report.sh
     "$runner" "Prompt engine library" prompt check_library cc-prompt-engine.sh
     "$runner" "Prompt engine render" prompt check_prompt_engine
-    if [ "${CC_SELFTEST_SKIP_RELEASE_CHECK:-0}" != 1 ]; then
+    if [ "${SELFTEST_SKIP_RELEASE_CHECK:-0}" != 1 ] &&
+        [ "${CC_SELFTEST_SKIP_RELEASE_CHECK:-0}" != 1 ]; then
         "$runner" "Release check" engineering bash "$PROJECT_ROOT/tools/cc" release check
     fi
     "$runner" "Registry load" registry bash "$PROJECT_ROOT/tools/cc" registry
@@ -339,6 +341,13 @@ selftest_main() {
     done
 
     [ "$DEBUG" -eq 0 ] || cc_debug_enable
+    if [ "${CC_SELFTEST_SKIP_RELEASE_CHECK:-0}" = 1 ]; then
+        SELFTEST_SKIP_RELEASE_CHECK=1
+        # This is an orchestration directive, not test-wide ambient state.
+        unset CC_SELFTEST_SKIP_RELEASE_CHECK
+    else
+        SELFTEST_SKIP_RELEASE_CHECK=0
+    fi
     SELFTEST_TOTAL=0
     selftest_suite selftest_count
 
