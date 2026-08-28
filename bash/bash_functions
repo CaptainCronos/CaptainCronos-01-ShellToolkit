@@ -578,7 +578,11 @@ _ccvalidate_validation() {
 }
 
 _ccvalidate_selftest_without_release() {
-    CC_SELFTEST_SKIP_RELEASE_CHECK=1 _ccvalidate_cc selftest
+    (
+        CC_SELFTEST_SKIP_RELEASE_CHECK=1
+        export CC_SELFTEST_SKIP_RELEASE_CHECK
+        _ccvalidate_cc selftest
+    )
 }
 
 _ccvalidate_expected_name() {

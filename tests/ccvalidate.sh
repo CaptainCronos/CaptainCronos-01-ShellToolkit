@@ -174,6 +174,8 @@ assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'release mode omitt
 assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|release check' 'release mode omitted the release gate'
 [ "$(wc -l <"$CCVALIDATE_CC_LOG")" -eq 2 ] || fail 'release mode duplicated checks owned by the release gate'
 [ -f "$CCVALIDATE_RELEASE_DELEGATED_MARKER" ] || fail 'release mode did not delegate the nested selftest release gate'
+# shellcheck disable=SC2031
+[ "${CC_SELFTEST_SKIP_RELEASE_CHECK+x}" != x ] || fail 'release delegation leaked into caller environment'
 
 export CCVALIDATE_FAIL_MATCH=selftest
 : >"$CCVALIDATE_CC_LOG"
