@@ -103,6 +103,15 @@ EOF_HOOK
 BASH_ENV="$TEST_DIR/bash-env" \
     bash "$PROJECT_ROOT/tools/commands/docs" check --out "$docs_fixture" >/dev/null \
     || fail "caller shell hook changed generated documentation freshness"
+prompt_normal="$TEST_DIR/prompt-switches-normal"
+prompt_polluted="$TEST_DIR/prompt-switches-polluted"
+bash "$PROJECT_ROOT/tools/cc" prompt switches >"$prompt_normal" \
+    || fail "baseline prompt switch discovery failed"
+BASH_ENV="$TEST_DIR/bash-env" \
+    bash "$PROJECT_ROOT/tools/cc" prompt switches >"$prompt_polluted" \
+    || fail "caller shell hook changed prompt switch discovery"
+cmp -s "$prompt_normal" "$prompt_polluted" \
+    || fail "caller shell hook changed prompt switch output"
 
 LC_ALL=C bash "$PROJECT_ROOT/tools/commands/docs" inventory >"$TEST_DIR/inventory-c"
 LC_ALL=en_US.utf8 bash "$PROJECT_ROOT/tools/commands/docs" inventory >"$TEST_DIR/inventory-en"
