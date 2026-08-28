@@ -16,6 +16,20 @@ set -euo pipefail
 DEFAULT_TOOLKIT_ROOT="$HOME/GitHub/CaptainCronos-01-ShellToolkit"
 ORIGINAL_PWD="${PWD:-$(pwd)}"
 
+# Discovery must not initialize or consult mutable runtime state. Detect it
+# before loading dependency/package libraries, then remove caller-owned config
+# that could cause those libraries to create host resources.
+CC_DISCOVERY_REQUEST=0
+for cc_arg in "$@"; do
+    [ "$cc_arg" = switches ] || continue
+    CC_DISCOVERY_REQUEST=1
+    break
+done
+if [ "$CC_DISCOVERY_REQUEST" -eq 1 ]; then
+    unset BASH_ENV ENV CC_PROGRAMS_CONFIG CC_PROGRAMS_LOADED
+    unset CC_HOME CC_CONFIG CC_HOST_HOME CC_REPORT_DIR CC_ASSET_DIR
+fi
+
 cc_launcher_canonical_dir() {
     local path="$1"
     [ -d "$path" ] || return 1

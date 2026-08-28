@@ -190,7 +190,7 @@ done
 fingerprint() { find "$fixture_home" -mindepth 1 -printf '%P|%y|%s|%T@\n' | LC_ALL=C sort; }
 fingerprint >"$TEST_DIR/before"
 while read -r command_name; do
-    env HOME="$fixture_home" PATH="$mock_bin:$PATH" CC_SWITCH_TRACE="$trace" \
+    env HOME="$fixture_home" CC_HOME="$fixture_home/.captaincronos" PATH="$mock_bin:$PATH" CC_SWITCH_TRACE="$trace" \
         CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT" bash "$PROJECT_ROOT/tools/cc" \
         "$command_name" switches >/dev/null || fail "zero-write root discovery failed: $command_name"
 done <"$TEST_DIR/contracts"
@@ -198,7 +198,7 @@ for spec in \
     'kernel cleanup' 'env path' 'docs check' 'repos commit' \
     'storage workbench' 'update dev' 'verify executable'; do
     read -r -a args <<< "$spec"
-    env HOME="$fixture_home" PATH="$mock_bin:$PATH" CC_SWITCH_TRACE="$trace" \
+    env HOME="$fixture_home" CC_HOME="$fixture_home/.captaincronos" PATH="$mock_bin:$PATH" CC_SWITCH_TRACE="$trace" \
         CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT" bash "$PROJECT_ROOT/tools/cc" \
         "${args[@]}" switches >/dev/null || fail "zero-write nested discovery failed: $spec"
 done
