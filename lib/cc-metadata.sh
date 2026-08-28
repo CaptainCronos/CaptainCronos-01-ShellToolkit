@@ -387,11 +387,15 @@ EOF_SUBCOMMANDS
 
 cc_contract_command_row() {
     local command_name="$1"
-    cc_contract_commands | awk -F '|' -v command_name="$command_name" '$1 == command_name { print; exit }'
+    # Consume the complete producer.  An early-exiting consumer can close the
+    # pipe while the contract here-document is still being written; pipefail
+    # then turns a successful lookup into a timing-dependent SIGPIPE failure.
+    cc_contract_commands | awk -F '|' -v command_name="$command_name" \
+        '$1 == command_name && !found { row=$0; found=1 } END { if (found) print row }'
 }
 
 cc_contract_subcommand_row() {
     local command_name="$1" subcommand="$2"
     cc_contract_subcommands | awk -F '|' -v command_name="$command_name" -v subcommand="$subcommand" \
-        '$1 == command_name && $2 == subcommand { print; exit }'
+        '$1 == command_name && $2 == subcommand && !found { row=$0; found=1 } END { if (found) print row }'
 }

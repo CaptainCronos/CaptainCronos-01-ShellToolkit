@@ -103,6 +103,12 @@ EOF_HOOK
 BASH_ENV="$TEST_DIR/bash-env" \
     bash "$PROJECT_ROOT/tools/commands/docs" check --out "$docs_fixture" >/dev/null \
     || fail "caller shell hook changed generated documentation freshness"
+polluted_hook_docs="$TEST_DIR/generated-polluted-hook"
+BASH_ENV="$TEST_DIR/bash-env" \
+    bash "$PROJECT_ROOT/tools/commands/docs" build --apply --out "$polluted_hook_docs" >/dev/null \
+    || fail "caller shell hook changed generated documentation"
+diff -qr "$docs_fixture" "$polluted_hook_docs" >/dev/null \
+    || fail "clean and polluted generated documentation differed"
 prompt_normal="$TEST_DIR/prompt-switches-normal"
 prompt_polluted="$TEST_DIR/prompt-switches-polluted"
 bash "$PROJECT_ROOT/tools/cc" prompt switches >"$prompt_normal" \
@@ -112,6 +118,39 @@ BASH_ENV="$TEST_DIR/bash-env" \
     || fail "caller shell hook changed prompt switch discovery"
 cmp -s "$prompt_normal" "$prompt_polluted" \
     || fail "caller shell hook changed prompt switch output"
+
+# Discovery failures retain the real child status and bounded phase context,
+# while write_output prevents publication of a partial reference artifact.
+failure_bin="$TEST_DIR/failure-bin"
+failure_docs="$TEST_DIR/generated-failure"
+mkdir -p "$failure_bin"
+real_bash="$(type -P bash)"
+cat >"$failure_bin/bash" <<EOF_FAILURE_BASH
+#!$real_bash
+if [ "\${1:-}" = "$PROJECT_ROOT/tools/cc" ] &&
+   [ "\${2:-}" = about ] && [ "\${3:-}" = switches ]; then
+    printf 'partial output\n'
+    printf 'injected discovery failure\n' >&2
+    exit 23
+fi
+exec $(printf '%q' "$real_bash") "\$@"
+EOF_FAILURE_BASH
+chmod 700 "$failure_bin/bash"
+if PATH="$failure_bin:$PATH" \
+    "$real_bash" "$PROJECT_ROOT/tools/commands/docs" reference --apply --out "$failure_docs" \
+    >"$TEST_DIR/discovery-failure.out" 2>"$TEST_DIR/discovery-failure.err"; then
+    fail "injected discovery failure returned success"
+else
+    discovery_status=$?
+fi
+[ "$discovery_status" -eq 23 ] \
+    || fail "discovery failure changed child status 23 to $discovery_status"
+grep -Fq 'Discovery failure: phase=switch-discovery, exit=23, stdout_bytes=15.' \
+    "$TEST_DIR/discovery-failure.err" || fail "discovery failure omitted status or stdout size"
+grep -Fq 'injected discovery failure' "$TEST_DIR/discovery-failure.err" \
+    || fail "discovery failure omitted captured stderr"
+[ ! -e "$failure_docs/COMMAND_REFERENCE.md" ] \
+    || fail "discovery failure published a partial command reference"
 
 LC_ALL=C bash "$PROJECT_ROOT/tools/commands/docs" inventory >"$TEST_DIR/inventory-c"
 LC_ALL=en_US.utf8 bash "$PROJECT_ROOT/tools/commands/docs" inventory >"$TEST_DIR/inventory-en"

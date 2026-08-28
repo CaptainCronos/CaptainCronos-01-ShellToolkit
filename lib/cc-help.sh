@@ -10,7 +10,8 @@ cc_help_context_usage() {
         return
     fi
     subcommand="${context#*/}"
-    row="$(cc_contract_subcommands | awk -F '|' -v target="$context" '$4 == target { print; exit }')"
+    row="$(cc_contract_subcommands | awk -F '|' -v target="$context" \
+        '$4 == target && !found { row=$0; found=1 } END { if (found) print row }')"
     IFS='|' read -r _ _ _ _ <<< "$row"
     printf 'cc %s %s [switches]\n' "$command_name" "$subcommand"
 }
@@ -21,7 +22,8 @@ cc_help_context_description() {
         row="$(cc_contract_command_row "$command_name")"
         IFS='|' read -r _ _ _ description _ <<< "$row"
     else
-        row="$(cc_contract_subcommands | awk -F '|' -v target="$context" '$4 == target { print; exit }')"
+        row="$(cc_contract_subcommands | awk -F '|' -v target="$context" \
+            '$4 == target && !found { row=$0; found=1 } END { if (found) print row }')"
         IFS='|' read -r _ _ description _ <<< "$row"
     fi
     printf '%s\n' "$description"

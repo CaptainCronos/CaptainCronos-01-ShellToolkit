@@ -18,10 +18,14 @@ set -euo pipefail
 # invokes Bash for syntax checks. Re-exec once with an explicit environment.
 if [ "${CC_DOCS_SANITIZED:-0}" != 1 ]; then
     docs_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
+    docs_bash="$(type -P bash)" || {
+        printf 'docs: could not resolve the Bash executable.\n' >&2
+        exit 127
+    }
     /usr/bin/env -i \
         PATH="${PATH:-}" HOME="${HOME:-}" TMPDIR="${TMPDIR:-}" \
         LC_ALL=C TERM=dumb NO_COLOR=1 CC_COLOR_MODE=never \
-        CC_DOCS_SANITIZED=1 bash "$docs_script" "$@"
+        CC_DOCS_SANITIZED=1 "$docs_bash" "$docs_script" "$@"
     exit $?
 fi
 
@@ -29,6 +33,10 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-metadata.sh"
+DOCS_BASH="$(type -P bash)" || {
+    printf 'docs: could not resolve the Bash executable.\n' >&2
+    exit 127
+}
 
 ACTION="build"
 OUT_DIR="$PROJECT_ROOT/docs/generated"
@@ -145,18 +153,20 @@ generate_reference() {
         echo "## cc $cmd"
         echo
         echo "~~~text"
-        if ! docs_reference_cc "$cmd" --help 2>&1; then
-            printf 'Failed to render help for cc %s.\n' "$cmd" >&2
-            return 1
+        if docs_reference_render help "$cmd" "$cmd" --help; then
+            :
+        else
+            return $?
         fi
         echo "~~~"
         echo
         echo "### Switch discovery"
         echo
         echo "~~~text"
-        if ! docs_reference_cc "$cmd" switches; then
-            printf 'Failed to render switch discovery for cc %s.\n' "$cmd" >&2
-            return 1
+        if docs_reference_render switch-discovery "$cmd" "$cmd" switches; then
+            :
+        else
+            return $?
         fi
         echo "~~~"
     done < <(command_list)
@@ -178,8 +188,62 @@ docs_reference_cc() {
             PATH="$reference_path" HOME="$reference_home" \
             LC_ALL=C TERM=dumb NO_COLOR=1 CC_COLOR_MODE=never \
             CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT" \
-            bash "$PROJECT_ROOT/tools/cc" "$@"
+            "$DOCS_BASH" "$PROJECT_ROOT/tools/cc" "$@"
     )
+}
+
+docs_reference_render() {
+    local phase="$1" command_name="$2" stdout_file stderr_file status stdout_size
+    local stream_status cleanup_status=0
+    shift 2
+    cc_temp_file stdout_file "${TMPDIR:-/tmp}/cc-docs-stdout.XXXXXX" || return 1
+    cc_temp_file stderr_file "${TMPDIR:-/tmp}/cc-docs-stderr.XXXXXX" || {
+        cc_temp_remove "$stdout_file" || :
+        return 1
+    }
+    if docs_reference_cc "$@" >"$stdout_file" 2>"$stderr_file"; then
+        status=0
+    else
+        status=$?
+    fi
+    if [ "$status" -eq 0 ]; then
+        if command cat "$stdout_file"; then
+            :
+        else
+            status=$?
+        fi
+        # Help historically captured stderr into the generated reference.
+        if [ "$phase" = help ]; then
+            if command cat "$stderr_file"; then
+                :
+            else
+                stream_status=$?
+                [ "$status" -ne 0 ] || status="$stream_status"
+            fi
+        else
+            if command cat "$stderr_file" >&2; then
+                :
+            else
+                stream_status=$?
+                [ "$status" -ne 0 ] || status="$stream_status"
+            fi
+        fi
+    else
+        stdout_size="$(wc -c <"$stdout_file" | tr -d ' ')"
+        printf 'Failed to render %s for cc %s.\n' "${phase//-/ }" "$command_name" >&2
+        printf 'Discovery failure: phase=%s, exit=%s, stdout_bytes=%s.\n' \
+            "$phase" "$status" "$stdout_size" >&2
+        if [ -s "$stderr_file" ]; then
+            printf '%s\n' 'Captured discovery stderr:' >&2
+            sed 's/^/  | /' "$stderr_file" >&2
+        else
+            printf '%s\n' 'Captured discovery stderr: (empty)' >&2
+        fi
+    fi
+    cc_temp_remove "$stdout_file" || cleanup_status=1
+    cc_temp_remove "$stderr_file" || cleanup_status=1
+    [ "$status" -ne 0 ] || status="$cleanup_status"
+    return "$status"
 }
 
 generate_changelog() {

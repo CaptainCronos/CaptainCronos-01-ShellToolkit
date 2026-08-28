@@ -111,6 +111,25 @@ cmp -s "$TEST_DIR/registry" "$TEST_DIR/contracts" || fail 'registered commands a
 [ "$(wc -l <"$TEST_DIR/contracts" | tr -d ' ')" -eq 48 ] || fail 'public command count changed unexpectedly'
 [ "$(sort "$TEST_DIR/contracts" | uniq -d | wc -l | tr -d ' ')" -eq 0 ] || fail 'duplicate command contracts exist'
 
+# Contract row selection must consume its producer completely.  Expanding the
+# producer beyond pipe capacity makes an early-exit/pipefail race deterministic.
+(
+    command_contracts="$(cc_contract_commands)"
+    subcommand_contracts="$(cc_contract_subcommands)"
+    cc_contract_commands() {
+        local iteration
+        for ((iteration = 0; iteration < 100; iteration++)); do printf '%s\n' "$command_contracts"; done
+    }
+    cc_contract_subcommands() {
+        local iteration
+        for ((iteration = 0; iteration < 100; iteration++)); do printf '%s\n' "$subcommand_contracts"; done
+    }
+    command_row="$(cc_contract_command_row about)" || exit 1
+    subcommand_row="$(cc_contract_subcommand_row kernel cleanup)" || exit 1
+    [ "$command_row" = "$(awk -F '|' '$1 == "about" { print; exit }' <<<"$command_contracts")" ] || exit 1
+    [ "$subcommand_row" = "$(awk -F '|' '$1 == "kernel" && $2 == "cleanup" { print; exit }' <<<"$subcommand_contracts")" ] || exit 1
+) || fail 'contract row lookup did not drain a backpressured producer'
+
 while IFS='|' read -r command_name class _; do
     assert_success "cc $command_name switches failed" run_cc "$command_name" switches
     if [[ "$class" == namespace* ]]; then
