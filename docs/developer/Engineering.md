@@ -61,11 +61,15 @@ architecture + implementation + focused tests + changed-file checks + diff revie
 
 Operator:
 ccvalidate full
+ccvalidate release
 
 Codex returns only when operator validation reports a failure requiring diagnosis.
 
 Final repository completion:
 ccvalidate finish
+
+Interrupted post-merge continuation:
+ccvalidate publish
 ```
 
 This keeps broad mechanical validation local, reduces engineering-session
@@ -85,14 +89,30 @@ runtime-only dependency gates, ignores caller-specific program mappings and
 shell startup hooks, and propagates generation failures instead of treating
 partial help output as a stale committed document.
 
-The `fast`, `full`, and `release` modes are validation-only. Only the explicit
-`ccvalidate finish` mode may change Git state. It requires the ShellToolkit
-repository, an approved origin, a clean committed feature/fix/development
-branch, and fast-forward-only history. It validates before switching branches,
-updates and merges main with `--ff-only`, revalidates before pushing only
-`main -> origin/main`, verifies the remote commit, and then uses safe local
-branch deletion. It never stashes, resets, forces, rewrites history, resolves
-conflicts, or deletes a feature branch after a failed step.
+The `fast`, `full`, and `release` modes are validation-only. The explicit
+`ccvalidate finish` mode owns the feature-branch workflow: it requires the
+ShellToolkit repository, an approved origin, a clean committed
+feature/fix/development branch, and fast-forward-only history. It validates
+before switching branches, updates and merges main with `--ff-only`, records a
+local continuation marker after the verified merge, and runs release validation.
+
+If that post-merge validation stops the workflow, repair and commit on local
+main, then use `ccvalidate publish`. Publish never merges: it requires clean
+main, the canonical origin, and a local main that is equal to or a strict
+fast-forward descendant of `origin/main`. It refreshes the remote, runs the
+authoritative release validation, refreshes again, stops if the remote changed,
+pushes only `refs/heads/main:refs/heads/main`, and proves local main,
+`origin/main`, and live remote main are identical. Only then may it delete the
+marker-owned local feature branch with `git branch -d`, and only when the branch
+still has its recorded tip and Git proves it merged. Missing or invalid ownership
+evidence produces a cleanup warning without guessing or deleting a branch.
+
+Finish reuses the same publish, live-verification, and cleanup helpers. Neither
+workflow stashes, resets, rebases, forces, rewrites history, resolves conflicts,
+deletes remote feature branches, or rolls back a failed operation. A failed push
+or incomplete live verification preserves local main, the local feature branch,
+and continuation evidence for review. Repeating publish after success validates
+and verifies the equal state without pushing again.
 
 The function is maintained in `bash/bash_functions` and promoted verbatim to
 `defaults/v1/bash_functions`; installer and update workflows deploy that

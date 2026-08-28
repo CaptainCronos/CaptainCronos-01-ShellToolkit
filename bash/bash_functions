@@ -440,6 +440,7 @@ Usage:
   ccvalidate fast
   ccvalidate release
   ccvalidate finish
+  ccvalidate publish
   ccvalidate help
 
 Modes:
@@ -448,10 +449,13 @@ Modes:
   release  Run full-equivalent coverage plus the release-readiness gate.
   finish   Validate, fast-forward main, revalidate, push main, verify the
            remote commit, and safely delete the local feature branch.
+  publish  Validate and publish an already-merged local main, verify the
+           live remote, and clean up a proven retained feature branch.
 
 Safety:
-  fast, full, and release are validation-only. Only finish may mutate Git,
-  and only after strict repository, branch, remote, and cleanliness checks.
+  fast, full, and release are validation-only. Only finish and publish may
+  mutate Git, and only after strict repository, topology, remote, cleanliness,
+  validation, and live-remote checks. Neither mode forces or rewrites history.
 EOF_HELP
 }
 
@@ -615,6 +619,238 @@ _ccvalidate_branch_allowed() {
     esac
 }
 
+_ccvalidate_repository_context() {
+    local repo_root expected_name
+    if ! repo_root="$(_ccvalidate_git rev-parse --show-toplevel 2>/dev/null)"; then
+        _ccvalidate_record 'Repository context' FAIL 'not inside a Git repository'
+        return 1
+    fi
+    expected_name="$(_ccvalidate_expected_name)"
+    if [ "$(basename "$repo_root")" != "$expected_name" ] ||
+       [ ! -f "$repo_root/manifest.yml" ] || [ ! -f "$repo_root/tools/cc" ] ||
+       [ ! -f "$repo_root/bash/bash_functions" ]; then
+        _ccvalidate_record 'Repository context' FAIL "expected $expected_name"
+        return 1
+    fi
+    cd "$repo_root" || return 1
+    _ccvalidate_record 'Repository context' PASS "$repo_root"
+}
+
+_ccvalidate_clean_repository() {
+    if _ccvalidate_git diff --quiet --ignore-submodules --; then
+        _ccvalidate_record 'Working tree' PASS
+    else
+        _ccvalidate_record 'Working tree' FAIL 'unstaged changes present'
+    fi
+    if _ccvalidate_git diff --cached --quiet --ignore-submodules --; then
+        _ccvalidate_record 'Index' PASS
+    else
+        _ccvalidate_record 'Index' FAIL 'staged changes present'
+    fi
+    if [ -z "$(_ccvalidate_git ls-files --others --exclude-standard)" ]; then
+        _ccvalidate_record 'Untracked files' PASS
+    else
+        _ccvalidate_record 'Untracked files' FAIL 'untracked files present'
+    fi
+}
+
+_ccvalidate_origin_context() {
+    local origin_url push_url
+    origin_url="$(_ccvalidate_git remote get-url origin 2>/dev/null || true)"
+    push_url="$(_ccvalidate_git remote get-url --push origin 2>/dev/null || true)"
+    if [ -n "$origin_url" ] && [ "$push_url" = "$origin_url" ] &&
+       _ccvalidate_origin_allowed "$origin_url"; then
+        _ccvalidate_record 'Origin remote' PASS "$origin_url"
+        CCVALIDATE_ORIGIN_URL="$origin_url"
+        return 0
+    fi
+    _ccvalidate_record 'Origin remote' FAIL "${origin_url:-missing or suspicious}"
+    return 1
+}
+
+_ccvalidate_state_path() {
+    _ccvalidate_git rev-parse --git-path ccvalidate/finish-state 2>/dev/null
+}
+
+_ccvalidate_state_write() {
+    local feature_branch="$1" feature_head="$2" origin_head="$3"
+    local state_file state_dir temporary main_head timestamp
+    state_file="$(_ccvalidate_state_path)" || return 1
+    state_dir="${state_file%/*}"
+    main_head="$(_ccvalidate_git rev-parse refs/heads/main)" || return 1
+    timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)" || return 1
+    mkdir -p -- "$state_dir" || return 1
+    temporary="$(mktemp "$state_dir/.finish-state.XXXXXX")" || return 1
+    chmod 600 "$temporary" || {
+        rm -f -- "$temporary"
+        return 1
+    }
+    if ! printf '%s\n' \
+        'version=1' \
+        "repository=$(_ccvalidate_expected_name)" \
+        "origin=$CCVALIDATE_ORIGIN_URL" \
+        "feature_branch=$feature_branch" \
+        "feature_head=$feature_head" \
+        "main_at_merge=$main_head" \
+        "origin_main=$origin_head" \
+        "created_at=$timestamp" >"$temporary"; then
+        rm -f -- "$temporary"
+        return 1
+    fi
+    mv -f -- "$temporary" "$state_file"
+}
+
+_ccvalidate_state_read() {
+    local state_file line key value
+    local version='' repository='' origin='' feature_branch='' feature_head=''
+    local main_at_merge='' origin_main='' created_at='' seen=''
+    state_file="$(_ccvalidate_state_path)" || return 1
+    [ -f "$state_file" ] || return 1
+    while IFS= read -r line; do
+        key="${line%%=*}"
+        value="${line#*=}"
+        case "$key" in
+            version|repository|origin|feature_branch|feature_head|main_at_merge|origin_main|created_at)
+                case " $seen " in *" $key "*) return 1 ;; esac
+                seen="$seen $key"
+                printf -v "$key" '%s' "$value"
+                ;;
+            *) return 1 ;;
+        esac
+    done <"$state_file"
+    [ "$version" = 1 ] && [ "$repository" = "$(_ccvalidate_expected_name)" ] &&
+        [ "$origin" = "$CCVALIDATE_ORIGIN_URL" ] &&
+        [ -n "$created_at" ] &&
+        _ccvalidate_branch_allowed "$feature_branch" &&
+        _ccvalidate_git check-ref-format --branch "$feature_branch" >/dev/null 2>&1 &&
+        case "$feature_head$main_at_merge$origin_main" in
+            *[!0-9a-f]*|'') false ;;
+            *) [ "${#feature_head}" -eq 40 ] && [ "${#main_at_merge}" -eq 40 ] &&
+               [ "${#origin_main}" -eq 40 ] ;;
+        esac || return 1
+    CCVALIDATE_STATE_BRANCH="$feature_branch"
+    CCVALIDATE_STATE_FEATURE_HEAD="$feature_head"
+}
+
+_ccvalidate_state_clear() {
+    local state_file
+    state_file="$(_ccvalidate_state_path)" || return 1
+    rm -f -- "$state_file"
+}
+
+_ccvalidate_main_topology() {
+    local ahead behind
+    if ! _ccvalidate_git show-ref --verify --quiet refs/heads/main; then
+        _ccvalidate_record 'Local main' FAIL 'local main is missing'
+        return 1
+    fi
+    if ! _ccvalidate_git show-ref --verify --quiet refs/remotes/origin/main; then
+        _ccvalidate_record 'Remote main' FAIL 'origin/main is missing'
+        return 1
+    fi
+    ahead="$(_ccvalidate_git rev-list --count refs/remotes/origin/main..refs/heads/main 2>/dev/null || printf 'invalid')"
+    behind="$(_ccvalidate_git rev-list --count refs/heads/main..refs/remotes/origin/main 2>/dev/null || printf 'invalid')"
+    if ! [[ "$ahead" =~ ^[0-9]+$ ]] || ! [[ "$behind" =~ ^[0-9]+$ ]]; then
+        _ccvalidate_record 'Main topology' FAIL 'could not compare main and origin/main'
+        return 1
+    fi
+    if [ "$behind" -gt 0 ]; then
+        if [ "$ahead" -gt 0 ]; then
+            _ccvalidate_record 'Main topology' FAIL "diverged: ahead $ahead, behind $behind"
+        else
+            _ccvalidate_record 'Main topology' FAIL "local main is behind by $behind commit(s)"
+        fi
+        return 1
+    fi
+    if [ "$ahead" -gt 0 ] &&
+       ! _ccvalidate_git merge-base --is-ancestor refs/remotes/origin/main refs/heads/main 2>/dev/null; then
+        _ccvalidate_record 'Main topology' FAIL 'fast-forward publication is not possible'
+        return 1
+    fi
+    if [ "$ahead" -gt 0 ]; then
+        _ccvalidate_record 'Local main ahead' PASS "$ahead commit(s)"
+    else
+        _ccvalidate_record 'Local main ahead' SKIP 'no unpublished commits'
+    fi
+    CCVALIDATE_MAIN_AHEAD="$ahead"
+}
+
+_ccvalidate_verify_remote() {
+    local local_head tracking_head remote_head
+    local_head="$(_ccvalidate_git rev-parse refs/heads/main 2>/dev/null || true)"
+    tracking_head="$(_ccvalidate_git rev-parse --verify refs/remotes/origin/main 2>/dev/null || true)"
+    remote_head="$(_ccvalidate_git ls-remote --exit-code --heads origin refs/heads/main 2>/dev/null |
+        awk 'NR == 1 {print $1}')"
+    if [ -n "$local_head" ] && [ "$local_head" = "$tracking_head" ] &&
+       [ "$local_head" = "$remote_head" ]; then
+        _ccvalidate_record 'Remote verification' PASS "$remote_head"
+        return 0
+    fi
+    _ccvalidate_record 'Remote verification' FAIL \
+        "local=${local_head:-unavailable} origin/main=${tracking_head:-unavailable} remote=${remote_head:-unavailable}"
+    return 1
+}
+
+_ccvalidate_cleanup_feature() {
+    local branch="${1:-}" expected_head="${2:-}" merged found=1
+    if [ -z "$branch" ]; then
+        if [ "${CCVALIDATE_MAIN_AHEAD:-0}" -eq 0 ]; then
+            _ccvalidate_record 'Feature cleanup' SKIP 'no retained feature cleanup is pending'
+        else
+            _ccvalidate_record 'Feature cleanup' WARN 'retained feature branch is unknown; no branch deleted'
+        fi
+        return 0
+    fi
+    if ! _ccvalidate_git show-ref --verify --quiet "refs/heads/$branch"; then
+        _ccvalidate_record 'Feature cleanup' SKIP "$branch is already absent"
+        _ccvalidate_state_clear || true
+        return 0
+    fi
+    if [ -z "$expected_head" ] ||
+       [ "$(_ccvalidate_git rev-parse "refs/heads/$branch" 2>/dev/null || true)" != "$expected_head" ]; then
+        _ccvalidate_record 'Feature cleanup' WARN "$branch no longer matches recorded feature HEAD"
+        return 0
+    fi
+    while IFS= read -r merged; do
+        [ "$merged" = "$branch" ] && found=0
+    done < <(_ccvalidate_git branch --format='%(refname:short)' --merged main)
+    if [ "$found" -ne 0 ]; then
+        _ccvalidate_record 'Feature cleanup' WARN "$branch is not proven merged into main"
+        return 0
+    fi
+    if _ccvalidate_finish_command 'Feature cleanup' _ccvalidate_git branch -d "$branch"; then
+        _ccvalidate_state_clear ||
+            _ccvalidate_record 'Workflow state cleanup' WARN 'publication marker could not be removed'
+        return 0
+    fi
+    _ccvalidate_record 'Feature cleanup result' WARN "$branch remains after verified publication"
+    return 0
+}
+
+_ccvalidate_publish_main() {
+    local expected_origin="$1" feature_branch="${2:-}" feature_head="${3:-}"
+    local refreshed_origin
+    if ! _ccvalidate_finish_command 'Remote refresh' _ccvalidate_git fetch origin main; then
+        return 1
+    fi
+    refreshed_origin="$(_ccvalidate_git rev-parse --verify refs/remotes/origin/main 2>/dev/null || true)"
+    if [ -z "$refreshed_origin" ] || [ "$refreshed_origin" != "$expected_origin" ]; then
+        _ccvalidate_record 'Remote unchanged' FAIL \
+            "expected=$expected_origin current=${refreshed_origin:-unavailable}"
+        return 1
+    fi
+    _ccvalidate_record 'Remote unchanged' PASS "$refreshed_origin"
+    _ccvalidate_main_topology || return 1
+    if [ "$CCVALIDATE_MAIN_AHEAD" -gt 0 ]; then
+        _ccvalidate_finish_command 'Push origin/main' \
+            _ccvalidate_git push origin refs/heads/main:refs/heads/main || return 1
+    else
+        _ccvalidate_record 'Push origin/main' SKIP 'already published'
+    fi
+    _ccvalidate_verify_remote || return 1
+    _ccvalidate_cleanup_feature "$feature_branch" "$feature_head"
+}
+
 _ccvalidate_finish_stop() {
     echo
     printf '%s\n' 'STOP: automatic recovery is disabled; local state is preserved for operator review.'
@@ -636,29 +872,17 @@ _ccvalidate_finish_command() {
 }
 
 _ccvalidate_finish() {
-    local repo_root expected_name branch feature_head origin_url push_url ahead
-    local remote_head tracking_head local_head
+    local branch feature_head ahead origin_head
 
     echo 'Captain Cronos Finish Workflow'
     echo '=============================='
     echo
     _ccvalidate_reset_results
 
-    if ! repo_root="$(_ccvalidate_git rev-parse --show-toplevel 2>/dev/null)"; then
-        _ccvalidate_record 'Repository context' FAIL 'not inside a Git repository'
+    if ! _ccvalidate_repository_context; then
         _ccvalidate_finish_stop
         return 1
     fi
-    expected_name="$(_ccvalidate_expected_name)"
-    if [ "$(basename "$repo_root")" != "$expected_name" ] ||
-       [ ! -f "$repo_root/manifest.yml" ] || [ ! -f "$repo_root/tools/cc" ] ||
-       [ ! -f "$repo_root/bash/bash_functions" ]; then
-        _ccvalidate_record 'Repository context' FAIL "expected $expected_name"
-        _ccvalidate_finish_stop
-        return 1
-    fi
-    cd "$repo_root" || return 1
-    _ccvalidate_record 'Repository context' PASS "$repo_root"
 
     branch="$(_ccvalidate_git branch --show-current 2>/dev/null)"
     if [ -n "$branch" ] && [ "$branch" != main ] && _ccvalidate_branch_allowed "$branch" &&
@@ -668,29 +892,8 @@ _ccvalidate_finish() {
         _ccvalidate_record 'Feature branch' FAIL "${branch:-detached HEAD}"
     fi
 
-    if _ccvalidate_git diff --quiet --ignore-submodules --; then
-        _ccvalidate_record 'Working tree' PASS
-    else
-        _ccvalidate_record 'Working tree' FAIL 'unstaged changes present'
-    fi
-    if _ccvalidate_git diff --cached --quiet --ignore-submodules --; then
-        _ccvalidate_record 'Index' PASS
-    else
-        _ccvalidate_record 'Index' FAIL 'staged changes present'
-    fi
-    if [ -z "$(_ccvalidate_git ls-files --others --exclude-standard)" ]; then
-        _ccvalidate_record 'Untracked files' PASS
-    else
-        _ccvalidate_record 'Untracked files' FAIL 'untracked files present'
-    fi
-
-    origin_url="$(_ccvalidate_git remote get-url origin 2>/dev/null || true)"
-    push_url="$(_ccvalidate_git remote get-url --push origin 2>/dev/null || true)"
-    if [ -n "$origin_url" ] && [ "$push_url" = "$origin_url" ] && _ccvalidate_origin_allowed "$origin_url"; then
-        _ccvalidate_record 'Origin remote' PASS "$origin_url"
-    else
-        _ccvalidate_record 'Origin remote' FAIL "${origin_url:-missing or suspicious}"
-    fi
+    _ccvalidate_clean_repository
+    _ccvalidate_origin_context || true
 
     if _ccvalidate_git show-ref --verify --quiet refs/heads/main; then
         _ccvalidate_record 'Main branch' PASS
@@ -736,6 +939,12 @@ _ccvalidate_finish() {
         _ccvalidate_finish_stop
         return 1
     fi
+    origin_head="$(_ccvalidate_git rev-parse --verify refs/remotes/origin/main 2>/dev/null || true)"
+    if [ -z "$origin_head" ]; then
+        _ccvalidate_record 'Origin/main baseline' FAIL 'origin/main is unavailable after update'
+        _ccvalidate_finish_stop
+        return 1
+    fi
     if ! _ccvalidate_git merge-base --is-ancestor main "$feature_head" 2>/dev/null; then
         _ccvalidate_record 'Main fast-forward' FAIL 'updated main diverged from feature'
         _ccvalidate_finish_stop
@@ -754,7 +963,15 @@ _ccvalidate_finish() {
     fi
     _ccvalidate_record 'Merged commit verification' PASS "$feature_head"
 
-    if (ccvalidate release); then
+    if _ccvalidate_state_write "$branch" "$feature_head" "$origin_head"; then
+        _ccvalidate_record 'Workflow continuation state' PASS "$branch"
+    else
+        _ccvalidate_record 'Workflow continuation state' FAIL 'could not record retained feature ownership'
+        _ccvalidate_finish_stop
+        return 1
+    fi
+
+    if (_ccvalidate_validation release); then
         _ccvalidate_record 'Post-merge validation' PASS
     else
         _ccvalidate_record 'Post-merge validation' FAIL
@@ -762,24 +979,82 @@ _ccvalidate_finish() {
         return 1
     fi
 
-    if ! _ccvalidate_finish_command 'Push origin/main' _ccvalidate_git push origin main:main; then
+    if ! _ccvalidate_publish_main "$origin_head" "$branch" "$feature_head"; then
         _ccvalidate_finish_stop
         return 1
     fi
-    local_head="$(_ccvalidate_git rev-parse refs/heads/main)"
-    remote_head="$(_ccvalidate_git ls-remote --exit-code --heads origin refs/heads/main 2>/dev/null | awk 'NR == 1 {print $1}')"
-    tracking_head="$(_ccvalidate_git rev-parse --verify refs/remotes/origin/main 2>/dev/null || true)"
-    if [ -n "$remote_head" ] && [ "$remote_head" = "$local_head" ] &&
-       [ "$tracking_head" = "$local_head" ]; then
-        _ccvalidate_record 'Remote verification' PASS "$remote_head"
+    echo
+    _ccvalidate_git status
+    _ccvalidate_summary
+}
+
+_ccvalidate_publish() {
+    local branch initial_origin state_file state_branch='' state_feature_head=''
+
+    echo 'Captain Cronos Publish Workflow'
+    echo '==============================='
+    echo
+    _ccvalidate_reset_results
+
+    if ! _ccvalidate_repository_context; then
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    branch="$(_ccvalidate_git branch --show-current 2>/dev/null)"
+    if [ "$branch" = main ]; then
+        _ccvalidate_record 'Current branch' PASS 'main'
     else
-        _ccvalidate_record 'Remote verification' FAIL \
-            "local=$local_head origin/main=${tracking_head:-unavailable} remote=${remote_head:-unavailable}"
+        _ccvalidate_record 'Current branch' FAIL "${branch:-detached HEAD}"
+    fi
+    _ccvalidate_clean_repository
+    _ccvalidate_origin_context || true
+    if ! _ccvalidate_git show-ref --verify --quiet refs/heads/main; then
+        _ccvalidate_record 'Local main' FAIL 'local main is missing'
+    fi
+    if [ "$CCVALIDATE_FAIL" -gt 0 ]; then
         _ccvalidate_finish_stop
         return 1
     fi
 
-    if ! _ccvalidate_finish_command 'Feature cleanup' _ccvalidate_git branch -d "$branch"; then
+    if ! _ccvalidate_finish_command 'Initial remote refresh' _ccvalidate_git fetch origin main; then
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    initial_origin="$(_ccvalidate_git rev-parse --verify refs/remotes/origin/main 2>/dev/null || true)"
+    if [ -z "$initial_origin" ]; then
+        _ccvalidate_record 'Remote main' FAIL 'origin/main is missing'
+        _ccvalidate_finish_stop
+        return 1
+    fi
+    if ! _ccvalidate_main_topology; then
+        _ccvalidate_finish_stop
+        return 1
+    fi
+
+    if _ccvalidate_state_read; then
+        state_branch="$CCVALIDATE_STATE_BRANCH"
+        state_feature_head="$CCVALIDATE_STATE_FEATURE_HEAD"
+        _ccvalidate_record 'Workflow continuation state' PASS "$state_branch"
+    else
+        state_file="$(_ccvalidate_state_path 2>/dev/null || true)"
+        if [ -n "$state_file" ] && [ -e "$state_file" ]; then
+            _ccvalidate_record 'Workflow continuation state' WARN 'retained-feature marker is invalid; cleanup will be conservative'
+        elif [ "$CCVALIDATE_MAIN_AHEAD" -eq 0 ]; then
+            _ccvalidate_record 'Workflow continuation state' SKIP 'no continuation marker or unpublished commits'
+        else
+            _ccvalidate_record 'Workflow continuation state' WARN 'no retained-feature marker; cleanup will be conservative'
+        fi
+    fi
+
+    if (_ccvalidate_validation release); then
+        _ccvalidate_record 'Release validation' PASS
+    else
+        _ccvalidate_record 'Release validation' FAIL
+        _ccvalidate_finish_stop
+        return 1
+    fi
+
+    if ! _ccvalidate_publish_main "$initial_origin" "$state_branch" "$state_feature_head"; then
         _ccvalidate_finish_stop
         return 1
     fi
@@ -790,10 +1065,11 @@ _ccvalidate_finish() {
 
 # @name ccvalidate
 # @group Engineering
-# @desc Run local acceptance checks or explicitly finish a validated feature branch.
-# @usage ccvalidate [fast|full|release|finish|help]
+# @desc Run local acceptance checks or explicitly finish or publish validated work.
+# @usage ccvalidate [fast|full|release|finish|publish|help]
 # @example ccvalidate full
 # @example ccvalidate finish
+# @example ccvalidate publish
 ccvalidate() {
     local mode="${1:-full}"
     local CCVALIDATE_PASS=0 CCVALIDATE_WARN=0 CCVALIDATE_FAIL=0 CCVALIDATE_SKIP=0
@@ -806,6 +1082,7 @@ ccvalidate() {
         help|--help|-h) _ccvalidate_usage ;;
         fast|full|release) (_ccvalidate_validation "$mode") ;;
         finish) _ccvalidate_finish ;;
+        publish) _ccvalidate_publish ;;
         *)
             printf 'ccvalidate: unknown mode: %s\n' "$mode" >&2
             _ccvalidate_usage >&2

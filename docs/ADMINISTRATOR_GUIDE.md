@@ -296,12 +296,32 @@ the feature before changing branches, updates and merges main with `--ff-only`,
 revalidates before pushing only main to origin/main, verifies the remote commit,
 and deletes the local feature branch with `git branch -d` only after success.
 
+If finish has already fast-forwarded the feature into local main but stops at
+post-merge release validation, correct and commit the defect on local main and
+run `ccvalidate publish`. Publish is a constrained continuation, not a general
+push or merge command. It requires the recognized ShellToolkit repository,
+clean main, the canonical fetch/push origin, and non-diverged fast-forward
+publication topology. It runs release validation, fetches again, and stops if
+remote main changed during the workflow. It pushes only local main to
+`origin/main`, without tags or force, then compares local main, the
+remote-tracking ref, and live `ls-remote` output.
+
+Finish records the retained branch and merge commits in local Git-private
+workflow state. That marker helps publish identify cleanup ownership but never
+overrides current Git topology. After verified publication, publish deletes the
+local retained branch only when its tip still matches the marker and
+`git branch --merged main` proves it merged. Invalid or missing state, a moved
+branch, or failed safe deletion is reported without guessing; remote feature
+branches are never deleted. An already-published main is verified idempotently
+and is not pushed again.
+
 If validation fails before the branch switch, nothing is pushed and the feature
 checkout is left untouched. If validation fails after a local merge, nothing is
-pushed or reset and the feature branch remains for operator review. The workflow
-never auto-stashes, force-pushes, rewrites history, resolves conflicts, deletes
-remote feature branches, or changes packages, kernels, bootloaders, browsers,
-services, PATH configuration, or unrelated repositories.
+pushed or reset and the feature branch remains for `ccvalidate publish` or
+operator review. There is no automatic rollback. The workflows never
+auto-stash, force-push, rebase, rewrite history, resolve conflicts, delete remote
+feature branches, or change packages, kernels, bootloaders, browsers, services,
+PATH configuration, or unrelated repositories.
 
 ## Persistent Resource Retention
 

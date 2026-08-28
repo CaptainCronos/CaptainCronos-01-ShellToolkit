@@ -22,6 +22,12 @@ The format follows a simple milestone-based structure until the project reaches 
   plus explicitly authorized fast-forward completion of a feature branch.
 - Disposable Git and bare-remote fixtures covering validation aggregation,
   finish success, refusal boundaries, push verification, and safe branch cleanup.
+- Post-merge `ccvalidate publish` continuation with release validation, remote
+  stability checks, exact main-only publication, live-remote verification,
+  Git-private retained-feature evidence, conservative cleanup, and idempotency.
+- Shared finish/publish publication helpers and disposable bare-remote coverage
+  for topology, validation, remote-change, push, verification, and cleanup
+  failure boundaries.
 
 - Shared managed-PATH policy and disposable-home regression coverage for legacy
   normalization, repeated sourcing, shell ordering, and startup-file safety.

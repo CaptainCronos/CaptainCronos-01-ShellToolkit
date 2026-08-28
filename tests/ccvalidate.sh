@@ -58,6 +58,11 @@ if [ -n "${CCVALIDATE_FAIL_BRANCH:-}" ] &&
    [ "$*" = "${CCVALIDATE_FAIL_BRANCH_COMMAND:-selftest}" ]; then
     exit 8
 fi
+if [ "${CCVALIDATE_ADVANCE_REMOTE_ON_VALIDATE:-0}" = 1 ] &&
+   [ ! -e "$CCVALIDATE_REMOTE_ADVANCED_MARKER" ]; then
+    : >"$CCVALIDATE_REMOTE_ADVANCED_MARKER"
+    git -C "$CCVALIDATE_REMOTE_ADVANCE_PEER" push -q origin main
+fi
 exit 0
 EOF_CC
 chmod 700 "$TEST_DIR/bin/cc-fixture"
@@ -69,6 +74,10 @@ if [ "\${CCVALIDATE_FAIL_REMOTE_VERIFY:-0}" = 1 ] &&
    [ "\${1:-}" = ls-remote ]; then
     exit 1
 fi
+if [ "\${CCVALIDATE_FAIL_BRANCH_CLEANUP:-0}" = 1 ] &&
+   [ "\${1:-}" = branch ] && [ "\${2:-}" = -d ]; then
+    exit 7
+fi
 exec "$REAL_GIT" "\$@"
 EOF_GIT
 chmod 700 "$TEST_DIR/bin/git-fixture"
@@ -79,6 +88,7 @@ export CCVALIDATE_GIT_BIN="$TEST_DIR/bin/git-fixture"
 export CCVALIDATE_CC_LOG="$TEST_DIR/cc.log"
 export CCVALIDATE_GIT_LOG="$TEST_DIR/git.log"
 export CCVALIDATE_RELEASE_DELEGATED_MARKER="$TEST_DIR/release-delegated"
+export CCVALIDATE_REMOTE_ADVANCED_MARKER="$TEST_DIR/remote-advanced"
 export TMPDIR="$TEST_DIR/tmp"
 
 alias functions=: funcs=: showfunc=:
@@ -193,7 +203,12 @@ ccvalidate help >"$TEST_DIR/help.out"
 ccvalidate --help >>"$TEST_DIR/help.out"
 ccvalidate -h >>"$TEST_DIR/help.out"
 assert_contains "$TEST_DIR/help.out" 'finish' 'help omitted finish mode'
-assert_failure 'unknown mode returned zero' ccvalidate foo >"$TEST_DIR/unknown.out" 2>&1
+assert_contains "$TEST_DIR/help.out" 'publish' 'help omitted publish mode'
+set +e
+ccvalidate foo >"$TEST_DIR/unknown.out" 2>&1
+unknown_status=$?
+set -e
+[ "$unknown_status" -eq 2 ] || fail 'unknown mode did not return status 2'
 assert_contains "$TEST_DIR/unknown.out" 'unknown mode: foo' 'unknown-mode help lacked context'
 
 [ "$(git_in "$validation_repo" rev-parse HEAD)" = "$validation_head" ] || fail 'validation mode changed HEAD'
@@ -372,15 +387,268 @@ run_finish_failure "$verify_fail_repo" "$TEST_DIR/remote-verify-fail.out"
 unset CCVALIDATE_FAIL_REMOTE_VERIFY
 assert_contains "$TEST_DIR/remote-verify-fail.out" 'Remote verification' 'remote verification failure was not reported'
 
+run_publish_failure() {
+    local repo="$1" output="$2"
+    set_fixture_contract "$repo"
+    : >"$CCVALIDATE_CC_LOG"
+    : >"$CCVALIDATE_GIT_LOG"
+    if (cd "$repo" && ccvalidate publish) >"$output" 2>&1; then
+        fail "publish unexpectedly succeeded for $(basename "$repo")"
+    fi
+}
+
+make_interrupted_finish() {
+    local repo="$1" output="$2"
+    export CCVALIDATE_FAIL_BRANCH=main
+    export CCVALIDATE_FAIL_BRANCH_COMMAND=selftest
+    run_finish_failure "$repo" "$output"
+    unset CCVALIDATE_FAIL_BRANCH CCVALIDATE_FAIL_BRANCH_COMMAND
+    [ "$(git_in "$repo" branch --show-current)" = main ] ||
+        fail 'interrupted finish did not leave main checked out'
+    [ -f "$repo/.git/ccvalidate/finish-state" ] ||
+        fail 'interrupted finish did not record continuation state'
+}
+
+# Publish resumes the exact post-merge/pre-push state left by finish, validates
+# main, pushes only main, verifies local/tracking/live equality, and deletes the
+# locally retained feature with -d. Remote feature refs are never deleted.
+publish_repo="$(new_fixture publish-success)"
+publish_origin="$(git_in "$publish_repo" remote get-url origin)"
+git_in "$publish_repo" push -q origin feature/work:feature/work
+publish_head="$(git_in "$publish_repo" rev-parse feature/work)"
+make_interrupted_finish "$publish_repo" "$TEST_DIR/publish-interrupted.out"
+set_fixture_contract "$publish_repo"
+: >"$CCVALIDATE_CC_LOG"
+: >"$CCVALIDATE_GIT_LOG"
+(cd "$publish_repo" && ccvalidate publish) >"$TEST_DIR/publish-success.out" 2>&1 ||
+    fail 'publish did not resume an interrupted finish'
+[ "$(git_in "$publish_repo" rev-parse main)" = "$publish_head" ] || fail 'publish changed local main unexpectedly'
+[ "$(git_in "$publish_repo" rev-parse origin/main)" = "$publish_head" ] || fail 'publish did not update origin/main tracking'
+[ "$(git_in "$publish_origin" rev-parse refs/heads/main)" = "$publish_head" ] || fail 'publish did not update live main'
+git_in "$publish_origin" show-ref --verify --quiet refs/heads/feature/work || fail 'publish deleted a remote feature branch'
+if git_in "$publish_repo" show-ref --verify --quiet refs/heads/feature/work; then
+    fail 'publish retained a known, unchanged, fully merged local feature branch'
+fi
+[ ! -e "$publish_repo/.git/ccvalidate/finish-state" ] ||
+    fail 'successful publish retained workflow state after branch cleanup'
+assert_contains "$TEST_DIR/publish-success.out" 'Release validation' 'publish omitted release validation'
+assert_contains "$TEST_DIR/publish-success.out" 'Remote unchanged' 'publish omitted remote stability verification'
+assert_contains "$TEST_DIR/publish-success.out" 'Remote verification' 'publish omitted live remote verification'
+assert_contains "$TEST_DIR/publish-success.out" 'Feature cleanup' 'publish omitted retained-feature cleanup'
+assert_contains "$TEST_DIR/publish-success.out" 'Overall Status:  PASS' 'publish success did not report PASS'
+assert_contains "$CCVALIDATE_GIT_LOG" 'push origin refs/heads/main:refs/heads/main' 'publish used an unexpected main refspec'
+if grep -E '\|push .*feature|\|push .*tags|\|push .*force' "$CCVALIDATE_GIT_LOG"; then
+    fail 'publish attempted a non-main, tag, or force push'
+fi
+
+# Repetition after publication is safe: validate and verify, but do not push or
+# recreate commits/refs. Unknown cleanup ownership is reported conservatively.
+published_refs="$(git_in "$publish_repo" show-ref)"
+: >"$CCVALIDATE_GIT_LOG"
+(cd "$publish_repo" && ccvalidate publish) >"$TEST_DIR/publish-repeat.out" 2>&1 ||
+    fail 'repeated publish was not idempotent'
+[ "$(git_in "$publish_repo" show-ref)" = "$published_refs" ] || fail 'repeated publish changed refs'
+assert_contains "$TEST_DIR/publish-repeat.out" 'no unpublished commits' 'repeated publish did not explain equal state'
+assert_contains "$TEST_DIR/publish-repeat.out" 'already published' 'repeated publish did not skip push'
+assert_contains "$TEST_DIR/publish-repeat.out" 'Overall Status:  PASS' 'repeated publish did not report a clean idempotent result'
+if grep -Fq '|push ' "$CCVALIDATE_GIT_LOG"; then fail 'repeated publish issued a push'; fi
+
+publish_branch_repo="$(new_fixture publish-feature-branch)"
+run_publish_failure "$publish_branch_repo" "$TEST_DIR/publish-refuse-branch.out"
+assert_contains "$TEST_DIR/publish-refuse-branch.out" 'Current branch' 'publish did not refuse a feature checkout'
+if grep -Eq '\|(fetch|push|branch -d) ' "$CCVALIDATE_GIT_LOG"; then fail 'branch refusal mutated Git'; fi
+
+publish_dirty_repo="$(new_fixture publish-dirty)"
+git_in "$publish_dirty_repo" switch -q main
+git_in "$publish_dirty_repo" merge -q --ff-only feature/work
+printf 'dirty\n' >>"$publish_dirty_repo/feature.txt"
+run_publish_failure "$publish_dirty_repo" "$TEST_DIR/publish-refuse-dirty.out"
+assert_contains "$TEST_DIR/publish-refuse-dirty.out" 'unstaged changes present' 'publish accepted a dirty worktree'
+
+publish_staged_repo="$(new_fixture publish-staged)"
+git_in "$publish_staged_repo" switch -q main
+git_in "$publish_staged_repo" merge -q --ff-only feature/work
+printf 'staged\n' >>"$publish_staged_repo/feature.txt"
+git_in "$publish_staged_repo" add feature.txt
+run_publish_failure "$publish_staged_repo" "$TEST_DIR/publish-refuse-staged.out"
+assert_contains "$TEST_DIR/publish-refuse-staged.out" 'staged changes present' 'publish accepted staged changes'
+
+publish_untracked_repo="$(new_fixture publish-untracked)"
+git_in "$publish_untracked_repo" switch -q main
+git_in "$publish_untracked_repo" merge -q --ff-only feature/work
+printf 'implementation\n' >"$publish_untracked_repo/untracked.sh"
+run_publish_failure "$publish_untracked_repo" "$TEST_DIR/publish-refuse-untracked.out"
+assert_contains "$TEST_DIR/publish-refuse-untracked.out" 'untracked files present' 'publish accepted an untracked file'
+
+publish_no_origin_repo="$(new_fixture publish-no-origin)"
+git_in "$publish_no_origin_repo" switch -q main
+git_in "$publish_no_origin_repo" merge -q --ff-only feature/work
+git_in "$publish_no_origin_repo" remote remove origin
+CCVALIDATE_EXPECTED_REPOSITORY_NAME="$(basename "$publish_no_origin_repo")"
+CCVALIDATE_EXPECTED_ORIGIN="$TEST_DIR/missing-origin.git"
+export CCVALIDATE_EXPECTED_REPOSITORY_NAME CCVALIDATE_EXPECTED_ORIGIN
+: >"$CCVALIDATE_GIT_LOG"
+# shellcheck disable=SC2016
+assert_failure 'publish accepted a missing origin' bash -c \
+    'cd "$1"; source "$2/bash/bash_functions"; ccvalidate publish' bash "$publish_no_origin_repo" "$PROJECT_ROOT" \
+    >"$TEST_DIR/publish-refuse-origin.out" 2>&1
+assert_contains "$TEST_DIR/publish-refuse-origin.out" 'missing or suspicious' 'publish did not explain missing origin'
+
+publish_wrong_origin_repo="$(new_fixture publish-wrong-origin)"
+git_in "$publish_wrong_origin_repo" switch -q main
+git_in "$publish_wrong_origin_repo" merge -q --ff-only feature/work
+set_fixture_contract "$publish_wrong_origin_repo"
+CCVALIDATE_EXPECTED_ORIGIN="$TEST_DIR/not-authorized.git"
+export CCVALIDATE_EXPECTED_ORIGIN
+# shellcheck disable=SC2016
+assert_failure 'publish accepted a wrong origin' bash -c \
+    'cd "$1"; source "$2/bash/bash_functions"; ccvalidate publish' bash "$publish_wrong_origin_repo" "$PROJECT_ROOT" \
+    >"$TEST_DIR/publish-refuse-wrong-origin.out" 2>&1
+
+# Behind and diverged topologies are refused after a real fetch from a local
+# bare remote; publish never integrates, rebases, resets, or force-pushes.
+publish_behind_repo="$(new_fixture publish-behind)"
+publish_behind_origin="$(git_in "$publish_behind_repo" remote get-url origin)"
+publish_behind_peer="$TEST_DIR/publish-behind-peer"
+git_in "$TEST_DIR" clone -q "$publish_behind_origin" "$publish_behind_peer"
+printf 'remote\n' >"$publish_behind_peer/remote.txt"
+commit_all "$publish_behind_peer" 'remote advance'
+git_in "$publish_behind_peer" push -q origin main
+git_in "$publish_behind_repo" switch -q main
+run_publish_failure "$publish_behind_repo" "$TEST_DIR/publish-refuse-behind.out"
+assert_contains "$TEST_DIR/publish-refuse-behind.out" 'local main is behind' 'publish accepted main behind origin/main'
+
+publish_diverged_repo="$(new_fixture publish-diverged)"
+publish_diverged_origin="$(git_in "$publish_diverged_repo" remote get-url origin)"
+publish_diverged_peer="$TEST_DIR/publish-diverged-peer"
+git_in "$TEST_DIR" clone -q "$publish_diverged_origin" "$publish_diverged_peer"
+printf 'remote\n' >"$publish_diverged_peer/remote.txt"
+commit_all "$publish_diverged_peer" 'remote advance'
+git_in "$publish_diverged_peer" push -q origin main
+git_in "$publish_diverged_repo" switch -q main
+git_in "$publish_diverged_repo" merge -q --ff-only feature/work
+run_publish_failure "$publish_diverged_repo" "$TEST_DIR/publish-refuse-diverged.out"
+assert_contains "$TEST_DIR/publish-refuse-diverged.out" 'diverged' 'publish accepted divergent main'
+
+# A validation failure leaves both the remote and retained local feature intact.
+publish_validation_repo="$(new_fixture publish-validation-fail)"
+publish_validation_origin="$(git_in "$publish_validation_repo" remote get-url origin)"
+publish_validation_remote="$(git_in "$publish_validation_origin" rev-parse refs/heads/main)"
+make_interrupted_finish "$publish_validation_repo" "$TEST_DIR/publish-validation-interrupted.out"
+export CCVALIDATE_FAIL_BRANCH=main CCVALIDATE_FAIL_BRANCH_COMMAND=selftest
+run_publish_failure "$publish_validation_repo" "$TEST_DIR/publish-validation-fail.out"
+unset CCVALIDATE_FAIL_BRANCH CCVALIDATE_FAIL_BRANCH_COMMAND
+[ "$(git_in "$publish_validation_origin" rev-parse refs/heads/main)" = "$publish_validation_remote" ] ||
+    fail 'publish validation failure changed remote main'
+git_in "$publish_validation_repo" show-ref --verify --quiet refs/heads/feature/work ||
+    fail 'publish validation failure deleted retained feature'
+
+# A remote update occurring during validation is detected by the second fetch,
+# even though initial topology was acceptable.
+publish_changed_repo="$(new_fixture publish-remote-changed)"
+publish_changed_origin="$(git_in "$publish_changed_repo" remote get-url origin)"
+publish_changed_peer="$TEST_DIR/publish-changed-peer"
+git_in "$TEST_DIR" clone -q "$publish_changed_origin" "$publish_changed_peer"
+printf 'remote change\n' >"$publish_changed_peer/remote-change.txt"
+commit_all "$publish_changed_peer" 'advance during validation'
+make_interrupted_finish "$publish_changed_repo" "$TEST_DIR/publish-changed-interrupted.out"
+export CCVALIDATE_ADVANCE_REMOTE_ON_VALIDATE=1
+export CCVALIDATE_REMOTE_ADVANCE_PEER="$publish_changed_peer"
+rm -f "$CCVALIDATE_REMOTE_ADVANCED_MARKER"
+run_publish_failure "$publish_changed_repo" "$TEST_DIR/publish-remote-changed.out"
+unset CCVALIDATE_ADVANCE_REMOTE_ON_VALIDATE CCVALIDATE_REMOTE_ADVANCE_PEER
+assert_contains "$TEST_DIR/publish-remote-changed.out" 'Remote unchanged' 'publish did not detect a remote change during validation'
+git_in "$publish_changed_repo" show-ref --verify --quiet refs/heads/feature/work ||
+    fail 'remote-change refusal deleted retained feature'
+
+publish_push_fail_repo="$(new_fixture publish-push-fail)"
+publish_push_fail_origin="$(git_in "$publish_push_fail_repo" remote get-url origin)"
+make_interrupted_finish "$publish_push_fail_repo" "$TEST_DIR/publish-push-interrupted.out"
+cat >"$publish_push_fail_origin/hooks/pre-receive" <<'EOF_PUBLISH_HOOK'
+#!/usr/bin/env bash
+exit 1
+EOF_PUBLISH_HOOK
+chmod 700 "$publish_push_fail_origin/hooks/pre-receive"
+run_publish_failure "$publish_push_fail_repo" "$TEST_DIR/publish-push-fail.out"
+assert_contains "$TEST_DIR/publish-push-fail.out" 'Push origin/main' 'publish push failure was not reported'
+git_in "$publish_push_fail_repo" show-ref --verify --quiet refs/heads/feature/work || fail 'push failure deleted feature'
+
+publish_verify_fail_repo="$(new_fixture publish-verify-fail)"
+make_interrupted_finish "$publish_verify_fail_repo" "$TEST_DIR/publish-verify-interrupted.out"
+export CCVALIDATE_FAIL_REMOTE_VERIFY=1
+run_publish_failure "$publish_verify_fail_repo" "$TEST_DIR/publish-verify-fail.out"
+unset CCVALIDATE_FAIL_REMOTE_VERIFY
+assert_contains "$TEST_DIR/publish-verify-fail.out" 'Remote verification' 'publish verification failure was not reported'
+git_in "$publish_verify_fail_repo" show-ref --verify --quiet refs/heads/feature/work || fail 'verification failure deleted feature'
+
+# Without valid ownership state, publication may succeed but branch cleanup is
+# a warning and no local branch is guessed. A moved/unmerged retained branch is
+# likewise preserved despite a valid original marker.
+publish_unknown_repo="$(new_fixture publish-unknown-feature)"
+git_in "$publish_unknown_repo" switch -q main
+git_in "$publish_unknown_repo" merge -q --ff-only feature/work
+mkdir -p "$publish_unknown_repo/.git/ccvalidate"
+printf 'version=corrupt\nfeature_branch=feature/work\n' >"$publish_unknown_repo/.git/ccvalidate/finish-state"
+set_fixture_contract "$publish_unknown_repo"
+(cd "$publish_unknown_repo" && ccvalidate publish) >"$TEST_DIR/publish-unknown.out" 2>&1 ||
+    fail 'publication with unknown cleanup ownership failed'
+git_in "$publish_unknown_repo" show-ref --verify --quiet refs/heads/feature/work || fail 'publish guessed and deleted an unknown branch'
+assert_contains "$TEST_DIR/publish-unknown.out" 'retained feature branch is unknown' 'unknown cleanup was not reported'
+
+publish_unmerged_repo="$(new_fixture publish-unmerged-feature)"
+make_interrupted_finish "$publish_unmerged_repo" "$TEST_DIR/publish-unmerged-interrupted.out"
+git_in "$publish_unmerged_repo" switch -q feature/work
+printf 'later\n' >"$publish_unmerged_repo/later.txt"
+commit_all "$publish_unmerged_repo" 'unmerged later work'
+git_in "$publish_unmerged_repo" switch -q main
+set_fixture_contract "$publish_unmerged_repo"
+(cd "$publish_unmerged_repo" && ccvalidate publish) >"$TEST_DIR/publish-unmerged.out" 2>&1 ||
+    fail 'publication should succeed while unsafe cleanup warns'
+git_in "$publish_unmerged_repo" show-ref --verify --quiet refs/heads/feature/work || fail 'publish deleted an altered feature branch'
+assert_contains "$TEST_DIR/publish-unmerged.out" 'no longer matches recorded feature HEAD' 'altered feature cleanup was not refused'
+
+publish_cleanup_fail_repo="$(new_fixture publish-cleanup-fail)"
+publish_cleanup_fail_origin="$(git_in "$publish_cleanup_fail_repo" remote get-url origin)"
+make_interrupted_finish "$publish_cleanup_fail_repo" "$TEST_DIR/publish-cleanup-interrupted.out"
+export CCVALIDATE_FAIL_BRANCH_CLEANUP=1
+run_publish_failure "$publish_cleanup_fail_repo" "$TEST_DIR/publish-cleanup-fail.out"
+unset CCVALIDATE_FAIL_BRANCH_CLEANUP
+[ "$(git_in "$publish_cleanup_fail_origin" rev-parse refs/heads/main)" = \
+   "$(git_in "$publish_cleanup_fail_repo" rev-parse main)" ] ||
+    fail 'cleanup failure obscured or prevented successful publication'
+git_in "$publish_cleanup_fail_repo" show-ref --verify --quiet refs/heads/feature/work ||
+    fail 'cleanup failure removed the retained branch'
+assert_contains "$TEST_DIR/publish-cleanup-fail.out" 'Push origin/main' 'cleanup failure output omitted successful push stage'
+assert_contains "$TEST_DIR/publish-cleanup-fail.out" 'Remote verification' 'cleanup failure output omitted successful verification stage'
+
+publish_wrong_repo="$(new_fixture publish-wrong-repository)"
+git_in "$publish_wrong_repo" switch -q main
+git_in "$publish_wrong_repo" merge -q --ff-only feature/work
+set_fixture_contract "$publish_wrong_repo"
+CCVALIDATE_EXPECTED_REPOSITORY_NAME='CaptainCronos-01-ShellToolkit'
+export CCVALIDATE_EXPECTED_REPOSITORY_NAME
+# shellcheck disable=SC2016
+assert_failure 'publish accepted the wrong repository' bash -c \
+    'cd "$1"; source "$2/bash/bash_functions"; ccvalidate publish' bash "$publish_wrong_repo" "$PROJECT_ROOT" \
+    >"$TEST_DIR/publish-refuse-wrong-repo.out" 2>&1
+assert_contains "$TEST_DIR/publish-refuse-wrong-repo.out" 'Repository context' 'wrong publish repository was not explained'
+
+assert_contains "$TEST_DIR/finish-success.out" 'Remote refresh' 'finish did not use shared publication refresh logic'
+assert_contains "$CCVALIDATE_CC_LOG" 'main|release check' 'publish did not run the release gate on main'
+
 if grep -Eq '_ccvalidate_git[[:space:]]+(reset|stash)|_ccvalidate_git[[:space:]]+push[^\n]*--force|_ccvalidate_git[[:space:]]+branch[[:space:]]+-D' \
     "$PROJECT_ROOT/bash/bash_functions"; then
     fail 'unsafe force/reset/stash path is reachable from ccvalidate'
 fi
+if grep -Eq '_ccvalidate_validation[[:space:]]+publish|ccvalidate[[:space:]]+publish' \
+    <(sed -n '/^_ccvalidate_publish()/,/^}/p' "$PROJECT_ROOT/bash/bash_functions"); then
+    fail 'publish validation recursively invoked publish'
+fi
 if grep -Eq 'sudo|apt-get|dnf|pacman|systemctl|grub|bootloader|browser' "$CCVALIDATE_GIT_LOG"; then
     fail 'finish attempted an external system mutation'
 fi
-if LC_ALL=C grep -q $'\033' "$TEST_DIR/finish-success.out" "$TEST_DIR/refuse-"*.out "$TEST_DIR/"*-fail.out; then
-    fail 'redirected finish output contained ANSI escapes'
+if LC_ALL=C grep -q $'\033' "$TEST_DIR/finish-success.out" "$TEST_DIR/publish-"*.out "$TEST_DIR/refuse-"*.out "$TEST_DIR/"*-fail.out; then
+    fail 'redirected ccvalidate workflow output contained ANSI escapes'
 fi
 
 printf 'Local validation workflow tests: PASS\n'

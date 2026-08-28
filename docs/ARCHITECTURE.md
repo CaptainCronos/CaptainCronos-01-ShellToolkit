@@ -511,13 +511,25 @@ Local acceptance is orchestrated by the canonical `ccvalidate` function from
 Its `fast`, `full`, and `release` modes are validation-only. Full mode relies on
 the selftest's default release gate rather than repeating its verify, audit, and
 documentation stages. Release mode delegates that internal gate and invokes it
-once as an explicit final stage. The explicit `finish` mode is the sole Git-mutation
-boundary: it validates a clean committed development branch, permits only
-fast-forward main update/merge and `main -> origin/main` push, verifies the
-remote commit, and deletes the local feature branch only after verification.
-Any pre-switch validation failure leaves the feature checkout untouched; any
-post-merge failure leaves local main and the feature branch intact for review
-without pushing or resetting.
+once as an explicit final stage. Explicit `finish` and `publish` modes form the
+Git-mutation boundary. Finish owns the feature checkout, fast-forward main
+update/merge, and post-merge validation. After the verified merge it records
+Git-private continuation evidence containing repository/remote identity,
+feature branch and tip, merged main, and the observed origin/main. A post-merge
+failure leaves local main, the retained feature, and that marker intact without
+pushing or resetting.
+
+Publish owns continuation from clean local main. It accepts only equal or
+strictly-ahead, non-diverged main topology; runs release validation; rejects a
+remote ref change between its before/after fetches; and shares finish's exact
+main-only push, local/tracking/live verification, and safe cleanup helpers. The
+state marker identifies a candidate but is never authoritative: deletion also
+requires the unchanged recorded tip and membership in
+`git branch --merged main`, and uses only `git branch -d`. Successful verified
+publication can stand with a cleanup warning when ownership is unknown or
+deletion is unsafe. No
+rollback, force, reset, rebase, stash, tag push, or remote-feature deletion path
+exists.
 
 Generated command references execute repository help under a canonical root,
 C locale, ANSI-disabled presentation, and without caller shell hooks or custom

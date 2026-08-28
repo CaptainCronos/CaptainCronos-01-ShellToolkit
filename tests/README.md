@@ -44,8 +44,12 @@ Focused shell tests supplement `cc selftest`:
   and the explicit finish workflow with disposable repositories and bare
   remotes. It covers clean fast-forward success, post-push verification and
   branch cleanup, plus main/dirty/staged/untracked/origin/repository/divergence/
-  conflict/validation/push/verification refusal boundaries. It never runs
-  finish against the real repository or remote.
+  conflict/validation/push/verification refusal boundaries. It also exercises
+  post-merge `publish` continuation, exact main-only refspecs, ahead/equal/
+  behind/diverged topology, mid-validation remote changes, failed validation/
+  push/live verification, idempotency, marker validation, conservative unknown
+  or moved-branch cleanup, and preservation of remote feature refs. It never
+  runs finish or publish against the real repository or remote.
 - `safety-contracts.sh` validates default-safe and explicit-apply behavior for
   launcher/full installation, toolkit update, system update, the complete update
   orchestrator, and monthly-health previews. Mutation paths run only through
