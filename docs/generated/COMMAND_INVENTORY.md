@@ -40,6 +40,7 @@ Toolkit version: 1.3.0-beta1 (Blackbeard)
 | cc registry | namespace | 1.3.0-beta1 | Display command metadata registry information. |
 | cc release | namespace-with-switches | 1.3.0-beta1 | Plan and run the toolkit release workflow. |
 | cc repo | flat-no-switches | 1.3.0-beta1 | Show repository path and Git remote information. |
+| cc reports | namespace-with-switches | 1.3.0-beta1 | Inspect and conservatively prune persistent report history. |
 | cc repos | namespace-with-switches | 1.3.0-beta1 | Inventory and manage local Git repositories. |
 | cc roadmap | flat-no-switches | 1.3.0-beta1 | Show the canonical project roadmap from ROADMAP.md. |
 | cc selftest | flat-with-switches | 1.3.0-beta1 | Run the full toolkit engineering self-test suite. |

@@ -108,7 +108,7 @@ done
 cc_command_list >"$TEST_DIR/registry"
 cc_contract_commands | cut -d '|' -f1 | LC_ALL=C sort >"$TEST_DIR/contracts"
 cmp -s "$TEST_DIR/registry" "$TEST_DIR/contracts" || fail 'registered commands and contracts differ'
-[ "$(wc -l <"$TEST_DIR/contracts" | tr -d ' ')" -eq 48 ] || fail 'public command count changed unexpectedly'
+[ "$(wc -l <"$TEST_DIR/contracts" | tr -d ' ')" -eq 49 ] || fail 'public command count changed unexpectedly'
 [ "$(sort "$TEST_DIR/contracts" | uniq -d | wc -l | tr -d ' ')" -eq 0 ] || fail 'duplicate command contracts exist'
 
 # Contract row selection must consume its producer completely.  Expanding the
@@ -188,7 +188,7 @@ for fixture in \
     'doctor --full 0' 'kernel/cleanup --dry-run 0' 'kernel/cleanup --apply 0' \
     'env/path --fix 0' 'env/path --apply 0' 'docs --out 1' \
     'init --host-id 1' 'repos --message 1' 'maintenance --format 1' \
-    'maintenance/cleanup --dry-run 0' 'workbench --target 1'; do
+    'maintenance/cleanup --dry-run 0' 'reports/prune --apply 0' 'workbench --target 1'; do
     read -r context switch_name arity <<< "$fixture"
     metadata_has "$context" "$switch_name" "$arity" || fail "focused parser contract missing or wrong: $fixture"
 done

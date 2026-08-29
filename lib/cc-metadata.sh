@@ -44,7 +44,7 @@ cc_infer_category() {
         verify|doctor) echo "Diagnostics" ;;
         drives|smart) echo "Storage" ;;
         kernel|kernel-cleanup) echo "Maintenance" ;;
-        dev-update|system-update|update|monthly-health|monthly-health-timer|maintenance) echo "Maintenance" ;;
+        dev-update|system-update|update|monthly-health|monthly-health-timer|maintenance|reports) echo "Maintenance" ;;
         *) echo "General" ;;
     esac
 }
@@ -130,6 +130,7 @@ registry|namespace|cc registry [table|tsv|markdown]|Show the command header meta
 release|namespace-with-switches|cc release [subcommand] [switches]|Plan or check the release workflow.|namespace
 repo|flat-no-switches|cc repo|Show the current repository path, branch, and origin.|none
 repos|namespace-with-switches|cc repos [subcommand] [switches]|Inventory or conservatively manage local Git repositories.|namespace
+reports|namespace-with-switches|cc reports [subcommand] [switches]|Inspect and conservatively prune persistent report history.|namespace
 roadmap|flat-no-switches|cc roadmap [markdown]|Show the canonical project roadmap.|any
 selftest|flat-with-switches|cc selftest [switches]|Run the toolkit engineering self-test suite.|none
 smart|flat-with-switches|cc smart [DEVICE] [switches]|Show storage and SMART detail, optionally for one device.|any
@@ -193,6 +194,10 @@ maintenance/inventory|--format FORMAT|1|Render inventory as a readable table or 
 maintenance/cleanup|--dry-run|0|Explicitly request the read-only cleanup preview; cleanup remains disabled.
 monthly-health|--stdout|0|Write the report to standard output instead of a report file.
 monthly-health|--file|0|Write the report file under the configured report directory. [default]
+reports|--format FORMAT|1|Render list or prune as a readable table or stable TSV. [default: table]
+reports/list|--format FORMAT|1|Render retained reports as a readable table or stable TSV. [default: table]
+reports/prune|--format FORMAT|1|Render the bounded prune plan as a readable table or stable TSV. [default: table]
+reports/prune|--apply|0|Explicitly authorize deletion of the displayed, verified current-host plan; omission is preview-only. [default: preview]
 release|--apply|0|Accepted for workflow compatibility; release automation still does not bump, tag, or push.
 repos|--root PATH|1|Inspect repositories below PATH. [default: ~/GitHub]
 repos|--out FILE|1|Write inventory output to a .md or .csv file.
@@ -356,6 +361,9 @@ repos|push|Push eligible branches without force; dry-run by default.|repos/push
 repos|publish|Push eligible clean main branches; dry-run by default.|repos/publish
 repos|verify|Run cc verify in toolkit repositories.|repos/verify
 repos|doctor|Run cc doctor in toolkit repositories.|repos/doctor
+reports|status|Show current-host report lifecycle health and retained totals.|reports/status
+reports|list|List recognized retained reports and policy state.|reports/list
+reports|prune|Preview or explicitly apply a bounded current-host report plan.|reports/prune
 storage|inventory|Delegate to read-only drive inventory.|storage/inventory
 storage|help|Show storage namespace help.|storage/help
 storage|drives|Delegate to mounted and installed device reporting.|storage/drives

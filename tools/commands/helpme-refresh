@@ -133,6 +133,7 @@ helpme() {
         _cc_help_row "cc kernel" "Inspect kernels and review cleanup candidates safely."
         _cc_help_row "cc kernel-cleanup" "Compatibility entry point for cc kernel cleanup."
         _cc_help_row "cc maintenance" "Inspect persistent toolkit ownership and retention."
+        _cc_help_row "cc reports" "Inspect retained reports and preview bounded pruning."
         _cc_help_row "cc update" "Run managed maintenance workflow."
     }
 

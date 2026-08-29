@@ -40,6 +40,45 @@ cc_retention_class_description() {
     esac
 }
 
+# Authoritative report-family metadata shared by producers, persistent-resource
+# inventory, and the report lifecycle. Fields: family, resource class, producer,
+# unit kind, location, minimum retained count, maximum age in days, latest name,
+# and cleanup policy. A maximum age of zero disables age-based pruning.
+cc_retention_report_family_catalog() {
+    local report_dir log_dir
+    report_dir="$(cc_env_report_dir)"
+    log_dir="$(cc_env_log_dir)"
+
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        monthly-health report-history 'cc monthly-health --file' file \
+        "$report_dir/monthly-health" 24 1095 latest.log retention
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        drive-report report-history 'cc drive-report' directory \
+        "$report_dir/drives" 10 365 - retention
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        drive-qualification asset 'cc drive-qualify' directory \
+        "$report_dir/drives/qualification" 0 0 - protected
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        system-update report-history 'cc system-update --apply' file \
+        "$log_dir/system-update.log" 1 0 - protected-current
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        kernel-cleanup report-history 'cc kernel cleanup --apply' file \
+        "$log_dir/kernel-cleanup.log" 1 0 - protected-current
+}
+
+cc_retention_report_policy_value() {
+    local family="$1" field="$2" default="$3" key value
+    key="${family//-/_}_${field}"
+    key="${key^^}"
+    if declare -F cc_config_get >/dev/null 2>&1; then
+        value="$(cc_config_get "$key" "$default")"
+    else
+        value="$default"
+    fi
+    [[ "$value" =~ ^[0-9]+$ ]] || value="$default"
+    printf '%s\n' "$value"
+}
+
 _cc_retention_location_safe() {
     local path="$1" remainder component probe
     [ -n "$path" ] && [ "$path" != / ] && [[ "$path" == /* ]] || return 1

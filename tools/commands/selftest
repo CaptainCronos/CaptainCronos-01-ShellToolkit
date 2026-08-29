@@ -267,6 +267,7 @@ selftest_suite() {
     "$runner" "Config library" configuration check_library cc-config.sh
     "$runner" "Temporary-resource lifecycle" core bash "$PROJECT_ROOT/tests/temp-lifecycle.sh"
     "$runner" "Persistent-resource retention" maintenance bash "$PROJECT_ROOT/tests/retention.sh"
+    "$runner" "Report lifecycle" maintenance bash "$PROJECT_ROOT/tests/reports.sh"
     "$runner" "Semantic dependencies" dependencies bash "$PROJECT_ROOT/tests/dependencies.sh"
     "$runner" "Programs library" programs check_library cc-programs.sh
     "$runner" "Packages library" packages check_library cc-packages.sh

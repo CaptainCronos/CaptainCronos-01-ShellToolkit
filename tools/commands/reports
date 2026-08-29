@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : reports
+# Version     : reads VERSION
+# Category    : Maintenance
+# Requires    : bash find stat date sort readlink rm rmdir awk sed id
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect and conservatively prune persistent report history.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-environment.sh"
+source "$PROJECT_ROOT/lib/cc-config.sh"
+source "$PROJECT_ROOT/lib/cc-retention.sh"
+source "$PROJECT_ROOT/lib/cc-reports.sh"
+
+ACTION=status
+APPLY=0
+FORMAT=table
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc reports [status|list|prune] [--format table|tsv] [--apply]
+
+Inspects deliberately retained Captain Cronos reports for the current host.
+Inventory and preview are read-only. Only `reports prune --apply` deletes the
+exact verified candidate plan displayed by that invocation.
+
+Actions:
+  status  Show report families, retained size, lifecycle defects, and candidates. [default]
+  list    Show each recognized report and its retention state.
+  prune   Preview the exact bounded deletion plan; creates no files or logs.
+
+Options:
+  --format FORMAT  Render list or prune as table or stable TSV. [default: table]
+  --apply          Explicitly authorize the displayed prune plan.
+
+Safety:
+  Current-host scope only. Newest/minimum history, latest targets,
+  qualification evidence, current operational logs, unknown material,
+  configuration, identity, and assets are never report-prune candidates.
+EOF_HELP
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h) usage; exit 0 ;;
+        --version) cc_version; exit 0 ;;
+        status|list|prune) ACTION="$1"; shift ;;
+        --apply) APPLY=1; shift ;;
+        --format)
+            shift
+            FORMAT="${1:-}"
+            case "$FORMAT" in table|tsv) ;; *) cc_error "Format must be table or tsv."; exit 2 ;; esac
+            shift
+            ;;
+        *) cc_error "Unknown reports argument: $1"; usage >&2; exit 2 ;;
+    esac
+done
+
+if [ "$APPLY" -eq 1 ] && [ "$ACTION" != prune ]; then
+    cc_error "--apply is valid only with 'cc reports prune'."
+    exit 2
+fi
+if [ "$FORMAT" = tsv ] && [ "$ACTION" = status ]; then
+    cc_error "--format applies only to reports list or prune."
+    exit 2
+fi
+if [ "$FORMAT" = tsv ] && [ "$APPLY" -eq 1 ]; then
+    cc_error "--format tsv is read-only; apply uses the truthful human result summary."
+    exit 2
+fi
+
+cc_reports_inventory
+cc_reports_plan
+
+print_item_rows() {
+    local only_candidates="$1" index marker timestamp path unknown epoch bytes mode
+    if [ "$FORMAT" = tsv ]; then
+        printf 'family\ttimestamp\tepoch\tbytes\tstate\tlatest\tmode\tpath\n'
+    else
+        printf '%-20s %-19s %10s %-16s %s\n' Family Timestamp Size State Path
+        printf '%-20s %-19s %10s %-16s %s\n' ------ --------- ---- ----- ----
+    fi
+    for index in "${!CC_REPORT_ITEM_PATH[@]}"; do
+        [ "$only_candidates" = no ] || [ "${CC_REPORT_ITEM_STATE[index]}" = 'PRUNE age' ] || continue
+        timestamp="$(date -d "@${CC_REPORT_ITEM_EPOCH[index]}" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || printf unknown)"
+        path="${CC_REPORT_ITEM_PATH[index]}"
+        marker="${CC_REPORT_ITEM_STATE[index]}"
+        if [ "$FORMAT" = tsv ]; then
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "${CC_REPORT_ITEM_FAMILY[index]}" "$timestamp" "${CC_REPORT_ITEM_EPOCH[index]}" \
+                "${CC_REPORT_ITEM_BYTES[index]}" "$marker" "${CC_REPORT_ITEM_LATEST[index]}" \
+                "${CC_REPORT_ITEM_MODE[index]}" "$path"
+        else
+            printf '%-20s %-19s %10s %-16s %s\n' \
+                "${CC_REPORT_ITEM_FAMILY[index]}" "$timestamp" \
+                "$(cc_retention_human_bytes "${CC_REPORT_ITEM_BYTES[index]}")" "$marker" "$path"
+        fi
+    done
+    if [ "$only_candidates" = no ]; then
+        for unknown in "${CC_REPORT_UNKNOWN_PATHS[@]}"; do
+            epoch="$(stat -c %Y -- "$unknown" 2>/dev/null || printf 0)"
+            bytes="$(stat -c %s -- "$unknown" 2>/dev/null || printf 0)"
+            mode="$(stat -c %a -- "$unknown" 2>/dev/null || printf unknown)"
+            if [ "$epoch" -gt 0 ]; then timestamp="$(date -d "@$epoch" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || printf unknown)"; else timestamp=unknown; fi
+            printf -v path '%q' "$unknown"
+            if [ "$FORMAT" = tsv ]; then
+                printf 'UNKNOWN\t%s\t%s\t%s\tKEEP unknown\tno\t%s\t%s\n' "$timestamp" "$epoch" "$bytes" "$mode" "$path"
+            else
+                printf '%-20s %-19s %10s %-16s %s\n' UNKNOWN "$timestamp" \
+                    "$(cc_retention_human_bytes "$bytes")" 'KEEP unknown' "$path"
+            fi
+        done
+    fi
+}
+
+print_status() {
+    local index family family_count=0 report_count="${#CC_REPORT_ITEM_PATH[@]}" total_bytes=0 oldest=0 overall=PASS
+    while IFS= read -r family; do [ -n "$family" ] && family_count=$((family_count + 1)); done \
+        < <(cc_retention_report_family_catalog | cut -f1)
+    for index in "${!CC_REPORT_ITEM_PATH[@]}"; do
+        total_bytes=$((total_bytes + CC_REPORT_ITEM_BYTES[index]))
+        if [ "$oldest" -eq 0 ] || [ "${CC_REPORT_ITEM_EPOCH[index]}" -lt "$oldest" ]; then oldest="${CC_REPORT_ITEM_EPOCH[index]}"; fi
+    done
+    [ "$CC_REPORT_WARNINGS" -eq 0 ] || overall=WARN
+    echo "Captain Cronos Report Status"
+    echo "============================="
+    cc_dotted_line "Report families" "PASS  $family_count"
+    cc_dotted_line "Retained reports" "INFO  $report_count"
+    cc_dotted_line "Retained size" "INFO  $(cc_retention_human_bytes "$total_bytes")"
+    if [ "$oldest" -eq 0 ]; then
+        cc_dotted_line "Oldest retained report" "INFO  -"
+    else
+        cc_dotted_line "Oldest retained report" "INFO  $(date -d "@$oldest" +%F)"
+    fi
+    cc_dotted_line "Prune candidates" "INFO  ${#CC_REPORT_PLAN_INDEXES[@]}"
+    if [ "${#CC_REPORT_UNKNOWN_PATHS[@]}" -eq 0 ]; then
+        cc_dotted_line "Unknown persistent items" "PASS  0"
+    else
+        cc_dotted_line "Unknown persistent items" "WARN  ${#CC_REPORT_UNKNOWN_PATHS[@]}"
+    fi
+    if [ "$CC_REPORT_BROKEN_LATEST" -eq 0 ]; then cc_status_line "Latest pointers" PASS; else cc_status_line "Latest pointers" WARN; fi
+    if [ "$CC_REPORT_PERMISSION_WARNINGS" -eq 0 ]; then cc_status_line Permissions PASS; else cc_status_line Permissions WARN; fi
+    echo
+    cc_summary_status "Overall Status:" "$overall"
+    [ "$overall" = PASS ]
+}
+
+print_prune() {
+    local path
+    if [ "$FORMAT" = table ]; then
+        echo "Captain Cronos Report Prune"
+        echo "============================"
+        if [ "$APPLY" -eq 1 ]; then echo "Mode: APPLY"; else echo "Mode: PREVIEW (zero-write)"; fi
+        printf 'Candidates: %s\nCandidate size: %s\n\n' "${#CC_REPORT_PLAN_INDEXES[@]}" "$(cc_retention_human_bytes "$CC_REPORT_PLAN_BYTES")"
+    fi
+    print_item_rows yes
+    if [ "$APPLY" -eq 0 ]; then
+        [ "$FORMAT" = tsv ] || echo "No files were removed. Re-run with --apply to authorize this exact policy-derived set."
+        return 0
+    fi
+    if cc_reports_apply_plan; then
+        [ "$FORMAT" = tsv ] || printf '\nplanned: %s\ndeleted: %s\nfailed: %s\nskipped-safety-change: %s\nOverall Status: PASS\n' \
+            "$CC_REPORT_APPLY_PLANNED" "$CC_REPORT_APPLY_DELETED" "$CC_REPORT_APPLY_FAILED" "$CC_REPORT_APPLY_SKIPPED"
+    else
+        [ "$FORMAT" = tsv ] || printf '\nplanned: %s\ndeleted: %s\nfailed: %s\nskipped-safety-change: %s\nOverall Status: FAIL\n' \
+            "$CC_REPORT_APPLY_PLANNED" "$CC_REPORT_APPLY_DELETED" "$CC_REPORT_APPLY_FAILED" "$CC_REPORT_APPLY_SKIPPED"
+        if [ "$FORMAT" = table ]; then
+            for path in "${CC_REPORT_APPLY_FAILED_PATHS[@]}"; do printf 'failed-path: %s\n' "$path"; done
+            for path in "${CC_REPORT_APPLY_SKIPPED_PATHS[@]}"; do printf 'skipped-path: %s\n' "$path"; done
+        fi
+        return 1
+    fi
+}
+
+case "$ACTION" in
+    status) cc_banner; print_status ;;
+    list) [ "$FORMAT" = tsv ] || { cc_banner; echo "Retained Report Inventory"; echo "========================="; }; print_item_rows no ;;
+    prune) [ "$FORMAT" = tsv ] || cc_banner; print_prune ;;
+esac

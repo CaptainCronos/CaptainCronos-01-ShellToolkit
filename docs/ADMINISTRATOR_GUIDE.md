@@ -346,12 +346,40 @@ symlinks. `cc maintenance inventory --format tsv` provides stable machine-readab
 output. `cc maintenance status` is the concise view used by monthly health, and
 `cc maintenance retention` explains the policy model.
 
-`cc maintenance cleanup` and `cc maintenance cleanup --dry-run` are identical
-read-only previews: v1.3 selects zero candidates. There is deliberately no
-`--apply` switch. Installer recovery generations are incomplete/partial and no
-minimum recovery guarantee exists; report comparison value has no objective
-expiry; asset history is curated; bundles are explicit user exports; and legacy
-or unclassified paths lack deletion-grade ownership proof.
+`cc maintenance cleanup` remains the read-only, zero-candidate preview for the
+broad persistent-resource catalog. Installer recovery generations lack a
+minimum guarantee; asset history is curated; bundles are explicit exports; and
+legacy or unclassified paths lack deletion-grade ownership proof. It therefore
+has no apply interface.
+
+Use `cc reports` for the narrower current-host report lifecycle. `cc reports
+list` shows recognized report units, size, filesystem timestamp, permissions,
+latest state, and retention decision. `cc reports prune` is always a zero-write
+preview of the exact candidate set. Only `cc reports prune --apply` authorizes
+that invocation's already-built plan. Apply revalidates containment, type,
+identity, family structure, and latest protection before deleting each known
+regular report file. Changed or uncertain entries are skipped, and partial
+failure returns nonzero with planned, deleted, failed, and safety-skipped totals.
+
+The defaults are centralized in the report-family catalog and may be overridden
+through existing configuration keys without migration or automatic config
+edits:
+
+| Family | Minimum newest retained | Maximum age | Cleanup |
+|---|---:|---:|---|
+| monthly health | 24 | 1,095 days | older units outside both protections |
+| ordinary drive report | 10 | 365 days | older units outside both protections |
+| drive qualification | all | none | never; durable certification evidence |
+| system-update current log | current file | none | never; replaced per apply |
+| kernel-cleanup current log | current file | none | never; append-only current log |
+
+The override keys are `MONTHLY_HEALTH_RETENTION_MIN_COUNT`,
+`MONTHLY_HEALTH_RETENTION_MAX_AGE_DAYS`,
+`DRIVE_REPORT_RETENTION_MIN_COUNT`, and
+`DRIVE_REPORT_RETENTION_MAX_AGE_DAYS`. Values must be nonnegative integers;
+invalid values fall back to documented defaults. A candidate must be both
+outside the newest-count protection and older than the maximum age. The newest
+report and a valid `latest.log` target are always retained.
 
 Canonical host-scoped reports, assets, logs, cache, and plugins live below
 `~/.captaincronos/hosts/<host-id>/`. Installer backups and repository bundles
@@ -363,8 +391,10 @@ their existing `cc monthly-health-timer retire` workflow remains their sole
 lifecycle owner; retention cleanup does not touch them.
 
 Monthly health includes only a concise retention status and never cleans
-persistent resources. Doctor does not treat ordinary historical accumulation as
-a failure; no new retention doctor gate or policy configuration is introduced.
+persistent resources. Ordinary accumulation is informational. Broken or
+escaping latest pointers, insecure known-report permissions, unreadable known
+reports, and unknown entries beneath report roots are lifecycle warnings.
+Unknown files or directories are never recursively claimed or pruned.
 
 ## Backups
 Preserve `~/.captaincronos/` as part of system backups. Asset records and

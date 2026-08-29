@@ -39,6 +39,11 @@ Focused shell tests supplement `cc selftest`:
   cache, unknown ownership, safe accounting, oldest/newest dates, symlink
   non-traversal, inspection and cleanup-preview zero-write fingerprints,
   disabled apply, contextual help, deterministic TSV, and ANSI-free output.
+- `reports.sh` validates current-host report-family classification, deterministic
+  size/age policy, conservative monthly and drive overrides, latest-pointer and
+  permission health, zero-write preview, explicit bounded apply, idempotency,
+  config/asset/qualification/unknown protection, host isolation, symlink and
+  traversal confinement, identity-change skips, and truthful partial failure.
 - `ccvalidate.sh` validates bare/fast/full/release orchestration, failure
   aggregation and continuation, help and ANSI-free output, repeated sourcing,
   and the explicit finish workflow with disposable repositories and bare

@@ -77,7 +77,10 @@ Global installer backups and repository bundle exports remain directly below
 `~/.captaincronos/`. `lib/cc-retention.sh` catalogs these deterministic roots
 for bounded, non-following accounting. Persistent resources are not temporary
 resources: they must never be registered with `cc-temp` after publication.
-The v1.3 retention model is inspection-only and exposes no deletion apply path.
+The broad retention model remains inspection-only. The narrower report-history
+layer in `lib/cc-reports.sh` consumes family metadata from `cc-retention`, builds
+a bounded in-memory plan, previews by default, and exposes mutation only through
+`cc reports prune --apply` for recognized current-host report history.
 
 ---
 

@@ -358,10 +358,11 @@ Historical reports are stored under:
 
 Reports represent timestamped observations. Monthly-health reports remain mode
 0600 inside a mode-0700 directory and keep a `latest.log` symlink for operator
-convenience. Drive reports and qualification captures are historical records.
-They contain device, serial, host, and health data, so new drive report files
-are mode 0600 inside mode-0700 directories. The v1.3 policy retains all report
-history because no objective expiration rule has been established.
+convenience. Ordinary drive reports use private timestamped directories. Drive
+qualification captures are durable certification evidence referenced by asset
+state, so the report lifecycle classifies them as protected assets rather than
+prunable history. System-update and kernel-cleanup logs are visible report
+families, but their single current-log semantics exclude them from age pruning.
 
 ### Diagnostics and Progress
 
@@ -405,23 +406,50 @@ catalog used by `cc maintenance`. A path is deterministically classifiable only
 when it is under a canonical `CC_HOME`/host root or is an exact path or filename
 produced by a known command. Merely residing under `HOME` proves nothing.
 
-The lifecycle classes are authoritative state, user-curated state, historical
-record, regenerable cache, recovery artifact, user export, and unknown/external.
-Every v1.3 policy is preservation-first: `retain` or `user-managed`. Cleanup is
-disabled, there is no `--apply` interface, symlinks are counted but never
-followed, and scans are bounded to known roots without crossing filesystems.
+The broad lifecycle classes are authoritative state, user-curated state,
+historical record, regenerable cache, recovery artifact, user export, and
+unknown/external. Report lifecycle refines the relevant resources into report
+history, protected asset evidence, protected current logs, latest pointers, and
+unknown material. Configuration and host identity remain authoritative state;
+assets/history remain authoritative or curated; none can enter a report plan.
+
+`lib/cc-retention.sh` owns both the broad catalog and authoritative report-family
+metadata. `lib/cc-reports.sh` consumes that metadata through distinct inventory,
+classification, policy, immutable-plan, presentation, and optional mutation
+stages. Filesystem mtime is the retention timestamp because every active
+producer creates a fresh immutable report unit; filename timestamps are used
+only to recognize the producer-owned shape. Integer `stat` sizes and epochs
+drive accounting and policy. `CC_REPORT_NOW_EPOCH` is an internal deterministic
+test seam, not user policy.
+
+The report command is current-host-only. It never scans or prunes another host.
+Monthly health retains at least 24 newest units and only considers older units
+after 1,095 days; ordinary drive history retains at least 10 and only considers
+older units after 365 days. Existing config lookup supplies optional per-family
+integer overrides without modifying user configuration. A valid latest target,
+the newest protected set, qualification evidence, current logs, unknowns, and
+malformed units remain retained.
+
+Prune preview builds and prints the exact plan without creating a directory or
+log. Apply consumes that in-memory plan rather than rediscovering candidates,
+then cheaply revalidates absolute containment, regular-file/directory type,
+device/inode/size/mtime identity, known directory contents, and symlink
+boundaries. Drive directories are removed only after individually verified
+known regular files are deleted and the directory is proven empty. State change
+causes a safety skip; any failed or skipped item makes apply fail truthfully.
 
 | Subsystem / producer | Canonical or exact location | Class | Accumulation | Policy | Cleanup |
 |---|---|---|---|---|---|
 | host initialization / configuration | `CC_HOME/config`, `CC_HOST_HOME/config` | authoritative state | replaced in place | retain | never |
-| `cc monthly-health --file` | `CC_REPORT_DIR/monthly-health/` | historical record | timestamped reports plus latest symlink | retain | disabled |
-| `cc drive-report`, `cc drive-qualify` | `CC_REPORT_DIR/drives/` | historical record | timestamped report directories | retain | disabled |
+| `cc monthly-health --file` | `CC_REPORT_DIR/monthly-health/` | report history | timestamped reports plus latest symlink | 24 newest and 1,095 days | explicit report apply |
+| `cc drive-report` | `CC_REPORT_DIR/drives/` | report history | timestamped report directories | 10 newest and 365 days | explicit report apply |
+| `cc drive-qualify` | `CC_REPORT_DIR/drives/qualification/` | protected asset evidence | timestamped evidence directories | retain | never |
 | asset commands and drive workflows | `CC_ASSET_DIR/` | authoritative state | records replaced in place | retain | never |
 | asset history appenders | `CC_ASSET_DIR/.history/` | user-curated state | append-only logs | retain | never |
 | full installer / toolkit update | `CC_HOME/backups/` | recovery artifact | timestamped partial generations | retain | disabled |
 | `cc repos backup --apply` | `CC_HOME/repo-bundles/` | user export | timestamped Git bundles | user-managed | never |
-| system update apply | `CC_LOG_DIR/system-update.log` | historical record | replaced per apply | retain | disabled |
-| kernel cleanup apply | `CC_LOG_DIR/kernel-cleanup.log` | historical record | append-only | retain | disabled |
+| system update apply | `CC_LOG_DIR/system-update.log` | protected current log | replaced per apply | retain current | never |
+| kernel cleanup apply | `CC_LOG_DIR/kernel-cleanup.log` | protected current log | append-only | retain current | never |
 | optional monthly-health timer | `~/.config/systemd/user/captaincronos-monthly-health.{service,timer}` | authoritative state | replaced in place | retain | owner command only |
 | host plugins | `CC_HOST_HOME/plugins/` | user-curated state | operator/plugin managed | user-managed | never |
 | reserved cache root | `CC_CACHE_DIR/` | regenerable cache | no active producer | retain | disabled |

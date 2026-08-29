@@ -20,19 +20,16 @@ and mocked-adapter tests cover the complete call chain.
 
 ## v1.3 Persistent Resource Retention
 
-Status: **Inspection architecture complete**
+Status: **Report lifecycle complete**
 
 Persistent producers are cataloged by subsystem, lifecycle class, canonical or
 exact root, retention policy, and cleanup eligibility. `cc maintenance` provides
-bounded inventory, status, policy explanation, and a zero-candidate cleanup
-preview. Monthly health includes concise persistent-resource status. Active
-reports and operational logs now use the existing host-scoped environment
-roots; installer backups and user-requested repository bundles retain their
-global recovery/export homes.
-
-Deletion is intentionally deferred. No resource class currently has both an
-objective retention rule and sufficient recovery/ownership proof, so v1.3 keeps
-all policies at retain or user-managed and exposes no cleanup `--apply` path.
+bounded inventory, status, and policy explanation. Its broad cleanup remains
+disabled. `cc reports` now inventories authoritative current-host report
+families, applies documented family retention, previews an exact zero-write
+plan, and requires `cc reports prune --apply` for verified bounded deletion.
+Qualification evidence, current operational logs, configuration, identity,
+assets, exports, recovery material, and unknown resources remain protected.
 
 ## Package Management Standardization
 

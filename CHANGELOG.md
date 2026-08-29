@@ -10,6 +10,15 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- `cc reports` current-host lifecycle status, detailed inventory, zero-write
+  prune preview, and explicitly authorized bounded apply for recognized report
+  history.
+- Shared report-family metadata and inventory → classification → retention →
+  immutable-plan → verified-mutation primitives with deterministic age/size
+  accounting, latest protection, and truthful partial-failure results.
+- Disposable report lifecycle fixtures covering family policy, permissions,
+  unknown/config/asset/evidence protection, exact deletion sets, idempotency,
+  host isolation, state changes, and path/symlink confinement.
 - Read-only `cc maintenance` persistent-resource status, inventory, retention,
   and disabled-cleanup preview with stable TSV output and contextual switches.
 - Shared persistent ownership catalog and bounded accounting for reports, logs,

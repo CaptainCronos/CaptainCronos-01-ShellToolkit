@@ -1370,6 +1370,55 @@ Switches:
   --version......... Show toolkit version information.
 ~~~
 
+## cc reports
+
+~~~text
+Usage:
+  cc reports [status|list|prune] [--format table|tsv] [--apply]
+
+Inspects deliberately retained Captain Cronos reports for the current host.
+Inventory and preview are read-only. Only `reports prune --apply` deletes the
+exact verified candidate plan displayed by that invocation.
+
+Actions:
+  status  Show report families, retained size, lifecycle defects, and candidates. [default]
+  list    Show each recognized report and its retention state.
+  prune   Preview the exact bounded deletion plan; creates no files or logs.
+
+Options:
+  --format FORMAT  Render list or prune as table or stable TSV. [default: table]
+  --apply          Explicitly authorize the displayed prune plan.
+
+Safety:
+  Current-host scope only. Newest/minimum history, latest targets,
+  qualification evidence, current operational logs, unknown material,
+  configuration, identity, and assets are never report-prune candidates.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc reports
+
+Usage:
+  cc reports [subcommand] [switches]
+
+Inspect and conservatively prune persistent report history.
+
+Switches:
+  --format FORMAT........ Render list or prune as a readable table or stable TSV. [default: table]
+  --help, -h............. Show contextual command help.
+  --version.............. Show toolkit version information.
+
+Subcommands:
+  status........ Show current-host report lifecycle health and retained totals.
+  list.......... List recognized retained reports and policy state.
+  prune......... Preview or explicitly apply a bounded current-host report plan.
+
+Discovery:
+  cc reports <subcommand> switches
+~~~
+
 ## cc repos
 
 ~~~text
