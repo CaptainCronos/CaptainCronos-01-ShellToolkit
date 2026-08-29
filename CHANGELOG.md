@@ -6,7 +6,25 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ---
 
-## Unreleased
+## v1.3.0-beta2 — Blackbeard (2026-08-29)
+
+### Purpose
+
+Release-hardening milestone for the Captain Cronos Shell Toolkit. This release
+completes the audited validation and release lifecycle, command and switch
+discovery, help/reference hardening, persistent resource and secure report
+lifecycle work, kernel management, repository and maintenance safety,
+configuration and host-profile maturity, update/package safety, diagnostics,
+infrastructure hardening, and supporting documentation and test expansion.
+
+### Compatibility
+
+- Mutation-capable workflows remain preview-first and require explicit
+  `--apply` where supported.
+- Configuration migration remains explicit; host reports remain host-scoped;
+  and legacy persistent state remains protected.
+- Intentional compatibility wrappers, including `cc kernel-cleanup`, remain
+  available.
 
 ### Added
 

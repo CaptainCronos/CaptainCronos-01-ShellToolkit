@@ -1,6 +1,6 @@
 # Captain Cronos Shell Toolkit
 
-**Current milestone:** `v1.3.0-beta1` — **Blackbeard**
+**Current milestone:** `v1.3.0-beta2` — **Blackbeard**
 
 Captain Cronos Shell Toolkit is the executable toolkit in the Captain Cronos
 ecosystem. It provides a managed Linux shell environment, reusable Bash
@@ -176,7 +176,7 @@ and exposed to commands as capabilities through `lib/cc-programs.sh`. Use
 
 ## Framework Status
 
-`v1.3.0-beta1` marks the 1.3 framework milestone.
+`v1.3.0-beta2` marks the release-hardened 1.3 framework milestone.
 
 Completed framework areas:
 

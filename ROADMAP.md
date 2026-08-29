@@ -1,14 +1,14 @@
 # Captain Cronos Shell Toolkit Roadmap
 
-Current milestone: **v1.3.0-beta1 — Framework Complete**
+Current milestone: **v1.3.0-beta2 — Release Hardening Complete**
 
-Current version line: **v1.3.0-beta1 — Blackbeard**
+Current version line: **v1.3.0-beta2 — Blackbeard**
 
 The Shell Toolkit has moved from a personal Bash collection into an engineered, installable toolkit with versioning, verification, baseline capture, defaults, storage workflows, asset history, shared libraries, and a GitHub-backed development workflow.
 
 ## v1.3 RC Stabilization — Diagnostic Integrity and Release State
 
-Status: **In progress**
+Status: **Complete for v1.3.0-beta2**
 
 Mutation-capable install and maintenance commands now default to zero-write
 preview and require explicit `--apply`. Toolkit preview does not fetch or modify
