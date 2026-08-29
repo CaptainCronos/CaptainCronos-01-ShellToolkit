@@ -72,6 +72,12 @@ if bash "$PROJECT_ROOT/tools/cc" definitely-not-a-command >/dev/null 2>&1; then
     fail 'unknown-command exit status changed'
 fi
 
+bash "$PROJECT_ROOT/tools/cc" about >"$TEST_DIR/about.out" || fail 'cc about returned nonzero'
+grep -Fxq 'ROADMAP.md' "$TEST_DIR/about.out" || fail 'cc about omitted the authoritative roadmap path'
+if grep -Fxq 'docs/ROADMAP.md' "$TEST_DIR/about.out"; then
+    fail 'cc about still advertises the removed duplicate roadmap'
+fi
+
 for environment in \
     'TERM=xterm-256color CC_COLOR_MODE=auto' \
     'TERM=xterm-256color CC_COLOR_MODE=never' \

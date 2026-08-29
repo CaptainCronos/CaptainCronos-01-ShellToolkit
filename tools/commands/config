@@ -71,15 +71,15 @@ case "$ACTION" in
         shift || true
         key="${1:-}"
         default="${2:-}"
-        [ -n "$key" ] || { usage; exit 1; }
+        [ -n "$key" ] || { usage >&2; exit 2; }
         cc_config_get "$key" "$default"
         ;;
     set)
         shift || true
         key="${1:-}"
         value="${2:-}"
-        [ -n "$key" ] || { usage; exit 1; }
-        [ -n "$value" ] || { usage; exit 1; }
+        [ -n "$key" ] || { usage >&2; exit 2; }
+        [ -n "$value" ] || { usage >&2; exit 2; }
         cc_config_set "$key" "$value"
         cc_log "Set $key"
         ;;

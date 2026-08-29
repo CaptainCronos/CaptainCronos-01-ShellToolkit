@@ -86,6 +86,10 @@ assert_contains "$TEST_DIR/error" 'Command: cc env path' 'nested positional used
 assert_usage_error 'missing switch value was not a usage error' run_cc docs --out
 assert_contains "$TEST_DIR/error" '[CC ERROR] Missing value for switch: --out' 'missing-value diagnostic drifted'
 assert_contains "$TEST_DIR/error" 'Command: cc docs' 'missing-value context was absent'
+assert_usage_error 'missing config get key was not a usage error' run_cc config get
+assert_contains "$TEST_DIR/error" 'Usage:' 'missing config get key omitted usage'
+assert_usage_error 'missing config set value was not a usage error' run_cc config set EDITOR
+assert_contains "$TEST_DIR/error" 'Usage:' 'missing config set value omitted usage'
 
 # Dotted leaders remain safe for long labels, and discovery presentation remains
 # ANSI-free under every non-color contract.

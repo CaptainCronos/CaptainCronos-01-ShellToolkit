@@ -68,7 +68,7 @@ cc drive-inventory
 
 Documentation
 -------------
-docs/ROADMAP.md
+ROADMAP.md
 docs/ADMINISTRATOR_GUIDE.md
 docs/ARCHITECTURE.md
 docs/PLUGIN_DEVELOPER_GUIDE.md

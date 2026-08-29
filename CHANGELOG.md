@@ -10,6 +10,12 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Layered, data-only configuration with an explicit schema marker, deployed
+  defaults, global user state, host-specific overrides, stable private host
+  identity, and read-only status and validation diagnostics.
+- Preview-first configuration and host initialization plus explicit migration
+  apply with private backup, atomic replacement, unknown-key preservation,
+  symlink/path/ownership confinement, and idempotent host-profile creation.
 - `cc reports` current-host lifecycle status, detailed inventory, zero-write
   prune preview, and explicitly authorized bounded apply for recognized report
   history.
@@ -84,6 +90,9 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- `cc about` now points to the authoritative root roadmap, and missing required
+  operands for `cc config get`/`set` consistently return contextual usage
+  status 2.
 - Maintenance and repository commands now preserve batch child failures,
   continue safe independent work, distinguish invalid Git state, identify
   cached remote comparisons, and enforce clean-main fast-forward toolkit apply.
