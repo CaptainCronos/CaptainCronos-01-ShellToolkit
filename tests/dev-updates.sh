@@ -95,6 +95,17 @@ for mode in default dry-run status-only; do
     assert_contains "$output" "gem outdated" "$mode omitted gem review command"
 done
 
+for conflict in '--dry-run --apply' '--apply --status-only' '--status-only --dry-run'; do
+    read -r -a conflict_args <<< "$conflict"
+    set +e
+    env "${common_env[@]}" bash "$PROJECT_ROOT/tools/commands/dev-update" \
+        "${conflict_args[@]}" >"$TEST_DIR/conflict.out" 2>"$TEST_DIR/conflict.err"
+    conflict_status=$?
+    set -e
+    [ "$conflict_status" -eq 2 ] || fail "dev-update conflict returned $conflict_status: $conflict"
+    [ ! -s "$TRACE_FILE" ] || fail "dev-update conflict executed a developer manager: $conflict"
+done
+
 # Explicit apply reaches only the two supported user-scoped managers. pip,
 # cargo, Go, and gem remain manual-review, and this layer never injects sudo.
 : >"$TRACE_FILE"

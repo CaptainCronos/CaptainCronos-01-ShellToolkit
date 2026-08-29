@@ -247,8 +247,15 @@ case "$MODE" in
         else
             cc_status_line "Failures" "PASS"
         fi
+        if [ "$STRICT" -eq 1 ]; then
+            if [ "$warn" -gt 0 ] || [ "$fail" -gt 0 ]; then
+                cc_status_line "Strict compliance" "FAIL"
+            else
+                cc_status_line "Strict compliance" "PASS"
+            fi
+        fi
         echo
-        if [ "$fail" -gt 0 ]; then
+        if [ "$fail" -gt 0 ] || { [ "$STRICT" -eq 1 ] && [ "$warn" -gt 0 ]; }; then
             overall=FAIL
         elif [ "$warn" -gt 0 ]; then
             overall=WARN
@@ -261,6 +268,7 @@ case "$MODE" in
             echo "Run detail: cc audit commands"
         fi
         [ "$fail" -eq 0 ] || exit 1
+        [ "$STRICT" -eq 0 ] || [ "$warn" -eq 0 ] || exit 1
         ;;
     commands)
         cc_banner
@@ -269,10 +277,15 @@ case "$MODE" in
             "Command" "Issues" "Exec" "Syntax" "Script" "Version" "Category" "Requires" "Repository" "Purpose" "Help" "VerFlag"
         printf '%-22s %-6s %-5s %-6s %-6s %-7s %-8s %-8s %-10s %-8s %-6s %-8s\n' \
             "-------" "------" "----" "------" "------" "-------" "--------" "--------" "----------" "-------" "----" "-------"
-        rows | while IFS=$'\t' read -r cmd issues executable syntax script version category requires repository purpose help verflag; do
+        command_failures=0
+        while IFS=$'\t' read -r cmd issues executable syntax script version category requires repository purpose help verflag; do
             printf '%-22s %-6s %-5s %-6s %-6s %-7s %-8s %-8s %-10s %-8s %-6s %-8s\n' \
                 "$cmd" "$issues" "$executable" "$syntax" "$script" "$version" "$category" "$requires" "$repository" "$purpose" "$help" "$verflag"
-        done
+            if [ "$syntax" = fail ] || { [ "$STRICT" -eq 1 ] && [ "$issues" -gt 0 ]; }; then
+                command_failures=$((command_failures + 1))
+            fi
+        done < <(rows)
+        [ "$command_failures" -eq 0 ]
         ;;
     fix)
         cc_banner

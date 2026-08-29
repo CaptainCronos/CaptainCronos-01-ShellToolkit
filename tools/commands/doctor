@@ -37,13 +37,24 @@ usage() {
 }
 
 run_cc() {
-    local cmd="$1"
-    shift
+    local label="$1" cmd="$2" rc state
+    shift 2
     if [ -r "$TOOLKIT_ROOT/tools/cc" ]; then
-        bash "$TOOLKIT_ROOT/tools/cc" "$cmd" "$@" || true
+        if bash "$TOOLKIT_ROOT/tools/cc" "$cmd" "$@"; then
+            rc=0
+        else
+            rc=$?
+        fi
+        case "$rc" in
+            0) state=PASS ;;
+            10) state=WARN; WARNINGS=$((WARNINGS + 1)) ;;
+            20) state=SKIP ;;
+            *) state=FAIL; FAILURES=$((FAILURES + 1)) ;;
+        esac
+        cc_status_line "$label" "$state"
     else
         WARNINGS=$((WARNINGS + 1))
-        cc_status_line "cc $cmd available" "WARN"
+        cc_status_line "$label" "WARN"
         cc_warn "tools/cc not readable; skipping cc $cmd"
     fi
 }
@@ -187,11 +198,11 @@ if [ "$FULL" -eq 1 ]; then
     echo
     echo "Storage Inventory"
     echo "-----------------"
-    run_cc drives
+    run_cc "Storage inventory" drives
     echo
     echo "SMART Summary"
     echo "-------------"
-    run_cc smart
+    run_cc "SMART summary" smart
 fi
 
 echo

@@ -287,6 +287,7 @@ selftest_suite() {
     "$runner" "Configuration safety" configuration bash "$PROJECT_ROOT/tests/config.sh"
     "$runner" "Mutation safety contracts" maintenance bash "$PROJECT_ROOT/tests/safety-contracts.sh"
     "$runner" "Developer update contracts" maintenance bash "$PROJECT_ROOT/tests/dev-updates.sh"
+    "$runner" "Maintenance operation contracts" maintenance bash "$PROJECT_ROOT/tests/maintenance-operations.sh"
     "$runner" "RC diagnostic integrity" maintenance bash "$PROJECT_ROOT/tests/rc-integrity.sh"
     "$runner" "Storage library" storage check_library cc-storage.sh
     "$runner" "Storage inventory" storage bash "$PROJECT_ROOT/tests/storage.sh"

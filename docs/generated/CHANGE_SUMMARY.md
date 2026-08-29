@@ -79,6 +79,12 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Changed
 
+- Maintenance and repository commands now preserve batch child failures,
+  continue safe independent work, distinguish invalid Git state, identify
+  cached remote comparisons, and enforce clean-main fast-forward toolkit apply.
+- Doctor full diagnostics now aggregate storage/SMART child WARN and FAIL
+  results, developer update modes reject conflicts, and strict/detail command
+  audits return nonzero for required defects.
 - Generated command references now isolate caller-specific shell/program
   settings, bypass runtime dependency gates for help, and fail generation
   instead of misreporting incomplete help as stale committed documentation.

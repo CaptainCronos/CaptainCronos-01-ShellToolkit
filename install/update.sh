@@ -65,8 +65,9 @@ while [ "$#" -gt 0 ]; do
             shift
             ;;
         *)
-            usage
-            exit 1
+            cc_error "Unknown option: $1"
+            usage >&2
+            exit 2
             ;;
     esac
 done
@@ -74,13 +75,31 @@ done
 cc_banner
 
 if [ "$MODE" = apply ]; then
-    cc_log "Updating repository from origin/main..."
-    git pull --rebase origin main
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        cc_error "Toolkit update requires a Git working tree: $PROJECT_ROOT"
+        exit 1
+    fi
+    branch="$(git branch --show-current)"
+    if [ "$branch" != main ]; then
+        cc_error "Toolkit update apply requires branch main; current branch: ${branch:-detached}"
+        exit 1
+    fi
+    if [ -n "$(git status --porcelain)" ]; then
+        cc_error "Toolkit update apply requires a clean working tree."
+        exit 1
+    fi
+    if ! git remote get-url origin >/dev/null 2>&1; then
+        cc_error "Toolkit update apply requires an origin remote."
+        exit 1
+    fi
+    cc_log "Updating clean main from origin/main (fast-forward only)..."
+    git pull --ff-only origin main
 else
     cc_log "DRY RUN: inspecting local toolkit repository without contacting origin."
     printf '%-18s %s\n' "Branch:" "$(git branch --show-current 2>/dev/null || printf unknown)"
     printf '%-18s %s\n' "Local HEAD:" "$(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
     printf '%-18s %s\n' "Origin:" "$(git remote get-url origin 2>/dev/null || printf unavailable)"
+    printf '%-18s %s\n' "Remote state:" "cached local refs; not refreshed"
     cc_log "DRY RUN: would fetch and pull origin/main during --apply."
 fi
 

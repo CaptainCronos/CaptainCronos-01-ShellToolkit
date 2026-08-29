@@ -36,16 +36,21 @@ case "${1:-}" in
         exit 0
         ;;
 esac
+[ "$#" -eq 0 ] || { echo "Usage: cc status" >&2; exit 2; }
 
 cc_banner
 REPO_ROOT="$(cc_current_repo)"
+if ! cc_repo_is_git "$REPO_ROOT"; then
+    cc_error "Not a Git repository: $REPO_ROOT"
+    exit 1
+fi
 printf '%-14s %s\n' "Repository:" "$REPO_ROOT"
-printf '%-14s %s\n' "Branch:" "$(cc_repo_branch "$REPO_ROOT" 2>/dev/null || echo unknown)"
+printf '%-14s %s\n' "Branch:" "$(cc_repo_head_display "$REPO_ROOT")"
 printf '%-14s %s\n' "Origin:" "$(cc_repo_remote "$REPO_ROOT" origin 2>/dev/null || echo none)"
 echo
 echo "Recent commits"
 echo "--------------"
-git -C "$REPO_ROOT" log --oneline -5 2>/dev/null || true
+git -C "$REPO_ROOT" log --oneline -5 2>/dev/null || echo "none"
 echo
 echo "Working tree"
 echo "------------"

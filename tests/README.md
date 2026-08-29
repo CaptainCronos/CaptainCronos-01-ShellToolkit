@@ -61,6 +61,11 @@ Focused shell tests supplement `cc selftest`:
   npm/pipx apply boundaries, report-only ecosystems, failure continuation,
   absence of privilege escalation, and the `DEV_UPDATES` orchestrator gate using
   only disposable homes and mocked manager commands.
+- `maintenance-operations.sh` validates current-repository clean, dirty,
+  detached, missing-origin, and invalid-context reporting; cached ahead/behind
+  immutability; repository batch failure continuation; doctor child-result
+  aggregation; and strict/detail audit exit authority using disposable Git,
+  remote, command, and toolkit fixtures.
 - `rc-integrity.sh` verifies release forbidden-content searches without
   requiring optional ripgrep and rejects false PASS results when forbidden
   maturity, documentation, or predictable temporary-path content is present.

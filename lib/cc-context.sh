@@ -140,6 +140,21 @@ cc_repo_branch() {
     echo "$branch"
 }
 
+cc_repo_head_display() {
+    local repo="${1:-$(cc_current_repo 2>/dev/null || true)}" branch commit
+    cc_repo_is_git "$repo" || return 1
+
+    branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"
+    if [ -n "$branch" ]; then
+        echo "$branch"
+        return 0
+    fi
+
+    commit="$(git -C "$repo" rev-parse --short HEAD 2>/dev/null || true)"
+    [ -n "$commit" ] || return 1
+    echo "detached at $commit"
+}
+
 cc_repo_remote() {
     local repo="${1:-$(cc_current_repo 2>/dev/null || true)}" remote="${2:-origin}"
     cc_repo_is_git "$repo" || return 1

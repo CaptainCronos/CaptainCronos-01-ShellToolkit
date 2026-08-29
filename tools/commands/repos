@@ -27,6 +27,8 @@ MESSAGE=""
 ACTION_PASSES=0
 ACTION_WARNINGS=0
 ACTION_FAILURES=0
+ACTION_SKIPS=0
+STATUS_ACCESS_FAILURES=0
 
 usage() {
     cat <<'EOF_HELP'
@@ -135,7 +137,12 @@ case "$ACTION" in
 esac
 
 find_repos() {
-    find "$ROOT" -maxdepth 3 -type d -name .git 2>/dev/null | sed 's#/.git$##' | sort
+    find "$ROOT" -maxdepth 3 \( -type d -o -type f \) -name .git -print 2>/dev/null |
+        sed 's#/.git$##' | sort
+}
+
+repo_valid() {
+    git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1
 }
 
 repo_branch() {
@@ -149,7 +156,11 @@ repo_origin() {
 }
 
 repo_state() {
-    if [ -n "$(git -C "$1" status --short 2>/dev/null)" ]; then
+    local status
+    repo_valid "$1" || { echo unavailable; return 0; }
+    if ! status="$(git -C "$1" status --short 2>/dev/null)"; then
+        echo unavailable
+    elif [ -n "$status" ]; then
         echo dirty
     else
         echo clean
@@ -176,13 +187,18 @@ repo_upstream() {
 }
 
 repo_counts() {
-    local repo="$1" upstream
+    local repo="$1" upstream counts
+    repo_valid "$repo" || { echo "0 0 2"; return 0; }
     upstream="$(repo_upstream "$repo")"
     if [ -z "$upstream" ]; then
         echo "0 0 0"
         return 0
     fi
-    git -C "$repo" rev-list --left-right --count HEAD..."$upstream" 2>/dev/null | awk '{print $1, $2, 1}' || echo "0 0 0"
+    if ! counts="$(git -C "$repo" rev-list --left-right --count HEAD..."$upstream" 2>/dev/null)"; then
+        echo "0 0 2"
+        return 0
+    fi
+    awk '{print $1, $2, 1}' <<< "$counts"
 }
 
 repo_ahead_behind() {
@@ -191,11 +207,11 @@ repo_ahead_behind() {
     ahead="$(echo "$counts" | awk '{print $1}')"
     behind="$(echo "$counts" | awk '{print $2}')"
     upstream_flag="$(echo "$counts" | awk '{print $3}')"
-    if [ "$upstream_flag" = "0" ]; then
-        echo "no-upstream"
-    else
-        echo "ahead:$ahead behind:$behind"
-    fi
+    case "$upstream_flag" in
+        0) echo "no-upstream" ;;
+        1) echo "ahead:$ahead behind:$behind" ;;
+        *) echo "unavailable" ;;
+    esac
 }
 
 repo_last_commit() {
@@ -249,6 +265,10 @@ repo_type() {
 
 repo_health() {
     local repo="$1" score=100 branch state origin counts ahead behind upstream_flag default_branch
+    if ! repo_valid "$repo"; then
+        echo "FAIL:0"
+        return 0
+    fi
     branch="$(repo_branch "$repo")"
     state="$(repo_state "$repo")"
     origin="$(repo_origin "$repo")"
@@ -262,6 +282,7 @@ repo_health() {
     [ "$branch" = "detached" ] && score=$((score - 20))
     [ "$origin" = "none" ] && score=$((score - 20))
     [ "$upstream_flag" = "0" ] && score=$((score - 15))
+    [ "$upstream_flag" = "2" ] && score=$((score - 40))
     [ "$ahead" -gt 0 ] 2>/dev/null && score=$((score - 10))
     [ "$behind" -gt 0 ] 2>/dev/null && score=$((score - 10))
     [ "$default_branch" = "unknown" ] && score=$((score - 5))
@@ -343,20 +364,23 @@ inventory_md() {
     echo
     echo "Generated: $(date)"
     echo "Root: $ROOT"
+    echo "Remote refs: cached local state; no network refresh performed."
     echo
-    echo "| Repository | Health | Type | Branch | Default | Branches | State | Sync | Origin | Last Commit | Size |"
+    echo "| Repository | Health | Type | Branch | Default | Branches | State | Sync (local refs) | Origin | Last Commit | Size |"
     echo "|---|---|---|---|---|---|---|---|---|---|---|"
     while read -r repo; do
         [ -n "$repo" ] || continue
+        repo_valid "$repo" || STATUS_ACCESS_FAILURES=$((STATUS_ACCESS_FAILURES + 1))
         echo "| $(basename "$repo") | $(repo_health "$repo") | $(repo_type "$repo") | $(repo_branch "$repo") | $(repo_default_remote_branch "$repo") | $(repo_branch_counts "$repo") | $(repo_state "$repo") | $(repo_ahead_behind "$repo") | $(repo_origin "$repo") | $(repo_last_commit "$repo" | sed 's/|/-/g') | $(repo_size "$repo") |"
     done < <(find_repos)
     summary_footer
 }
 
 inventory_csv() {
-    echo "repository,path,health,type,branch,default_branch,branches,state,sync,origin,last_commit,size"
+    echo "repository,path,health,type,branch,default_branch,branches,state,sync_local_refs,origin,last_commit,size"
     while read -r repo; do
         [ -n "$repo" ] || continue
+        repo_valid "$repo" || STATUS_ACCESS_FAILURES=$((STATUS_ACCESS_FAILURES + 1))
         printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
             "$(csv_escape "$(basename "$repo")")" \
             "$(csv_escape "$repo")" \
@@ -388,27 +412,74 @@ write_inventory() {
 
 repo_fetch() {
     local repo="$1"
+    if ! repo_valid "$repo"; then
+        repo_action_result "$repo" FAIL "invalid or inaccessible Git repository"
+        return 0
+    fi
     if [ "$APPLY" -eq 1 ]; then
-        git -C "$repo" fetch --all --prune
+        if git -C "$repo" fetch --all --prune; then
+            repo_action_result "$repo" PASS "fetched all remotes and pruned stale refs"
+        else
+            repo_action_result "$repo" FAIL "fetch failed"
+        fi
     else
-        echo "DRY RUN: git -C '$repo' fetch --all --prune"
+        repo_action_result "$repo" PASS "dry-run: would fetch all remotes and prune stale refs"
     fi
 }
 
 repo_pull() {
     local repo="$1"
+    if ! repo_valid "$repo"; then
+        repo_action_result "$repo" FAIL "invalid or inaccessible Git repository"
+        return 0
+    fi
     if [ "$(repo_state "$repo")" != "clean" ]; then
-        echo "SKIP: working tree is dirty"
+        repo_action_result "$repo" WARN "working tree is dirty; skipped"
         return 0
     fi
     if [ -z "$(repo_upstream "$repo")" ]; then
-        echo "SKIP: no upstream configured"
+        repo_action_result "$repo" SKIP "no upstream configured"
         return 0
     fi
     if [ "$APPLY" -eq 1 ]; then
-        git -C "$repo" pull --ff-only
+        if git -C "$repo" pull --ff-only; then
+            repo_action_result "$repo" PASS "fast-forward-only pull complete"
+        else
+            repo_action_result "$repo" FAIL "fast-forward-only pull failed"
+        fi
     else
-        echo "DRY RUN: git -C '$repo' pull --ff-only"
+        repo_action_result "$repo" PASS "dry-run: would pull --ff-only"
+    fi
+}
+
+repo_sync() {
+    local repo="$1"
+    if ! repo_valid "$repo"; then
+        repo_action_result "$repo" FAIL "invalid or inaccessible Git repository"
+        return 0
+    fi
+    if [ "$(repo_state "$repo")" != clean ]; then
+        repo_action_result "$repo" WARN "working tree is dirty; skipped"
+        return 0
+    fi
+    if [ "$APPLY" -eq 0 ]; then
+        if [ -z "$(repo_upstream "$repo")" ]; then
+            repo_action_result "$repo" SKIP "no upstream configured"
+        else
+            repo_action_result "$repo" PASS "dry-run: would fetch all remotes, prune, and pull --ff-only"
+        fi
+        return 0
+    fi
+    if ! git -C "$repo" fetch --all --prune; then
+        repo_action_result "$repo" FAIL "fetch failed; pull not attempted"
+        return 0
+    fi
+    if [ -z "$(repo_upstream "$repo")" ]; then
+        repo_action_result "$repo" SKIP "fetch complete; no upstream configured"
+    elif git -C "$repo" pull --ff-only; then
+        repo_action_result "$repo" PASS "fetch and fast-forward-only pull complete"
+    else
+        repo_action_result "$repo" FAIL "fetch succeeded; fast-forward-only pull failed"
     fi
 }
 
@@ -417,16 +488,22 @@ repo_backup() {
     name="$(basename "$repo")"
     stamp="$(date +%Y%m%d-%H%M%S)"
     bundle="$BUNDLE_DIR/${name}-${stamp}.bundle"
+    if ! repo_valid "$repo"; then
+        repo_action_result "$repo" FAIL "invalid or inaccessible Git repository"
+        return 0
+    fi
     if [ "$(repo_state "$repo")" != "clean" ]; then
-        echo "SKIP: working tree is dirty"
+        repo_action_result "$repo" WARN "working tree is dirty; skipped"
         return 0
     fi
     if [ "$APPLY" -eq 1 ]; then
-        mkdir -p "$BUNDLE_DIR"
-        git -C "$repo" bundle create "$bundle" --all
-        echo "WROTE: $bundle"
+        if mkdir -p "$BUNDLE_DIR" && git -C "$repo" bundle create "$bundle" --all; then
+            repo_action_result "$repo" PASS "wrote $bundle"
+        else
+            repo_action_result "$repo" FAIL "bundle creation failed"
+        fi
     else
-        echo "DRY RUN: git -C '$repo' bundle create '$bundle' --all"
+        repo_action_result "$repo" PASS "dry-run: would create $bundle"
     fi
 }
 
@@ -437,6 +514,7 @@ repo_action_result() {
         PASS) ACTION_PASSES=$((ACTION_PASSES + 1)) ;;
         WARN) ACTION_WARNINGS=$((ACTION_WARNINGS + 1)) ;;
         FAIL) ACTION_FAILURES=$((ACTION_FAILURES + 1)) ;;
+        SKIP) ACTION_SKIPS=$((ACTION_SKIPS + 1)) ;;
     esac
 
     printf '%-34s ' "$(basename "$repo")"
@@ -456,6 +534,7 @@ repo_action_summary() {
     printf '%-14s %s\n' "PASS:" "$ACTION_PASSES"
     printf '%-14s %s\n' "WARN:" "$ACTION_WARNINGS"
     printf '%-14s %s\n' "FAIL:" "$ACTION_FAILURES"
+    printf '%-14s %s\n' "SKIP:" "$ACTION_SKIPS"
 }
 
 repo_origin_branch_ref() {
@@ -534,6 +613,10 @@ repo_analyze_push() {
 repo_commit() {
     local repo="$1" state branch
 
+    if ! repo_valid "$repo"; then
+        repo_action_result "$repo" FAIL "invalid or inaccessible Git repository"
+        return 0
+    fi
     state="$(repo_state "$repo")"
     if [ "$state" = "clean" ]; then
         repo_action_result "$repo" "PASS" "clean; skipped"
@@ -565,6 +648,10 @@ repo_commit() {
 repo_push() {
     local repo="$1" state
 
+    if ! repo_valid "$repo"; then
+        repo_action_result "$repo" FAIL "invalid or inaccessible Git repository"
+        return 0
+    fi
     state="$(repo_state "$repo")"
     if [ "$state" != "clean" ]; then
         repo_action_result "$repo" "WARN" "dirty; skipped; $(repo_ahead_behind "$repo")"
@@ -591,6 +678,10 @@ repo_push() {
 repo_publish() {
     local repo="$1" state branch
 
+    if ! repo_valid "$repo"; then
+        repo_action_result "$repo" FAIL "invalid or inaccessible Git repository"
+        return 0
+    fi
     state="$(repo_state "$repo")"
     if [ "$state" != "clean" ]; then
         repo_action_result "$repo" "WARN" "dirty; skipped; publish requires a clean working tree"
@@ -632,59 +723,71 @@ case "$ACTION" in
         find_repos
         ;;
     status)
-        printf '%-34s %-10s %-10s %-16s %-8s %-22s %s\n' "Repository" "Health" "Type" "Branch" "State" "Sync" "Origin"
-        printf '%-34s %-10s %-10s %-16s %-8s %-22s %s\n' "----------" "------" "----" "------" "-----" "----" "------"
+        echo "Remote refs: cached local state; no network refresh performed."
+        echo
+        printf '%-34s %-10s %-10s %-16s %-12s %-22s %s\n' "Repository" "Health" "Type" "Branch" "State" "Sync (local refs)" "Origin"
+        printf '%-34s %-10s %-10s %-16s %-12s %-22s %s\n' "----------" "------" "----" "------" "-----" "-----------------" "------"
         while read -r repo; do
             [ -n "$repo" ] || continue
-            printf '%-34s %-10s %-10s %-16s %-8s %-22s %s\n' "$(basename "$repo")" "$(repo_health "$repo")" "$(repo_type "$repo")" "$(repo_branch "$repo")" "$(repo_state "$repo")" "$(repo_ahead_behind "$repo")" "$(repo_origin "$repo")"
+            repo_valid "$repo" || STATUS_ACCESS_FAILURES=$((STATUS_ACCESS_FAILURES + 1))
+            printf '%-34s %-10s %-10s %-16s %-12s %-22s %s\n' "$(basename "$repo")" "$(repo_health "$repo")" "$(repo_type "$repo")" "$(repo_branch "$repo")" "$(repo_state "$repo")" "$(repo_ahead_behind "$repo")" "$(repo_origin "$repo")"
         done < <(find_repos)
         summary_footer
+        [ "$STATUS_ACCESS_FAILURES" -eq 0 ]
         ;;
     health)
-        printf '%-34s %-10s %-10s %-16s %-8s %-22s\n' "Repository" "Health" "Type" "Branch" "State" "Sync"
+        echo "Remote refs: cached local state; no network refresh performed."
+        echo
+        printf '%-34s %-10s %-10s %-16s %-8s %-22s\n' "Repository" "Health" "Type" "Branch" "State" "Sync (local refs)"
         printf '%-34s %-10s %-10s %-16s %-8s %-22s\n' "----------" "------" "----" "------" "-----" "----"
         while read -r repo; do
             [ -n "$repo" ] || continue
+            repo_valid "$repo" || STATUS_ACCESS_FAILURES=$((STATUS_ACCESS_FAILURES + 1))
             printf '%-34s %-10s %-10s %-16s %-8s %-22s\n' "$(basename "$repo")" "$(repo_health "$repo")" "$(repo_type "$repo")" "$(repo_branch "$repo")" "$(repo_state "$repo")" "$(repo_ahead_behind "$repo")"
         done < <(find_repos)
         summary_footer
+        [ "$STATUS_ACCESS_FAILURES" -eq 0 ]
         ;;
     inventory)
         write_inventory
+        [ "$STATUS_ACCESS_FAILURES" -eq 0 ]
         ;;
     fetch)
+        repo_action_header
         while read -r repo; do
             [ -n "$repo" ] || continue
-            echo
-            echo "[$(basename "$repo")] $repo"
             repo_fetch "$repo"
         done < <(find_repos)
+        repo_action_summary
+        [ "$ACTION_FAILURES" -eq 0 ]
         ;;
     pull)
+        repo_action_header
         while read -r repo; do
             [ -n "$repo" ] || continue
-            echo
-            echo "[$(basename "$repo")] $repo"
             repo_pull "$repo"
         done < <(find_repos)
+        repo_action_summary
+        [ "$ACTION_FAILURES" -eq 0 ]
         ;;
     sync)
+        repo_action_header
         while read -r repo; do
             [ -n "$repo" ] || continue
-            echo
-            echo "[$(basename "$repo")] $repo"
-            repo_fetch "$repo"
-            repo_pull "$repo"
+            repo_sync "$repo"
         done < <(find_repos)
+        repo_action_summary
+        [ "$ACTION_FAILURES" -eq 0 ]
         ;;
     backup)
         printf '%-14s %s\n' "Bundle dir:" "$BUNDLE_DIR"
+        repo_action_header
         while read -r repo; do
             [ -n "$repo" ] || continue
-            echo
-            echo "[$(basename "$repo")] $repo"
             repo_backup "$repo"
         done < <(find_repos)
+        repo_action_summary
+        [ "$ACTION_FAILURES" -eq 0 ]
         ;;
     commit)
         repo_action_header
@@ -715,11 +818,24 @@ case "$ACTION" in
         ;;
     verify|doctor)
         while read -r repo; do
+            rc=0
             [ -n "$repo" ] || continue
+            if ! repo_valid "$repo"; then
+                repo_action_result "$repo" FAIL "invalid or inaccessible Git repository"
+                continue
+            fi
             [ -f "$repo/tools/cc" ] || continue
             echo
             echo "[$(basename "$repo")] cc $ACTION"
-            bash "$repo/tools/cc" "$ACTION" || true
+            bash "$repo/tools/cc" "$ACTION" || rc=$?
+            case "$rc" in
+                0) repo_action_result "$repo" PASS "cc $ACTION completed" ;;
+                10) repo_action_result "$repo" WARN "cc $ACTION reported warnings" ;;
+                20) repo_action_result "$repo" SKIP "cc $ACTION skipped" ;;
+                *) repo_action_result "$repo" FAIL "cc $ACTION failed with status $rc" ;;
+            esac
         done < <(find_repos)
+        repo_action_summary
+        [ "$ACTION_FAILURES" -eq 0 ]
         ;;
 esac

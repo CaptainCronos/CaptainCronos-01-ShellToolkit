@@ -42,6 +42,15 @@ mkdir -p "$MOCK_BIN"
 
 cat > "$MOCK_BIN/git" <<'EOF_GIT'
 #!/usr/bin/env bash
+if [ "${CC_SAFETY_ALLOW_GIT_MUTATION:-0}" = 1 ] &&
+   [ "${1:-}" = branch ] && [ "${2:-}" = --show-current ]; then
+    printf 'main\n'
+    exit 0
+fi
+if [ "${CC_SAFETY_ALLOW_GIT_MUTATION:-0}" = 1 ] &&
+   [ "${1:-}" = status ] && [ "${2:-}" = --porcelain ]; then
+    exit 0
+fi
 case "${1:-}" in
     fetch|pull|checkout|reset|rebase)
         printf '%s' "$1" >> "${CC_SAFETY_GIT_TRACE:?}"
@@ -251,13 +260,37 @@ toolkit_output="$(env "${common_env[@]}" HOME="$toolkit_home" \
 [ ! -e "$toolkit_home/.captaincronos/backups" ] || fail "toolkit-update preview created installer backups"
 assert_file_content "$toolkit_home/.bashrc" "toolkit old bashrc" "toolkit-update preview replaced bashrc"
 assert_contains "$toolkit_output" "would fetch and pull origin/main during --apply" "toolkit preview omitted remote deferral"
+assert_contains "$toolkit_output" "cached local refs; not refreshed" "toolkit preview overstated remote freshness"
 assert_rejected "toolkit-update accepted an unknown option" \
     env "${common_env[@]}" HOME="$toolkit_home" bash "$PROJECT_ROOT/tools/commands/toolkit-update" --bogus
 
 env "${common_env[@]}" HOME="$toolkit_home" CC_SAFETY_ALLOW_GIT_MUTATION=1 \
     bash "$PROJECT_ROOT/tools/commands/toolkit-update" --apply >/dev/null || fail "mocked toolkit-update apply failed"
-grep -Fq $'pull\t--rebase\torigin\tmain' "$GIT_TRACE_FILE" || fail "toolkit apply did not reach mocked git pull"
+grep -Fq $'pull\t--ff-only\torigin\tmain' "$GIT_TRACE_FILE" || fail "toolkit apply did not use a bounded fast-forward pull"
 cmp -s "$PROJECT_ROOT/bash/bashrc" "$toolkit_home/.bashrc" || fail "toolkit apply did not reach installer apply"
+
+# Apply refuses unsafe repository state before any Git or installer mutation.
+toolkit_guard="$TEST_DIR/toolkit-guard"
+cp -a "$PROJECT_ROOT/." "$toolkit_guard"
+rm -rf "$toolkit_guard/.git"
+git -C "$toolkit_guard" init -q -b main
+git -C "$toolkit_guard" config user.name "Toolkit Guard Fixture"
+git -C "$toolkit_guard" config user.email "toolkit-guard@example.invalid"
+git -C "$toolkit_guard" add .
+git -C "$toolkit_guard" commit -qm "test: toolkit guard fixture"
+git -C "$toolkit_guard" switch -qc feature/unsafe
+if (cd "$toolkit_guard" && bash install/update.sh --apply >/dev/null 2>&1); then
+    fail "toolkit apply accepted a non-main branch"
+fi
+git -C "$toolkit_guard" switch -q main
+printf 'dirty\n' >>"$toolkit_guard/README.md"
+if (cd "$toolkit_guard" && bash install/update.sh --apply >/dev/null 2>&1); then
+    fail "toolkit apply accepted a dirty working tree"
+fi
+git -C "$toolkit_guard" restore README.md
+if (cd "$toolkit_guard" && bash install/update.sh --apply >/dev/null 2>&1); then
+    fail "toolkit apply accepted a missing origin remote"
+fi
 
 # The complete update preview is allowed to inspect the host, but every
 # mutation-capable adapter is mocked to fail if reached. Fixture installation,

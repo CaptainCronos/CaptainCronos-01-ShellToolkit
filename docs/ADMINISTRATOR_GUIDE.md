@@ -114,6 +114,11 @@ semantic state rather than applying Linux artifact or package assumptions.
 
 ## Repository Publishing
 Use `cc repos status` to review repository health before batch Git operations.
+Its ahead/behind dashboard uses existing local remote-tracking refs and clearly
+states that it does not refresh the network. Use an explicitly authorized
+`cc repos fetch --apply` or `cc repos sync --apply` when fresh remote state is
+required. Batch actions continue through independent repositories, summarize
+PASS/WARN/FAIL/SKIP results, and return nonzero when any required action fails.
 
 ```bash
 cc repos push
@@ -134,6 +139,9 @@ cc repos publish --apply
 preview mode. Persistent package, Git, backup, or installed-file changes require
 an explicit `--apply`; unknown options are rejected. Toolkit preview inspects
 only local Git state because fetching would modify repository metadata.
+Toolkit apply requires a clean `main` branch and an `origin` remote, then uses a
+fast-forward-only pull before passing explicit apply authorization to the full
+installer.
 
 `cc system-update` is the OS and packaged desktop application update path. It
 applies semantic system package operations plus detected Snap and Flatpak updates
