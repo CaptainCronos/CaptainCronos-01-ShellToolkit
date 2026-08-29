@@ -344,9 +344,47 @@ _cc_kernel_human_bytes() {
 }
 
 _cc_kernel_version_order() {
-    # GNU sort -V matches the version syntax used by supported Linux packages.
-    # LC_ALL=C keeps ordering stable across host locales.
-    LC_ALL=C sort -V -u
+    local version candidate inserted index
+    local -a ordered=() input=()
+    while IFS= read -r version; do
+        [ -n "$version" ] || continue
+        _cc_kernel_in_list "$version" "${input[@]}" || input+=("$version")
+    done
+    for version in "${input[@]}"; do
+        inserted=0
+        for index in "${!ordered[@]}"; do
+            candidate="${ordered[$index]}"
+            if _cc_kernel_version_lt "$version" "$candidate"; then
+                ordered=("${ordered[@]:0:$index}" "$version" "${ordered[@]:$index}")
+                inserted=1
+                break
+            fi
+        done
+        [ "$inserted" -eq 1 ] || ordered+=("$version")
+    done
+    [ "${#ordered[@]}" -eq 0 ] || printf '%s\n' "${ordered[@]}"
+}
+
+_cc_kernel_version_compare_program() {
+    if [ -n "${CC_KERNEL_DPKG_PROGRAM:-}" ]; then
+        printf '%s\n' "$CC_KERNEL_DPKG_PROGRAM"
+    else
+        _cc_pkg_database_program
+    fi
+}
+
+_cc_kernel_version_lt() {
+    [ "$#" -eq 2 ] || return 2
+    local program
+    program="$(_cc_kernel_version_compare_program 2>/dev/null)" || return 1
+    "$program" --compare-versions "$1" lt "$2"
+}
+
+_cc_kernel_version_gt() {
+    [ "$#" -eq 2 ] || return 2
+    local program
+    program="$(_cc_kernel_version_compare_program 2>/dev/null)" || return 1
+    "$program" --compare-versions "$1" gt "$2"
 }
 
 _cc_kernel_artifact_name_release() {
@@ -464,42 +502,55 @@ _cc_kernel_artifact_unsafe_count() {
     printf '%s\n' "$count"
 }
 
-_cc_kernel_package_releases() {
+_cc_kernel_inventory_capture() {
     local package release
-    _cc_kernel_can_correlate_packages || return 0
+    [ "${_CC_KERNEL_INVENTORY_READY:-0}" -eq 0 ] || return 0
+    declare -ga _CC_KERNEL_INSTALLED_PACKAGES=()
+    declare -ga _CC_KERNEL_PACKAGE_RELEASES=()
+    _CC_KERNEL_INSTALLED_PACKAGES=()
+    _CC_KERNEL_PACKAGE_RELEASES=()
     while IFS= read -r package; do
+        [ -n "$package" ] || continue
+        _CC_KERNEL_INSTALLED_PACKAGES+=("$package")
         case "$package" in
             linux-image-unsigned-*) release="${package#linux-image-unsigned-}" ;;
             linux-image-*) release="${package#linux-image-}" ;;
             *) continue ;;
         esac
-        # Excludes unversioned meta packages such as linux-image-generic/amd64.
-        case "$release" in
-            [0-9]*.*) printf '%s\n' "$release" ;;
-        esac
+        case "$release" in [0-9]*.*) _CC_KERNEL_PACKAGE_RELEASES+=("$release") ;; esac
     done < <(_cc_pkg_list_installed 2>/dev/null || true)
+    if [ "${#_CC_KERNEL_PACKAGE_RELEASES[@]}" -gt 0 ]; then
+        mapfile -t _CC_KERNEL_PACKAGE_RELEASES < <(
+            printf '%s\n' "${_CC_KERNEL_PACKAGE_RELEASES[@]}" | _cc_kernel_version_order
+        )
+    fi
+    _CC_KERNEL_INVENTORY_READY=1
+}
+
+_cc_kernel_inventory_reset() {
+    _CC_KERNEL_INVENTORY_READY=0
+    _CC_KERNEL_INSTALLED_PACKAGES=()
+    _CC_KERNEL_PACKAGE_RELEASES=()
+}
+
+_cc_kernel_package_releases() {
+    _cc_kernel_can_correlate_packages || return 0
+    _cc_kernel_inventory_capture
+    [ "${#_CC_KERNEL_PACKAGE_RELEASES[@]}" -eq 0 ] || printf '%s\n' "${_CC_KERNEL_PACKAGE_RELEASES[@]}"
 }
 
 _cc_kernel_list() {
-    local boot_dir file running
-    boot_dir="$(_cc_kernel_boot_dir)"
+    local running
     _cc_kernel_supported || {
         _cc_kernel_running
         return
     }
-
-    {
-        if [ -d "$boot_dir" ]; then
-            while IFS= read -r -d '' file; do
-                file="${file##*/vmlinuz-}"
-                _cc_kernel_artifact_release_safe "$file" || continue
-                printf '%s\n' "$file"
-            done < <(find "$boot_dir" -xdev -maxdepth 1 -type f -name 'vmlinuz-*' -print0 2>/dev/null)
-        fi
+    if _cc_kernel_can_correlate_packages; then
         _cc_kernel_package_releases
+    else
         running="$(_cc_kernel_running 2>/dev/null || true)"
         [ -z "$running" ] || printf '%s\n' "$running"
-    } | awk 'NF && !seen[$0]++' | _cc_kernel_version_order
+    fi
 }
 
 _cc_kernel_newest() {
@@ -518,23 +569,130 @@ _cc_kernel_validate_keep_count() {
     esac
 }
 
+_cc_kernel_set_mapping_state() {
+    [ "$#" -eq 1 ] || return 2
+    local release="$1" boot_path owner
+    local -a primary=() owners=()
+    _cc_kernel_can_correlate_packages || { printf '%s\n' unsupported; return 0; }
+    mapfile -t primary < <(_cc_kernel_primary_packages_for_version "$release")
+    [ "${#primary[@]}" -eq 1 ] || {
+        if [ "${#primary[@]}" -eq 0 ]; then printf '%s\n' missing-image; else printf '%s\n' ambiguous-image; fi
+        return 0
+    }
+    boot_path="$(_cc_kernel_boot_dir)/vmlinuz-$release"
+    [ -f "$boot_path" ] && [ ! -L "$boot_path" ] || { printf '%s\n' missing-artifact; return 0; }
+    mapfile -t owners < <(_cc_pkg_owners_of_path "$boot_path" 2>/dev/null || true)
+    [ "${#owners[@]}" -eq 1 ] || { printf '%s\n' uncertain-ownership; return 0; }
+    owner="${owners[0]}"
+    [ "$owner" = "${primary[0]}" ] || { printf '%s\n' ownership-mismatch; return 0; }
+    printf '%s\n' verified
+}
+
+_cc_kernel_verified_sets() {
+    local release
+    _cc_kernel_inventory_capture
+    for release in "${_CC_KERNEL_PACKAGE_RELEASES[@]}"; do
+        [ -n "$release" ] || continue
+        [ "$(_cc_kernel_set_mapping_state "$release")" = verified ] && printf '%s\n' "$release"
+    done
+}
+
+_cc_kernel_newer_installed() {
+    local running release
+    local -a verified=()
+    running="$(_cc_kernel_running)" || return 1
+    mapfile -t verified < <(_cc_kernel_verified_sets)
+    for release in "${verified[@]}"; do
+        _cc_kernel_version_gt "$release" "$running" && printf '%s\n' "$release"
+    done
+}
+
+_cc_kernel_pending_release() {
+    local running
+    local -a verified=()
+    running="$(_cc_kernel_running)" || return 1
+    mapfile -t verified < <(_cc_kernel_verified_sets)
+    _cc_kernel_select_pending "$running" "${verified[@]}"
+}
+
+_cc_kernel_fallback_release() {
+    local running
+    local -a verified=()
+    running="$(_cc_kernel_running)" || return 1
+    mapfile -t verified < <(_cc_kernel_verified_sets)
+    _cc_kernel_select_fallback "$running" "${verified[@]}"
+}
+
+_cc_kernel_select_pending() {
+    [ "$#" -ge 1 ] || return 2
+    local running="$1" newest
+    shift
+    [ "$#" -gt 0 ] || return 0
+    newest="${!#}"
+    _cc_kernel_version_gt "$newest" "$running" && printf '%s\n' "$newest"
+}
+
+_cc_kernel_select_fallback() {
+    [ "$#" -ge 1 ] || return 2
+    local running="$1" release previous=''
+    shift
+    for release in "$@"; do
+        if [ "$release" = "$running" ]; then
+            [ -z "$previous" ] || printf '%s\n' "$previous"
+            [ -z "$previous" ] || return 0
+            break
+        fi
+        if _cc_kernel_version_gt "$release" "$running"; then break; fi
+        previous="$release"
+    done
+    if [ -n "$previous" ]; then
+        printf '%s\n' "$previous"
+    fi
+}
+
 _cc_kernel_protected() {
-    local keep_count="${1:-${KEEP_COUNT:-2}}" running kernel
-    local -a non_running=()
+    local keep_count="${1:-${KEEP_COUNT:-2}}" running pending fallback
+    local -a verified=()
     _cc_kernel_validate_keep_count "$keep_count" || return 2
     running="$(_cc_kernel_running)" || return 1
+    _cc_kernel_inventory_capture
+    mapfile -t verified < <(_cc_kernel_verified_sets)
+    pending="$(_cc_kernel_select_pending "$running" "${verified[@]}" 2>/dev/null || true)"
+    fallback="$(_cc_kernel_select_fallback "$running" "${verified[@]}" 2>/dev/null || true)"
+    _cc_kernel_select_protected_inventory "$keep_count" "$running" "$pending" "$fallback" \
+        "${_CC_KERNEL_PACKAGE_RELEASES[@]}"
+}
 
-    while IFS= read -r kernel; do
+_cc_kernel_select_protected() {
+    [ "$#" -ge 2 ] || return 2
+    local keep_count="$1" running="$2" kernel pending fallback additional=0
+    local -a releases=()
+    shift 2
+    pending="$(_cc_kernel_select_pending "$running" "$@" 2>/dev/null || true)"
+    fallback="$(_cc_kernel_select_fallback "$running" "$@" 2>/dev/null || true)"
+    releases=("$@")
+    _cc_kernel_select_protected_inventory "$keep_count" "$running" "$pending" "$fallback" "${releases[@]}"
+}
+
+_cc_kernel_select_protected_inventory() {
+    [ "$#" -ge 4 ] || return 2
+    local keep_count="$1" running="$2" pending="$3" fallback="$4" kernel additional=0
+    local -a non_running=() selected=()
+    shift 4
+    selected+=("$running")
+    [ -z "$pending" ] || selected+=("$pending")
+    [ -z "$fallback" ] || selected+=("$fallback")
+    for kernel in "$@"; do
         [ -n "$kernel" ] || continue
         [ "$kernel" = "$running" ] || non_running+=("$kernel")
-    done < <(_cc_kernel_list)
-
-    {
-        printf '%s\n' "$running"
-        if [ "$keep_count" -gt 0 ] && [ "${#non_running[@]}" -gt 0 ]; then
-            printf '%s\n' "${non_running[@]}" | tail -n "$keep_count"
+    done
+    for ((kernel = ${#non_running[@]} - 1; kernel >= 0 && additional < keep_count; kernel--)); do
+        if ! _cc_kernel_in_list "${non_running[$kernel]}" "${selected[@]}"; then
+            selected+=("${non_running[$kernel]}")
         fi
-    } | awk 'NF && !seen[$0]++' | _cc_kernel_version_order
+        additional=$((additional + 1))
+    done
+    printf '%s\n' "${selected[@]}" | awk 'NF && !seen[$0]++' | _cc_kernel_version_order
 }
 
 _cc_kernel_in_list() {
@@ -549,31 +707,35 @@ _cc_kernel_in_list() {
 
 _cc_kernel_cleanup_candidates() {
     local keep_count="${1:-${KEEP_COUNT:-2}}" kernel running
-    local -a protected=()
+    local -a protected=() verified=()
     _cc_kernel_supported || return 3
     running="$(_cc_kernel_running)" || return 1
+    mapfile -t verified < <(_cc_kernel_verified_sets)
     mapfile -t protected < <(_cc_kernel_protected "$keep_count") || return
-    while IFS= read -r kernel; do
+    for kernel in "${verified[@]}"; do
         [ -n "$kernel" ] || continue
         [ "$kernel" = "$running" ] && continue
         _cc_kernel_in_list "$kernel" "${protected[@]}" || printf '%s\n' "$kernel"
-    done < <(_cc_kernel_list)
+    done
 }
 
 _cc_kernel_primary_packages_for_version() {
     [ "$#" -eq 1 ] || return 2
     local version="$1" package
-    while IFS= read -r package; do
+    _cc_kernel_inventory_capture
+    for package in "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"; do
         case "$package" in
             "linux-image-$version"|"linux-image-unsigned-$version") printf '%s\n' "$package" ;;
         esac
-    done < <(_cc_pkg_list_installed 2>/dev/null || true)
+    done
 }
 
 _cc_kernel_companion_packages_for_version() {
     [ "$#" -eq 1 ] || return 2
-    local version="$1" package
-    while IFS= read -r package; do
+    local version="$1" package header_base
+    header_base="${version%-*}"
+    _cc_kernel_inventory_capture
+    for package in "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"; do
         case "$package" in
             "linux-image-$version"|"linux-image-unsigned-$version"|\
             "linux-modules-$version"|"linux-modules-extra-$version"|\
@@ -581,8 +743,11 @@ _cc_kernel_companion_packages_for_version() {
             "linux-cloud-tools-$version")
                 printf '%s\n' "$package"
                 ;;
+            "linux-headers-$header_base")
+                _cc_kernel_in_list "linux-headers-$version" "${_CC_KERNEL_INSTALLED_PACKAGES[@]}" && printf '%s\n' "$package"
+                ;;
         esac
-    done < <(_cc_pkg_list_installed 2>/dev/null || true)
+    done
 }
 
 _cc_kernel_packages_for_version() {
@@ -593,13 +758,7 @@ _cc_kernel_packages_for_version() {
     mapfile -t primary < <(_cc_kernel_primary_packages_for_version "$version")
     [ "${#primary[@]}" -eq 1 ] || return 4
 
-    boot_path="$(_cc_kernel_boot_dir)/vmlinuz-$version"
-    if [ -e "$boot_path" ]; then
-        mapfile -t owners < <(_cc_pkg_owners_of_path "$boot_path" 2>/dev/null || true)
-        [ "${#owners[@]}" -eq 1 ] || return 4
-        owner="${owners[0]}"
-        [ "$owner" = "${primary[0]}" ] || return 4
-    fi
+    [ "$(_cc_kernel_set_mapping_state "$version")" = verified ] || return 4
 
     mapfile -t packages < <(_cc_kernel_companion_packages_for_version "$version")
     [ "${#packages[@]}" -gt 0 ] || return 4
@@ -693,24 +852,152 @@ _cc_kernel_artifact_state() {
 
 _cc_kernel_classification() {
     [ "$#" -ge 1 ] || return 2
-    local release="$1" keep_count="${2:-${KEEP_COUNT:-2}}" state=""
+    local release="$1" keep_count="${2:-${KEEP_COUNT:-2}}" state="" pending fallback
     local -a protected=() candidates=()
     mapfile -t protected < <(_cc_kernel_protected "$keep_count")
     if _cc_kernel_supported; then
         mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count")
     fi
+    pending="$(_cc_kernel_pending_release 2>/dev/null || true)"
+    fallback="$(_cc_kernel_fallback_release 2>/dev/null || true)"
     _cc_kernel_is_running "$release" && state=RUNNING
+    [ -z "$pending" ] || [ "$release" != "$pending" ] || state="${state:+$state,}PENDING"
+    [ -z "$fallback" ] || [ "$release" != "$fallback" ] || state="${state:+$state,}FALLBACK"
     _cc_kernel_in_list "$release" "${protected[@]}" && state="${state:+$state,}PROTECTED"
     _cc_kernel_in_list "$release" "${candidates[@]}" && state="${state:+$state,}CANDIDATE"
     printf '%s\n' "${state:-UNCLASSIFIED}"
 }
 
+_cc_kernel_component_state() {
+    [ "$#" -eq 2 ] || return 2
+    local release="$1" component="$2" package header_base
+    header_base="${release%-*}"
+    _cc_kernel_inventory_capture
+    case "$component" in
+        image)
+            [ "$(_cc_kernel_set_mapping_state "$release")" = verified ] && printf '%s\n' present || printf '%s\n' missing
+            ;;
+        modules)
+            for package in "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"; do
+                case "$package" in "linux-modules-$release"|"linux-modules-extra-$release") printf '%s\n' present; return 0 ;; esac
+            done
+            if [ -d "${CC_KERNEL_MODULES_DIR:-/lib/modules}/$release" ]; then printf '%s\n' present
+            else printf '%s\n' bundled-or-unavailable
+            fi
+            ;;
+        headers)
+            for package in "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"; do
+                case "$package" in "linux-headers-$release"|"linux-headers-$header_base") printf '%s\n' present; return 0 ;; esac
+            done
+            printf '%s\n' optional-missing
+            ;;
+        *) return 2 ;;
+    esac
+}
+
 _cc_kernel_cleanup_packages() {
-    local keep_count="${1:-${KEEP_COUNT:-2}}" version
-    while IFS= read -r version; do
-        [ -n "$version" ] || continue
-        _cc_kernel_packages_for_version "$version" || true
-    done < <(_cc_kernel_cleanup_candidates "$keep_count") | awk 'NF && !seen[$0]++' | sort
+    local keep_count="${1:-${KEEP_COUNT:-2}}" version package release shared
+    local -a candidates=() packages=() installed=()
+    mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count")
+    mapfile -t installed < <(_cc_kernel_package_releases)
+    for version in "${candidates[@]}"; do
+        while IFS= read -r package; do
+            [ -n "$package" ] || continue
+            shared=0
+            for release in "${installed[@]}"; do
+                _cc_kernel_in_list "$release" "${candidates[@]}" && continue
+                if _cc_kernel_package_matches_release "$package" "$release"; then shared=1; break; fi
+            done
+            [ "$shared" -eq 1 ] || packages+=("$package")
+        done < <(_cc_kernel_packages_for_version "$version" || true)
+    done
+    [ "${#packages[@]}" -eq 0 ] || printf '%s\n' "${packages[@]}" | awk 'NF && !seen[$0]++' | sort
+}
+
+_cc_kernel_package_matches_release() {
+    [ "$#" -eq 2 ] || return 2
+    local package="$1" release="$2" header_base
+    header_base="${release%-*}"
+    case "$package" in
+        "linux-image-$release"|"linux-image-unsigned-$release"|\
+        "linux-modules-$release"|"linux-modules-extra-$release"|\
+        "linux-headers-$release"|"linux-tools-$release"|\
+        "linux-cloud-tools-$release") return 0 ;;
+        "linux-headers-$header_base")
+            _cc_kernel_inventory_capture
+            _cc_kernel_in_list "linux-headers-$release" "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+_cc_kernel_package_mark() {
+    [ "$#" -eq 1 ] || return 2
+    local program="${CC_KERNEL_APT_MARK_PROGRAM:-apt-mark}" package="$1"
+    command -v "$program" >/dev/null 2>&1 || { printf '%s\n' unknown; return 0; }
+    if "$program" showmanual "$package" 2>/dev/null | grep -Fxq -- "$package"; then printf '%s\n' manual
+    elif "$program" showauto "$package" 2>/dev/null | grep -Fxq -- "$package"; then printf '%s\n' automatic
+    else printf '%s\n' unknown
+    fi
+}
+
+_cc_kernel_set_mark_state() {
+    [ "$#" -eq 1 ] || return 2
+    local package mark manual=0 automatic=0 unknown=0
+    while IFS= read -r package; do
+        mark="$(_cc_kernel_package_mark "$package")"
+        case "$mark" in manual) manual=1 ;; automatic) automatic=1 ;; *) unknown=1 ;; esac
+    done < <(_cc_kernel_companion_packages_for_version "$1")
+    if [ "$manual" -eq 1 ] && [ "$automatic" -eq 1 ]; then printf '%s\n' mixed
+    elif [ "$manual" -eq 1 ]; then printf '%s\n' manual
+    elif [ "$automatic" -eq 1 ]; then printf '%s\n' automatic
+    elif [ "$unknown" -eq 1 ]; then printf '%s\n' unknown
+    else printf '%s\n' unknown
+    fi
+}
+
+_cc_kernel_package_installed_kib() {
+    [ "$#" -gt 0 ] || { printf '0\n'; return 0; }
+    local database package line total=0
+    database="$(_cc_pkg_database_program)" || return 1
+    for package in "$@"; do
+        # dpkg-query expands this format expression; the shell must not.
+        # shellcheck disable=SC2016
+        line="$("$database" -W -f='${Installed-Size}\n' "$package" 2>/dev/null || true)"
+        case "$line" in ''|*[!0-9]*) return 1 ;; esac
+        total=$((total + line))
+    done
+    printf '%s\n' "$total"
+}
+
+_cc_kernel_package_issue_records() {
+    local database
+    _cc_kernel_can_correlate_packages || return 0
+    database="$(_cc_pkg_database_program)" || return 1
+    # dpkg-query expands these fields; the shell must not.
+    # shellcheck disable=SC2016
+    "$database" -W -f='${db:Status-Status}\t${Package}\n' 2>/dev/null |
+        awk -F '\t' '$2 ~ /^linux-(image(-unsigned)?|modules(-extra)?|headers)-[0-9]/ && $1 != "installed" {print}'
+}
+
+_cc_kernel_orphan_component_records() {
+    local package release image
+    _cc_kernel_inventory_capture
+    for package in "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"; do
+        case "$package" in
+            linux-modules-extra-*) release="${package#linux-modules-extra-}" ;;
+            linux-modules-*) release="${package#linux-modules-}" ;;
+            linux-headers-[0-9]*-*) release="${package#linux-headers-}" ;;
+            *) continue ;;
+        esac
+        image=0
+        while IFS= read -r version; do
+            [ "$release" = "$version" ] || [[ "$version" == "$release-"* ]] || continue
+            image=1
+            break
+        done < <(_cc_kernel_package_releases)
+        [ "$image" -eq 1 ] || printf '%s\n' "$package"
+    done
 }
 
 _cc_kernel_reboot_marker() {
@@ -718,16 +1005,16 @@ _cc_kernel_reboot_marker() {
 }
 
 _cc_kernel_reboot_state() {
-    local running newest marker
+    local running newer marker
     _cc_kernel_supported || { printf '%s\n' unknown; return 0; }
     running="$(_cc_kernel_running 2>/dev/null || true)"
-    newest="$(_cc_kernel_newest 2>/dev/null || true)"
+    newer="$(_cc_kernel_pending_release 2>/dev/null || true)"
     marker="$(_cc_kernel_reboot_marker)"
     if [ -f "$marker" ]; then
         printf '%s\n' required
-    elif [ -n "$running" ] && [ -n "$newest" ] && [ "$running" != "$newest" ]; then
+    elif [ -n "$running" ] && [ -n "$newer" ]; then
         printf '%s\n' newer-kernel-installed
-    elif [ -n "$running" ] && [ "$running" = "$newest" ]; then
+    elif [ -n "$running" ]; then
         printf '%s\n' not-required
     else
         printf '%s\n' unknown
@@ -768,7 +1055,7 @@ _cc_kernel_bootloader_environment() {
 _cc_kernel_health_findings() {
     local keep_count="${1:-${KEEP_COUNT:-2}}" boot_dir running release state severity
     local boot_usage efi_path efi_source efi_type efi_usage unsafe_count issue_count=0 warn_threshold
-    local artifact_states="${2:-}"
+    local artifact_states="${2:-}" mapping package_issue orphan
     boot_dir="$(_cc_kernel_boot_dir)"
     warn_threshold="${CC_KERNEL_USAGE_WARN_PERCENT:-90}"
     case "$warn_threshold" in
@@ -792,6 +1079,13 @@ _cc_kernel_health_findings() {
         printf 'FAIL\tRUNNING_KERNEL_ARTIFACT_FAILURE\tRunning kernel image is missing or unsafe: %s\n' "$running"
         issue_count=$((issue_count + 1))
     fi
+    if _cc_kernel_can_correlate_packages && [ -n "$running" ]; then
+        mapping="$(_cc_kernel_set_mapping_state "$running")"
+        if [ "$mapping" != verified ]; then
+            printf 'FAIL\tRUNNING_KERNEL_PACKAGE_FAILURE\tRunning kernel package mapping is %s: %s\n' "$mapping" "$running"
+            issue_count=$((issue_count + 1))
+        fi
+    fi
 
     if [ "$#" -lt 2 ]; then
         artifact_states="$(_cc_kernel_artifact_states)"
@@ -805,6 +1099,20 @@ _cc_kernel_health_findings() {
             printf '%s\tARTIFACT_%s\t%s artifact correlation is %s.\n' "$severity" "$state" "$release" "$state"
             issue_count=$((issue_count + 1))
         done <<< "$artifact_states"
+        while IFS= read -r package_issue; do
+            [ -n "$package_issue" ] || continue
+            printf 'WARN\tPACKAGE_STATE_INCOMPLETE\tKernel package database state is incomplete: %s\n' "$package_issue"
+            issue_count=$((issue_count + 1))
+        done < <(_cc_kernel_package_issue_records)
+        while IFS= read -r orphan; do
+            [ -n "$orphan" ] || continue
+            case "$orphan" in
+                linux-modules-*) printf 'WARN\tORPHAN_MODULES\tModules package has no matching installed image set: %s\n' "$orphan" ;;
+                linux-headers-*) printf 'WARN\tORPHAN_HEADERS\tHeaders package has no matching installed image set: %s\n' "$orphan" ;;
+                *) printf 'WARN\tORPHAN_COMPONENT\tKernel component has no matching installed image set: %s\n' "$orphan" ;;
+            esac
+            issue_count=$((issue_count + 1))
+        done < <(_cc_kernel_orphan_component_records)
     else
         printf 'WARN\tPACKAGE_CORRELATION_UNSUPPORTED\tPackage correlation is unsupported for the %s kernel package family.\n' "$(_cc_kernel_distribution_family)"
         issue_count=$((issue_count + 1))
@@ -816,17 +1124,6 @@ _cc_kernel_health_findings() {
             fi
         done <<< "$artifact_states"
     fi
-
-    case "$(_cc_kernel_reboot_state)" in
-        required)
-            printf 'WARN\tREBOOT_REQUIRED\tThe host reboot marker is present.\n'
-            issue_count=$((issue_count + 1))
-            ;;
-        newer-kernel-installed)
-            printf 'WARN\tNEWER_KERNEL_AVAILABLE\tA newer installed kernel is not currently running.\n'
-            issue_count=$((issue_count + 1))
-            ;;
-    esac
 
     boot_usage="$(_cc_kernel_boot_filesystem_field USE% 2>/dev/null || true)"
     boot_usage="$(_cc_kernel_percent_value "$boot_usage")"
@@ -905,8 +1202,9 @@ _cc_kernel_artifact_state_counts() {
 }
 
 _cc_kernel_snapshot_capture() {
-    local keep_count="${1:-${KEEP_COUNT:-2}}" running newest running_newest=unknown
+    local keep_count="${1:-${KEEP_COUNT:-2}}" running newest pending fallback running_newest=unknown
     local artifact_states='' findings status boot_bytes boot_usage efi_usage key value
+    local release older_count=0 manual_count=0 automatic_count=0 mixed_count=0 mark
     local -a kernels=() protected=() candidates=()
     declare -gA _CC_KERNEL_SNAPSHOT=()
     declare -ga _CC_KERNEL_SNAPSHOT_FINDINGS=()
@@ -917,6 +1215,8 @@ _cc_kernel_snapshot_capture() {
     running="$(_cc_kernel_running 2>/dev/null || printf unknown)"
     mapfile -t kernels < <(_cc_kernel_list 2>/dev/null || true)
     newest="$(_cc_kernel_newest 2>/dev/null || true)"
+    pending="$(_cc_kernel_pending_release 2>/dev/null || true)"
+    fallback="$(_cc_kernel_fallback_release 2>/dev/null || true)"
     mapfile -t protected < <(_cc_kernel_protected "$keep_count" 2>/dev/null || true)
     if _cc_kernel_can_cleanup; then
         mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count" 2>/dev/null || true)
@@ -925,6 +1225,17 @@ _cc_kernel_snapshot_capture() {
     if [ "$running" != unknown ] && [ "$newest" != unknown ]; then
         if [ "$running" = "$newest" ]; then running_newest=yes; else running_newest=no; fi
     fi
+    for release in "${kernels[@]}"; do
+        if [ "$running" != unknown ] && _cc_kernel_version_lt "$release" "$running"; then
+            older_count=$((older_count + 1))
+        fi
+        mark="$(_cc_kernel_set_mark_state "$release" 2>/dev/null || printf unknown)"
+        case "$mark" in
+            manual) manual_count=$((manual_count + 1)) ;;
+            automatic) automatic_count=$((automatic_count + 1)) ;;
+            mixed) mixed_count=$((mixed_count + 1)) ;;
+        esac
+    done
 
     if _cc_kernel_can_inspect_artifacts; then
         artifact_states="$(_cc_kernel_artifact_states)"
@@ -947,6 +1258,8 @@ _cc_kernel_snapshot_capture() {
     _CC_KERNEL_SNAPSHOT[health_status]="$status"
     _CC_KERNEL_SNAPSHOT[running]="$running"
     _CC_KERNEL_SNAPSHOT[newest]="$newest"
+    _CC_KERNEL_SNAPSHOT[pending]="${pending:-none}"
+    _CC_KERNEL_SNAPSHOT[fallback]="${fallback:-none}"
     _CC_KERNEL_SNAPSHOT[running_is_newest]="$running_newest"
     _CC_KERNEL_SNAPSHOT[reboot_state]="$(_cc_kernel_reboot_state)"
     _CC_KERNEL_SNAPSHOT[os]="$(_cc_kernel_os)"
@@ -957,8 +1270,12 @@ _cc_kernel_snapshot_capture() {
     _CC_KERNEL_SNAPSHOT[efi_filesystem_state]="$(_cc_kernel_efi_filesystem_state)"
     _CC_KERNEL_SNAPSHOT[efi_runtime_state]="$(_cc_kernel_efi_runtime_state)"
     _CC_KERNEL_SNAPSHOT[installed_count]="${#kernels[@]}"
+    _CC_KERNEL_SNAPSHOT[older_count]="$older_count"
     _CC_KERNEL_SNAPSHOT[protected_count]="${#protected[@]}"
     _CC_KERNEL_SNAPSHOT[cleanup_candidate_count]="${#candidates[@]}"
+    _CC_KERNEL_SNAPSHOT[manual_set_count]="$manual_count"
+    _CC_KERNEL_SNAPSHOT[automatic_set_count]="$automatic_count"
+    _CC_KERNEL_SNAPSHOT[mixed_set_count]="$mixed_count"
     _CC_KERNEL_SNAPSHOT[boot_path]="$(_cc_kernel_boot_dir)"
     _CC_KERNEL_SNAPSHOT[boot_filesystem]='not applicable'
     _CC_KERNEL_SNAPSHOT[boot_filesystem_mount]='not applicable'

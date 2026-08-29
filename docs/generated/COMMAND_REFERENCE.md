@@ -916,7 +916,7 @@ Usage:
 
 Actions:
   status   Show kernel state plus distinct /boot, backing filesystem, and EFI usage.
-  list     List installed kernels with RUNNING, PROTECTED, and CANDIDATE states.
+  list     List installed sets with role, protection, APT-mark, and mapping states.
   running  Show the running release and matching installed packages.
   platform  Show detected kernel environment and Captain Cronos support.
   artifacts  Correlate packages with kernel, initramfs, map, and config artifacts.
@@ -925,8 +925,10 @@ Actions:
   deps     Show required and optional kernel-management capabilities.
 
 Safety:
-  Cleanup always protects the running kernel and KEEP_COUNT newest additional
-  kernels (default: 2). Package removal requires an explicit --apply.
+  Cleanup protects the running kernel, a verified nearest-older fallback, a
+  verified newest pending kernel, and KEEP_COUNT newest additional installed
+  sets (default: 2). Only verified package/artifact mappings are candidates.
+  Package removal requires an explicit --apply.
 
 Compatibility:
   cc kernel-cleanup [--dry-run|--apply] remains available.
@@ -978,8 +980,8 @@ Discovery:
 Usage: cc kernel-cleanup [--dry-run|--apply]
 
 Compatibility entry point for `cc kernel cleanup`.
-Defaults to --dry-run and keeps the running kernel plus KEEP_COUNT newest
-additional installed kernels (default: 2).
+Defaults to --dry-run and delegates to the same running, fallback, pending,
+KEEP_COUNT, and verified-mapping protections as `cc kernel cleanup`.
 
 Environment: KEEP_COUNT=3 cc kernel-cleanup --dry-run
 ~~~

@@ -35,7 +35,7 @@ Usage:
 
 Actions:
   status   Show kernel state plus distinct /boot, backing filesystem, and EFI usage.
-  list     List installed kernels with RUNNING, PROTECTED, and CANDIDATE states.
+  list     List installed sets with role, protection, APT-mark, and mapping states.
   running  Show the running release and matching installed packages.
   platform  Show detected kernel environment and Captain Cronos support.
   artifacts  Correlate packages with kernel, initramfs, map, and config artifacts.
@@ -44,8 +44,10 @@ Actions:
   deps     Show required and optional kernel-management capabilities.
 
 Safety:
-  Cleanup always protects the running kernel and KEEP_COUNT newest additional
-  kernels (default: 2). Package removal requires an explicit --apply.
+  Cleanup protects the running kernel, a verified nearest-older fallback, a
+  verified newest pending kernel, and KEEP_COUNT newest additional installed
+  sets (default: 2). Only verified package/artifact mappings are candidates.
+  Package removal requires an explicit --apply.
 
 Compatibility:
   cc kernel-cleanup [--dry-run|--apply] remains available.
@@ -75,74 +77,80 @@ kernel_require_linux() {
     return 3
 }
 
-kernel_status() {
-    local running newest reboot_state keep_count platform_support package_family initramfs_provider running_newest=unknown
-    local boot_dir boot_source boot_mount boot_use boot_bytes boot_human
-    local efi_path efi_source efi_type efi_size efi_used efi_avail efi_use
-    local -a kernels=() protected=() candidates=()
-    running="$(_cc_kernel_running 2>/dev/null || printf unknown)"
-    keep_count="$(kernel_keep_count)" || return
-    mapfile -t kernels < <(_cc_kernel_list)
-    newest="$(_cc_kernel_newest 2>/dev/null || true)"
-    mapfile -t protected < <(_cc_kernel_protected "$keep_count" 2>/dev/null || true)
-    if _cc_kernel_supported; then
-        mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count" 2>/dev/null || true)
-    fi
-    [ -z "$newest" ] && newest=unknown
-    if [ "$running" != unknown ] && [ "$newest" != unknown ]; then
-        if [ "$running" = "$newest" ]; then running_newest=yes; else running_newest=no; fi
-    fi
-    reboot_state="$(_cc_kernel_reboot_state)"
-    package_family="$(_cc_kernel_distribution_family)"
-    initramfs_provider="$(_cc_kernel_initramfs_provider)"
-    boot_dir="$(_cc_kernel_boot_dir)"
-    boot_source="$(_cc_kernel_boot_filesystem_field SOURCE 2>/dev/null || printf unknown)"
-    boot_mount="$(_cc_kernel_boot_filesystem_field TARGET 2>/dev/null || printf unknown)"
-    boot_use="$(_cc_kernel_boot_filesystem_field USE% 2>/dev/null || printf unknown)"
-    boot_bytes="$(_cc_kernel_boot_usage_bytes 2>/dev/null || true)"
-    if [ -n "$boot_bytes" ]; then boot_human="$(_cc_kernel_human_bytes "$boot_bytes")"; else boot_human=unavailable; fi
-    efi_path="$(_cc_kernel_efi_path 2>/dev/null || true)"
-    if _cc_kernel_supported; then
-        platform_support="Linux inspection"
-        _cc_kernel_cleanup_supported && platform_support+="; cleanup supported"
-    else
-        platform_support="$(_cc_kernel_os); running-release inspection only"
-    fi
+kernel_prepare_inventory() {
+    _cc_kernel_can_correlate_packages || return 0
+    _cc_kernel_inventory_capture
+}
 
-    cc_banner
-    echo
-    echo "Kernel Status"
-    echo "-------------"
-    printf '%-24s %s\n' "Platform support:" "$platform_support"
-    printf '%-24s %s\n' "Kernel package family:" "$package_family"
-    printf '%-24s %s\n' "Initramfs provider:" "$initramfs_provider"
-    printf '%-24s %s\n' "Running kernel:" "$running"
-    printf '%-24s %s\n' "Newest installed:" "$newest"
-    printf '%-24s %s\n' "Installed count:" "${#kernels[@]}"
-    printf '%-24s %s\n' "Running is newest:" "$running_newest"
-    printf '%-24s %s\n' "Protected count:" "${#protected[@]}"
-    printf '%-24s %s\n' "Cleanup candidates:" "${#candidates[@]}"
-    printf '%-24s %s\n' "Reboot state:" "$reboot_state"
-    printf '%-24s %s\n' "Boot path:" "$boot_dir"
-    printf '%-24s %s\n' "Boot filesystem:" "$boot_source"
-    printf '%-24s %s\n' "Boot filesystem mount:" "$boot_mount"
-    printf '%-24s %s\n' "Boot filesystem usage:" "$boot_use"
-    printf '%-24s %s\n' "/boot artifacts:" "$boot_human"
-    if [ -n "$efi_path" ]; then
-        efi_source="$(_cc_kernel_efi_filesystem_field SOURCE 2>/dev/null || printf unknown)"
-        efi_type="$(_cc_kernel_efi_filesystem_field FSTYPE 2>/dev/null || printf unknown)"
-        efi_size="$(_cc_kernel_efi_filesystem_field SIZE 2>/dev/null || printf unknown)"
-        efi_used="$(_cc_kernel_efi_filesystem_field USED 2>/dev/null || printf unknown)"
-        efi_avail="$(_cc_kernel_efi_filesystem_field AVAIL 2>/dev/null || printf unknown)"
-        efi_use="$(_cc_kernel_efi_filesystem_field USE% 2>/dev/null || printf unknown)"
-        printf '%-24s %s mounted at %s\n' "EFI filesystem:" "$efi_source" "$efi_path"
-        printf '%-24s %s\n' "EFI filesystem type:" "$efi_type"
-        printf '%-24s %s (%s used, %s available)\n' "EFI size:" "$efi_size" "$efi_used" "$efi_avail"
-        printf '%-24s %s\n' "EFI usage:" "$efi_use"
-    else
-        printf '%-24s %s\n' "EFI filesystem:" "not mounted at a known path"
+kernel_status() {
+    local keep_count running severity image_state modules_state headers_state artifact_status
+    local newer reboot boot_usage boot_usage_status=INFO cleanup_detail efi_path
+    keep_count="$(kernel_keep_count)" || return
+    kernel_prepare_inventory
+    _cc_kernel_snapshot_capture "$keep_count"
+    running="$(_cc_kernel_snapshot_get running)"
+    severity="$(_cc_kernel_snapshot_get health_status)"
+    image_state="$(_cc_kernel_component_state "$running" image 2>/dev/null || printf unavailable)"
+    modules_state="$(_cc_kernel_component_state "$running" modules 2>/dev/null || printf unavailable)"
+    headers_state="$(_cc_kernel_component_state "$running" headers 2>/dev/null || printf unavailable)"
+    newer="$(_cc_kernel_snapshot_get pending)"
+    reboot="$(_cc_kernel_snapshot_get reboot_state)"
+    boot_usage="$(_cc_kernel_snapshot_get boot_filesystem_usage)"
+    if [[ "${boot_usage%%%}" =~ ^[0-9]+$ ]] && [ "${boot_usage%%%}" -ge "${CC_KERNEL_USAGE_WARN_PERCENT:-90}" ]; then
+        boot_usage_status=WARN
+    elif [ "$boot_usage" != unknown ] && [ "$boot_usage" != 'not applicable' ]; then
+        boot_usage_status=PASS
     fi
-    printf '%-24s %s\n' "Bootloader environment:" "$(_cc_kernel_bootloader_environment)"
+    if [ "$(_cc_kernel_snapshot_get artifact_missing)" = 0 ] &&
+        [ "$(_cc_kernel_snapshot_get artifact_partial)" = 0 ] &&
+        [ "$(_cc_kernel_snapshot_get artifact_unmatched)" = 0 ] &&
+        [ "$(_cc_kernel_snapshot_get artifact_unknown)" = 0 ]; then artifact_status=PASS
+    else artifact_status=WARN
+    fi
+    cleanup_detail="$(_cc_kernel_snapshot_get cleanup_candidate_count) eligible set(s)"
+
+    echo "Captain Cronos Kernel Status"
+    echo "============================"
+    echo
+    kernel_status_detail "Running kernel:" INFO "$running"
+    kernel_status_detail "Running image package:" "$([ "$image_state" = present ] && printf PASS || printf FAIL)" "$image_state"
+    kernel_status_detail "Running modules:" "$([ "$modules_state" = present ] && printf PASS || printf INFO)" "$modules_state"
+    kernel_status_detail "Running headers:" "$([ "$headers_state" = present ] && printf PASS || printf INFO)" "$headers_state"
+    kernel_status_detail "Installed kernel sets:" INFO "$(_cc_kernel_snapshot_get installed_count)"
+    kernel_status_detail "Older kernel sets:" INFO "$(_cc_kernel_snapshot_get older_count)"
+    kernel_status_detail "Cleanup candidates:" INFO "$cleanup_detail"
+    kernel_status_detail "Kernel artifacts:" "$artifact_status" "matched $(_cc_kernel_snapshot_get artifact_matched)"
+    kernel_status_detail "Newer installed kernel:" INFO "$newer"
+    if [ "$reboot" = required ] || [ "$reboot" = newer-kernel-installed ]; then
+        kernel_status_detail "Reboot recommended:" INFO yes
+    else
+    kernel_status_detail "Reboot recommended:" INFO no
+    fi
+    kernel_status_detail "Boot path:" INFO "$(_cc_kernel_snapshot_get boot_path)"
+    kernel_status_detail "Boot filesystem:" INFO "$(_cc_kernel_snapshot_get boot_filesystem)"
+    kernel_status_detail "Boot filesystem mount:" INFO "$(_cc_kernel_snapshot_get boot_filesystem_mount)"
+    kernel_status_detail "/boot filesystem usage:" "$boot_usage_status" "$boot_usage"
+    kernel_status_detail "/boot artifacts:" INFO "$(_cc_kernel_snapshot_get boot_artifact_usage)"
+    efi_path="$(_cc_kernel_efi_path 2>/dev/null || true)"
+    if [ -n "$efi_path" ]; then
+        kernel_status_detail "EFI filesystem:" INFO "$(_cc_kernel_efi_filesystem_field SOURCE 2>/dev/null || printf unknown) mounted at $efi_path"
+        kernel_status_detail "EFI filesystem type:" INFO "$(_cc_kernel_efi_filesystem_field FSTYPE 2>/dev/null || printf unknown)"
+        kernel_status_detail "EFI size:" INFO "$(_cc_kernel_efi_filesystem_field SIZE 2>/dev/null || printf unknown) ($(_cc_kernel_efi_filesystem_field USED 2>/dev/null || printf unknown) used, $(_cc_kernel_efi_filesystem_field AVAIL 2>/dev/null || printf unknown) available)"
+        kernel_status_detail "EFI usage:" INFO "$(_cc_kernel_snapshot_get efi_usage)"
+    else
+        kernel_status_detail "EFI filesystem:" INFO "not mounted at a known path"
+    fi
+    kernel_status_detail "Bootloader environment:" INFO "$(_cc_kernel_snapshot_get bootloader)"
+    echo
+    cc_summary_status "Overall Status:" "$severity"
+    [ "$severity" != FAIL ]
+}
+
+kernel_status_detail() {
+    local label="$1" status="$2" detail="$3"
+    cc_dotted_leader_fd 1 "$label" 40
+    cc_status_cell "$status" 6
+    printf ' %s\n' "$detail"
 }
 
 kernel_platform() {
@@ -202,21 +210,24 @@ kernel_deps() {
 }
 
 kernel_list() {
-    local keep_count kernel state
+    local keep_count kernel state mark mapping
     local -a kernels=()
     keep_count="$(kernel_keep_count)" || return
+    kernel_prepare_inventory
     mapfile -t kernels < <(_cc_kernel_list)
 
     cc_banner
     echo
     echo "Installed Kernels"
     echo "-----------------"
-    printf '%-36s %s\n' "Release" "State"
-    printf '%-36s %s\n' "-------" "-----"
+    printf '%-32s %-28s %-10s %s\n' "Release" "Protection" "APT mark" "Mapping"
+    printf '%-32s %-28s %-10s %s\n' "-------" "----------" "--------" "-------"
     for kernel in "${kernels[@]}"; do
         state="$(_cc_kernel_classification "$kernel" "$keep_count")"
         [ "$state" = UNCLASSIFIED ] && state=INSTALLED
-        printf '%-36s %s\n' "$kernel" "$state"
+        mark="$(_cc_kernel_set_mark_state "$kernel")"
+        mapping="$(_cc_kernel_set_mapping_state "$kernel")"
+        printf '%-32s %-28s %-10s %s\n' "$kernel" "$state" "$mark" "$mapping"
     done
 }
 
@@ -224,6 +235,7 @@ kernel_artifacts() {
     local keep_count release kernel initramfs system_map config package ownership state classification bytes size
     kernel_require_linux || return
     keep_count="$(kernel_keep_count)" || return
+    kernel_prepare_inventory
     cc_banner
     echo
     echo "Kernel Boot Artifacts"
@@ -255,6 +267,7 @@ kernel_artifacts() {
 kernel_health() {
     local keep_count severity finding code message
     keep_count="$(kernel_keep_count)" || return
+    kernel_prepare_inventory
     _cc_kernel_snapshot_capture "$keep_count"
     severity="$(_cc_kernel_snapshot_get health_status)"
     cc_banner
@@ -278,6 +291,7 @@ kernel_health() {
 kernel_running() {
     local running package
     local -a packages=()
+    kernel_prepare_inventory
     running="$(_cc_kernel_running)" || {
         cc_error "Unable to determine the running kernel."
         return 1
@@ -314,8 +328,9 @@ kernel_cleanup_runner() {
 }
 
 kernel_cleanup() {
-    local option="${1:---dry-run}" keep_count running newest version
-    local -a kernels=() protected=() candidates=() packages=() mapped=() skipped=()
+    local option="${1:---dry-run}" keep_count running newest pending fallback version kib reclaimed
+    local package purge_status=0 current_running
+    local -a kernels=() protected=() candidates=() packages=() removed=() remaining=()
     case "$option" in
         --help|-h) usage; return 0 ;;
         --dry-run) KERNEL_APPLY=0 ;;
@@ -329,29 +344,28 @@ kernel_cleanup() {
         return 3
     }
     keep_count="$(kernel_keep_count)" || return
+    kernel_prepare_inventory
     running="$(_cc_kernel_running)" || return 1
     mapfile -t kernels < <(_cc_kernel_list)
     newest="$(_cc_kernel_newest 2>/dev/null || true)"
+    pending="$(_cc_kernel_pending_release 2>/dev/null || true)"
+    fallback="$(_cc_kernel_fallback_release 2>/dev/null || true)"
     mapfile -t protected < <(_cc_kernel_protected "$keep_count")
     mapfile -t candidates < <(_cc_kernel_cleanup_candidates "$keep_count")
+    mapfile -t packages < <(_cc_kernel_cleanup_packages "$keep_count")
+    kib="$(_cc_kernel_package_installed_kib "${packages[@]}" 2>/dev/null || true)"
+    if [ -n "$kib" ]; then reclaimed="$(_cc_kernel_human_bytes "$((kib * 1024))")"; else reclaimed=unavailable; fi
 
-    # Complete and validate the immutable package plan before any operation.
     for version in "${candidates[@]}"; do
-        if [ "$version" = "$running" ]; then
+        [ "$version" != "$running" ] || {
             cc_error "Safety invariant violation: running kernel entered candidate plan."
             return 5
-        fi
-        mapped=()
-        mapfile -t mapped < <(_cc_kernel_packages_for_version "$version" 2>/dev/null || true)
-        if [ "${#mapped[@]}" -eq 0 ]; then
-            skipped+=("$version")
-        else
-            packages+=("${mapped[@]}")
-        fi
+        }
+        _cc_kernel_in_list "$version" "${protected[@]}" && {
+            cc_error "Safety invariant violation: protected kernel entered candidate plan: $version"
+            return 5
+        }
     done
-    if [ "${#packages[@]}" -gt 0 ]; then
-        mapfile -t packages < <(printf '%s\n' "${packages[@]}" | sort -u)
-    fi
 
     KERNEL_LOG="${LOG:-$(cc_env_log_dir)/kernel-cleanup.log}"
     if [ "$KERNEL_APPLY" -eq 1 ]; then
@@ -363,12 +377,15 @@ kernel_cleanup() {
     fi
     kernel_cleanup_log "Kernel cleanup review"
     kernel_cleanup_log "Running kernel: $running"
+    kernel_cleanup_log "Protected fallback: ${fallback:-none available}"
+    kernel_cleanup_log "Protected pending kernel: ${pending:-none}"
     kernel_cleanup_log "Newest installed kernel: ${newest:-unknown}"
     kernel_cleanup_log "Keep newest additional kernels: $keep_count"
     kernel_cleanup_log "Mode: $([ "$KERNEL_APPLY" -eq 1 ] && printf APPLY || printf 'DRY RUN')"
     kernel_cleanup_log "Installed kernels: ${#kernels[@]}"
     kernel_cleanup_log "Protected kernels: ${#protected[@]}"
     kernel_cleanup_log "Cleanup candidates: ${#candidates[@]}"
+    kernel_cleanup_log "Approximate installed size: $reclaimed"
 
     if [ "${#candidates[@]}" -eq 0 ]; then
         kernel_cleanup_log "No obsolete kernels selected for purge."
@@ -376,13 +393,9 @@ kernel_cleanup() {
     fi
     printf 'Candidate kernels:\n'
     printf '  %s\n' "${candidates[@]}"
-    if [ "${#skipped[@]}" -gt 0 ]; then
-        printf 'Retained: package ownership was missing or ambiguous:\n'
-        printf '  %s\n' "${skipped[@]}"
-    fi
     if [ "${#packages[@]}" -eq 0 ]; then
-        kernel_cleanup_log "No confidently owned kernel packages were selected."
-        return 0
+        cc_error "Candidate package mapping was not complete; refusing cleanup."
+        return 5
     fi
     printf 'Candidate purge packages:\n'
     printf '  %s\n' "${packages[@]}"
@@ -392,15 +405,36 @@ kernel_cleanup() {
         return 0
     fi
 
+    [ "$(_cc_kernel_set_mapping_state "$running")" = verified ] || {
+        cc_error "Running-kernel package mapping is uncertain; refusing cleanup apply."
+        return 5
+    }
+    current_running="$(_cc_kernel_running)" || return 1
+    [ "$current_running" = "$running" ] || {
+        cc_error "Running kernel changed after plan creation; refusing cleanup apply."
+        return 5
+    }
     kernel_cleanup_log "Purging obsolete kernel packages..."
-    CC_PKG_RUNNER=kernel_cleanup_runner _cc_pkg_purge "${packages[@]}"
-    CC_PKG_RUNNER=kernel_cleanup_runner _cc_pkg_autoremove
-    CC_PKG_RUNNER=kernel_cleanup_runner _cc_pkg_clean
-    kernel_cleanup_log "Bootloader refresh: $(_cc_kernel_refresh_bootloader)"
+    CC_PKG_RUNNER=kernel_cleanup_runner _cc_pkg_purge "${packages[@]}" || purge_status=$?
+    if [ "$purge_status" -ne 0 ]; then
+        for package in "${packages[@]}"; do
+            if _cc_pkg_is_installed "$package"; then remaining+=("$package"); else removed+=("$package"); fi
+        done
+        kernel_cleanup_log "Kernel cleanup FAILED (package manager status: $purge_status)."
+        if [ "${#removed[@]}" -gt 0 ]; then
+            kernel_cleanup_log "Packages no longer installed:"
+            printf '  %s\n' "${removed[@]}"
+        fi
+        if [ "${#remaining[@]}" -gt 0 ]; then
+            kernel_cleanup_log "Packages still installed:"
+            printf '  %s\n' "${remaining[@]}"
+        fi
+        return "$purge_status"
+    fi
     kernel_cleanup_log "Kernel cleanup complete."
 }
 
-case "${1:-help}" in
+case "${1:-status}" in
     --help|-h|help|"") usage ;;
     --version) cc_version ;;
     status) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_status ;;
@@ -411,5 +445,5 @@ case "${1:-help}" in
     health) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_health ;;
     cleanup) shift; kernel_cleanup "$@" ;;
     deps|dependencies) shift; [ "$#" -eq 0 ] || { usage; exit 2; }; kernel_deps ;;
-    *) cc_error "Unknown kernel action: $1"; echo; usage; exit 1 ;;
+    *) cc_error "Unknown kernel action: $1"; echo; usage; exit 2 ;;
 esac

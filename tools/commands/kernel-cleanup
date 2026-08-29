@@ -23,8 +23,8 @@ case "${1:-}" in
 Usage: cc kernel-cleanup [--dry-run|--apply]
 
 Compatibility entry point for `cc kernel cleanup`.
-Defaults to --dry-run and keeps the running kernel plus KEEP_COUNT newest
-additional installed kernels (default: 2).
+Defaults to --dry-run and delegates to the same running, fallback, pending,
+KEEP_COUNT, and verified-mapping protections as `cc kernel cleanup`.
 
 Environment: KEEP_COUNT=3 cc kernel-cleanup --dry-run
 EOF_HELP

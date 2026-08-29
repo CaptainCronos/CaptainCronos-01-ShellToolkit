@@ -217,9 +217,11 @@ CC_KERNEL_EFI_PATH="$EFI_DIR"
 CC_TEST_MOUNT_SCENARIO=efi
 export CC_KERNEL_EFI_PATH CC_TEST_MOUNT_SCENARIO
 command_status="$(PATH="$BIN_DIR:$PATH" bash "$PROJECT_ROOT/tools/commands/kernel" status)"
-assert_contains "$command_status" 'Boot filesystem mount:   /' 'status conflated /boot with its backing filesystem'
+assert_contains "$command_status" 'Boot filesystem mount:' 'status omitted /boot backing mount'
+assert_contains "$command_status" 'INFO   /' 'status conflated /boot with its backing filesystem'
 assert_contains "$command_status" '/boot artifacts:' 'status omitted actual /boot consumption'
-assert_contains "$command_status" 'EFI filesystem type:     vfat' 'status omitted EFI filesystem details'
+assert_contains "$command_status" 'EFI filesystem type:' 'status omitted EFI filesystem details'
+assert_contains "$command_status" 'INFO   vfat' 'status omitted EFI filesystem type'
 command_artifacts="$(PATH="$BIN_DIR:$PATH" bash "$PROJECT_ROOT/tools/commands/kernel" artifacts)"
 assert_contains "$command_artifacts" MATCHED 'artifact command omitted correlation state'
 assert_contains "$command_artifacts" RUNNING,PROTECTED 'artifact command omitted shared classification'
@@ -238,6 +240,7 @@ fi
 assert_contains "$(_cc_kernel_health_findings 1)" 'unsupported on FreeBSD' 'unsupported health behavior was unclear'
 unsupported_status="$(bash "$PROJECT_ROOT/tools/commands/kernel" status)"
 assert_contains "$unsupported_status" 'Running kernel:' 'reduced non-Linux status regressed without Linux tools'
-assert_contains "$unsupported_status" '/boot artifacts:         unavailable' 'missing optional usage tool was not graceful'
+assert_contains "$unsupported_status" '/boot artifacts:' 'reduced status omitted /boot artifact usage'
+assert_contains "$unsupported_status" 'INFO   unavailable' 'missing optional usage tool was not graceful'
 
 printf 'Kernel artifact health tests: PASS\n'

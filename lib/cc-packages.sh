@@ -180,7 +180,7 @@ _cc_pkg_purge() {
     family="$(_cc_pkg_family)" || return 1
     manager="$(_cc_pkg_manager)" || return 1
     case "$family" in
-        apt-get) _cc_pkg_run "$manager" purge -y "$@" ;;
+        apt-get) _cc_pkg_run "$manager" purge -y -- "$@" ;;
         *) _cc_pkg_remove "$@" ;;
     esac
 }

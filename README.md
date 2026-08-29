@@ -137,8 +137,11 @@ cc kernel cleanup --dry-run
 cc kernel deps
 ```
 
-`cc kernel cleanup` defaults to dry-run, always protects the running kernel,
-and protects the newest `KEEP_COUNT` additional kernels. The legacy
+`cc kernel cleanup` defaults to dry-run. It protects the running kernel, the
+nearest verified older fallback when one exists, the newest verified pending
+kernel, and the newest `KEEP_COUNT` additional installed sets. Only installed
+sets with exact image-package, regular `/boot/vmlinuz-*`, and package-owner
+correlation can become cleanup candidates. The legacy
 `cc kernel-cleanup` command remains a compatibility entry point to the same
 implementation. Package removal requires an explicit `--apply`.
 

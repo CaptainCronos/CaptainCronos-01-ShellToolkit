@@ -235,13 +235,19 @@ Cronos operations are supported. Use `cc kernel artifacts` for detailed package,
 initramfs, map, and config correlation; use `cc kernel health` for a concise
 PASS/WARN/FAIL assessment. `cc kernel cleanup` is also read-only by default and prints the
 candidate package plan. Only `cc kernel cleanup --apply` permits package
-mutation. Set `KEEP_COUNT` to a non-negative integer to protect that many newest
-non-running kernels in addition to the running kernel.
+mutation. The running release is always protected. The nearest verified older
+release is protected as a fallback, the newest verified release newer than the
+running kernel is protected as pending reboot, and `KEEP_COUNT` protects that
+many newest non-running installed sets. Uncertain mappings are retained and
+never become cleanup candidates.
 
-Cleanup is enabled only on supported Debian-family package systems. Package
-ownership must be unambiguous; otherwise the release is retained. A reboot
-marker and a newer installed kernel are reported as distinct states. The legacy
-`cc kernel-cleanup` form remains supported.
+Cleanup is enabled only on supported Debian-family package systems. A candidate
+must have exactly one installed image package, a regular version-matched kernel
+artifact, and exactly one matching package owner. The complete purge plan is
+shown without mutation unless `--apply` is explicit; apply performs only the
+bounded purge and leaves bootloader work to Debian package lifecycle hooks. A
+reboot marker and a newer verified installed kernel are reported as distinct
+states. The legacy `cc kernel-cleanup` form delegates to the same implementation.
 
 Status distinguishes the boot path from its backing filesystem. “Boot
 filesystem usage” is capacity utilization of the filesystem containing `/boot`;

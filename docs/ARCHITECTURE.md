@@ -161,17 +161,28 @@ On Debian-family systems, toolkit automation uses the configured `apt-get` inter
 ### Kernel Management Architecture
 
 `lib/cc-kernel.sh` is the single kernel inspection and classification layer.
-On Linux it combines versioned `/boot/vmlinuz-*` artifacts with exact installed
-`linux-image-*` package releases, then orders releases with GNU `sort -V` under
-the C locale. The running release is always protected, followed by the newest
-`KEEP_COUNT` additional releases. List and cleanup commands consume the same
-protected and candidate sets.
+On supported Debian-family systems it captures the installed package inventory
+once per command, derives versioned sets from exact `linux-image-*` package
+names, and orders releases with Debian package-version comparison. Set mapping
+separately verifies a regular `/boot/vmlinuz-*` artifact and its unique package
+owner. List, status, health, and cleanup consume this prepared inventory.
+
+Protection and eligibility are separate. The running release is always
+protected. A verified nearest-older release is protected as the known fallback,
+the newest verified release newer than the running kernel is protected as the
+pending-reboot target, and `KEEP_COUNT` retains the newest additional installed
+sets even when their mapping is uncertain. Only verified sets outside all of
+those protections become cleanup candidates.
 
 Cleanup mutation is currently supported only for the Debian-family package
-adapter. A version is eligible only when exactly one installed image package is
-identified and, when its boot artifact exists, exactly one matching package
-owner is reported. Ambiguous or missing ownership retains the kernel. Purge,
-autoremove, and clean operations remain behind `lib/cc-packages.sh`.
+adapter. A version is eligible only when exactly one installed image package,
+a regular version-matched boot artifact, and exactly one matching package owner
+are present. Ambiguous, missing, symlinked, or mismatched evidence retains the
+set. Dry-run prints the immutable bounded package plan and writes no cleanup
+log. Explicit apply rechecks the running release and its verified mapping, then
+performs only the planned purge; it does not run unbounded autoremove or clean
+operations. Shared header packages are retained while any non-candidate set
+still references them.
 
 Debian kernel packages run bootloader maintenance through package lifecycle
 hooks, so kernel cleanup does not invoke `update-grub` directly. Non-Linux hosts
