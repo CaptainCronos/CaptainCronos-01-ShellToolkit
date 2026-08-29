@@ -217,6 +217,16 @@ show_shell() {
 }
 
 show_host() {
+    local rows
+    rows="$(cc_config_validation_rows)" || true
+    if grep -q $'^FAIL\t' <<< "$rows"; then
+        cc_error "Configuration is invalid; refusing to fabricate host context."
+        while IFS=$'\t' read -r status label detail; do
+            [ "$status" = FAIL ] || continue
+            printf '%-24s FAIL  %s\n' "$label" "$detail" >&2
+        done <<< "$rows"
+        return 1
+    fi
     echo "Host Environment"
     echo "----------------"
     cc_env_summary

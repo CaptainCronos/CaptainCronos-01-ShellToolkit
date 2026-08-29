@@ -22,12 +22,25 @@ usage() {
     cat <<'EOF_HELP'
 Usage:
   cc config show
+  cc config status
+  cc config validate
   cc config init
   cc config get KEY [DEFAULT]
   cc config set KEY VALUE
+  cc config migrate [--apply]
 
 Configuration file:
-  ~/.captaincronos/config
+  Global: ~/.captaincronos/config
+  Host:   ~/.captaincronos/hosts/<host-id>/config
+
+Host identity precedence:
+  CC_HOST_ID runtime/test override -> stored host-id -> legacy global HOST_ID
+  -> hostname fallback. An inherited CC_HOST_ID intentionally selects another
+  host tree; unset it to use the stored identity. Status/validate report it.
+
+Mutation safety:
+  set and init use private atomic writes. Migration is preview-only unless
+  --apply is supplied and creates a private backup before replacement.
 EOF_HELP
 }
 
@@ -42,11 +55,17 @@ case "$ACTION" in
         exit 0
         ;;
     init)
-        cc_config_init
+        cc_config_init 1
         cc_log "Configuration initialized: $(cc_config_file)"
         ;;
     show)
         cc_config_show
+        ;;
+    status)
+        cc_config_status
+        ;;
+    validate)
+        cc_config_validate
         ;;
     get)
         shift || true
@@ -64,8 +83,16 @@ case "$ACTION" in
         cc_config_set "$key" "$value"
         cc_log "Set $key"
         ;;
+    migrate)
+        shift || true
+        case "${1:-}" in
+            "") cc_config_migrate 0 ;;
+            --apply) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; cc_config_migrate 1 ;;
+            *) usage >&2; exit 2 ;;
+        esac
+        ;;
     *)
-        usage
-        exit 1
+        usage >&2
+        exit 2
         ;;
 esac

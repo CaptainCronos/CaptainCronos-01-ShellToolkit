@@ -349,6 +349,50 @@ YAML is required because active asset and drive commands read and mutate YAML.
 JSON remains optional because prompt and selftest JSON output modes are optional;
 their non-JSON behavior does not depend on jq.
 
+### Configuration and Host Identity
+
+`config/defaults.conf` is the canonical deployed-default layer and
+`CC_CONFIG_SCHEMA_VERSION` in `lib/cc-config.sh` is the authoritative schema
+version. Resolution is data-only and ordered: deployed defaults, global user
+configuration at `CC_HOME/config`, then current-host configuration at
+`CC_HOME/hosts/<host-id>/config`. Command-line arguments remain command-local.
+Stored configuration is parsed as data and is never sourced or evaluated.
+
+Host identity resolution is deliberately ordered as follows:
+
+1. nonempty `CC_HOST_ID`, an explicit runtime and test override;
+2. the private stable `CC_HOME/host-id` file;
+3. legacy `HOST_ID` in the global configuration; and
+4. a normalized short hostname fallback.
+
+Because environment variables are inherited, `CC_HOST_ID` can intentionally
+select a host tree different from the stored identity. Callers that want the
+stored identity must unset `CC_HOST_ID` (or set it empty for a bounded command).
+`cc config status` identifies the active source and `cc config validate` emits
+a warning whenever the override is active, including both selected and stored
+IDs when they differ. Thus an inherited override is effective by contract but
+is not silent. `cc init --host-id` uses this interface only for the invocation
+and refuses to replace a different existing stable identity.
+
+`HOST_ROLE` describes operational purpose; `HOST_PROFILE` selects the bounded
+defaults supported by init. Unknown configuration keys are retained and warn by
+name for forward compatibility. Malformed lines, duplicate keys, future schema
+versions, invalid roles/profiles, unsafe targets, wrong ownership, and host
+`HOST_ID` mismatches fail validation. Legacy or old schemas and repairable
+permission differences warn. Migration is preview-only by default, preserves
+unknown content, creates a private backup, and uses an atomic replacement only
+when `--apply` is explicit.
+
+Configuration roots and current-host roots are operator-owned mode-0700
+directories; global, identity, and host config files are mode 0600. Init and
+config mutation reject lexical traversal, symlinks in the target ancestry,
+wrong-owner targets, and changed replacement identities. Destination-adjacent
+temporary files are private and published by atomic rename. Init is idempotent:
+it creates missing state but preserves existing operator-owned global and host
+configuration. Install and update workflows likewise preserve the complete
+`CC_HOME` tree. A changed machine hostname does not rename or switch a host once
+stable identity exists.
+
 ### Reports
 Historical reports are stored under:
 

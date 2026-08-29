@@ -23,6 +23,7 @@ cd "$TOOLKIT_ROOT"
 source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
 source "$TOOLKIT_ROOT/lib/cc-kernel.sh"
+source "$TOOLKIT_ROOT/lib/cc-config.sh"
 cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 FULL=0
@@ -163,6 +164,17 @@ else
     cc_warn "Installed command missing or not executable: $HOME/bin/cc"
     cc_warn "Run: install/install.sh --apply"
 fi
+
+cc_log "Checking configuration health..."
+while IFS=$'\t' read -r config_status config_label config_detail; do
+    [ -n "$config_status" ] || continue
+    case "$config_status" in
+        FAIL) FAILURES=$((FAILURES + 1)) ;;
+        WARN) WARNINGS=$((WARNINGS + 1)) ;;
+    esac
+    cc_status_line "$config_label" "$config_status"
+    [ "$config_status" = PASS ] || cc_warn "$config_label: $config_detail"
+done < <(cc_config_validation_rows || true)
 
 echo
 cc_log "Checking host basics..."

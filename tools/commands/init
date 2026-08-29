@@ -50,6 +50,10 @@ Profiles:
   default
 
 Default is dry-run.
+
+CC_HOST_ID is an explicit runtime/test override with precedence over the stored
+identity. Prefer --host-id for initialization; an existing different stored
+identity is never replaced implicitly.
 EOF_HELP
 }
 
@@ -103,6 +107,10 @@ done
 if [ -n "$HOST_ID_INPUT" ]; then
     export CC_HOST_ID
     CC_HOST_ID="$(cc_env_safe_id "$HOST_ID_INPUT")"
+    [ -n "$CC_HOST_ID" ] && [ "$CC_HOST_ID" = "$HOST_ID_INPUT" ] || {
+        cc_error "Host ID must already be a safe lowercase identifier."
+        exit 2
+    }
 fi
 
 infer_role() {
@@ -159,6 +167,13 @@ if [ "$INTERACTIVE" -eq 1 ]; then
     interactive_select
 fi
 
+case "$ROLE" in developer|workbench|server|nas|laptop|custom|workstation) ;;
+    *) cc_error "Unsupported host role: $ROLE"; exit 2 ;;
+esac
+case "$PROFILE" in developer|workbench|server|truenas-scale|laptop|default) ;;
+    *) cc_error "Unsupported host profile: $PROFILE"; exit 2 ;;
+esac
+
 HOST_ID="$(cc_env_host_id)"
 HOST_HOME="$(cc_env_host_home)"
 CONFIG_FILE="$(cc_env_config)"
@@ -203,7 +218,8 @@ profile_defaults() {
 }
 
 write_config() {
-    cat > "$CONFIG_FILE" <<EOF_CONFIG
+    local content
+    content="$(cat <<EOF_CONFIG
 # Captain Cronos host configuration
 HOST_ID="$HOST_ID"
 HOST_ROLE="$ROLE"
@@ -223,6 +239,8 @@ LOG_DIR="$(cc_env_log_dir)"
 EDITOR="nano"
 $(profile_defaults)
 EOF_CONFIG
+    )"$'\n'
+    _cc_config_write_text "$CONFIG_FILE" "$content"
 }
 
 cc_banner
@@ -263,10 +281,25 @@ if [ "$APPLY" -eq 0 ]; then
     exit 0
 fi
 
-mkdir -p "$HOME/bin"
+cc_config_init
+cc_config_identity_init "$HOST_ID" || {
+    cc_error "Stored host identity differs from requested host ID; refusing cross-host mutation."
+    exit 1
+}
 cc_env_init_dirs
-write_config
+mkdir -p "$HOME/bin"
+if [ -e "$CONFIG_FILE" ] || [ -L "$CONFIG_FILE" ]; then
+    _cc_config_target_safe "$CONFIG_FILE" || {
+        cc_error "Existing host configuration is unsafe: $CONFIG_FILE"
+        exit 1
+    }
+    cc_log "Preserved existing host configuration: $CONFIG_FILE"
+else
+    write_config
+    cc_log "Created host configuration: $CONFIG_FILE"
+fi
 chmod 700 "$(cc_env_home)" "$(cc_env_home)/hosts" "$HOST_HOME" 2>/dev/null || true
+chmod 600 "$(cc_config_file)" "$(cc_config_identity_file)" "$CONFIG_FILE" 2>/dev/null || true
 chmod 755 "$HOME/bin"
 
 if [ -f "$PROJECT_ROOT/tools/cc" ]; then

@@ -11,9 +11,14 @@
 # Purpose     : Define portable Captain Cronos host identity and environment paths.
 # ==============================================================================
 
-cc_env_safe_id() {
-    printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g; s/--*/-/g; s/^-//; s/-$//'
-}
+if ! declare -F cc_config_host_id >/dev/null 2>&1; then
+    _cc_environment_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    # shellcheck disable=SC1091
+    source "$_cc_environment_lib_dir/cc-config.sh"
+    unset _cc_environment_lib_dir
+fi
+
+cc_env_safe_id() { cc_config_safe_id "$1"; }
 
 cc_env_default_host_id() {
     local raw
@@ -22,35 +27,19 @@ cc_env_default_host_id() {
 }
 
 cc_env_home() {
-    echo "${CC_HOME:-$HOME/.captaincronos}"
+    cc_config_dir
 }
 
 cc_env_host_id() {
-    if [ -n "${CC_HOST_ID:-}" ]; then
-        cc_env_safe_id "$CC_HOST_ID"
-        return 0
-    fi
-
-    local root config id
-    root="$(cc_env_home)"
-    config="$root/config"
-    if [ -f "$config" ]; then
-        id="$(awk -F= '$1=="HOST_ID" {gsub(/^"|"$/, "", $2); print $2; exit}' "$config" 2>/dev/null || true)"
-        if [ -n "$id" ]; then
-            cc_env_safe_id "$id"
-            return 0
-        fi
-    fi
-
-    cc_env_default_host_id
+    cc_config_host_id
 }
 
 cc_env_host_home() {
-    echo "$(cc_env_home)/hosts/$(cc_env_host_id)"
+    cc_config_host_home
 }
 
 cc_env_config() {
-    echo "$(cc_env_host_home)/config"
+    cc_config_host_file
 }
 
 cc_env_report_dir() {
@@ -82,27 +71,21 @@ cc_env_plugin_dir() {
 }
 
 cc_env_role() {
-    local config role
-    config="$(cc_env_config)"
-    role="$(awk -F= '$1=="HOST_ROLE" {gsub(/^"|"$/, "", $2); print $2; exit}' "$config" 2>/dev/null || true)"
-    echo "${role:-workstation}"
+    cc_config_get HOST_ROLE workstation
 }
 
 cc_env_profile() {
-    local config profile
-    config="$(cc_env_config)"
-    profile="$(awk -F= '$1=="HOST_PROFILE" {gsub(/^"|"$/, "", $2); print $2; exit}' "$config" 2>/dev/null || true)"
-    echo "${profile:-default}"
+    cc_config_get HOST_PROFILE default
 }
 
 cc_env_init_dirs() {
-    local home host_home
+    local home host_home dir
     home="$(cc_env_home)"
     host_home="$(cc_env_host_home)"
-    mkdir -p \
-        "$home/hosts" \
-        "$host_home" \
+    for dir in \
+        "$home" "$home/hosts" "$host_home" \
         "$(cc_env_report_dir)" \
+        "$(cc_env_asset_dir)" \
         "$(cc_env_asset_dir)/drives" \
         "$(cc_env_asset_dir)/systems" \
         "$(cc_env_asset_dir)/repositories" \
@@ -111,14 +94,20 @@ cc_env_init_dirs() {
         "$(cc_env_cache_dir)" \
         "$(cc_env_log_dir)" \
         "$(cc_env_plugin_dir)"
+    do
+        _cc_config_ensure_private_dir "$dir" || return 1
+    done
 }
 
 cc_env_write_default_config() {
     local config host_id
     config="$(cc_env_config)"
     host_id="$(cc_env_host_id)"
-    [ -f "$config" ] && return 0
-    cat > "$config" <<EOF_CONFIG
+    if [ -e "$config" ] || [ -L "$config" ]; then
+        return 0
+    fi
+    local content
+    content="$(cat <<EOF_CONFIG
 # Captain Cronos host configuration
 HOST_ID="$host_id"
 HOST_ROLE="workstation"
@@ -133,6 +122,8 @@ EDITOR="nano"
 AUTO_DOCS="no"
 AUTO_PUSH="no"
 EOF_CONFIG
+    )"$'\n'
+    _cc_config_write_text "$config" "$content"
 }
 
 cc_env_export() {

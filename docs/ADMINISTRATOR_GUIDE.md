@@ -337,6 +337,37 @@ auto-stash, force-push, rebase, rewrite history, resolve conflicts, delete remot
 feature branches, or change packages, kernels, bootloaders, browsers, services,
 PATH configuration, or unrelated repositories.
 
+## Configuration and Host Profiles
+
+Use `cc config status` for the active schema, layers, identity source, role,
+profile, ownership, permissions, and validation summary. `cc config validate`
+is read-only. `cc config show` prints all present layers with likely secret
+values redacted. `cc config set KEY VALUE` changes only the global user layer by
+private atomic replacement. Unknown keys are preserved and reported by name.
+
+Configuration precedence is deployed defaults, global user configuration, then
+the selected host configuration. Host identity precedence is `CC_HOST_ID`, the
+stored `~/.captaincronos/host-id`, a legacy global `HOST_ID`, then hostname.
+`CC_HOST_ID` is an intentional runtime/test override and may select a different
+host tree. Unset it when stored identity should win. Status and validation make
+an active override visible, and validation names both IDs when it differs from
+stored identity.
+
+`cc init` previews by default. `cc init --apply --host-id ID --role ROLE
+--profile PROFILE` creates missing private state and preserves existing host
+configuration on later runs. It refuses an unsafe path or a host ID different
+from the stored identity. Roles describe host purpose; profiles select one of
+the supported initialization policies. Changing the machine hostname does not
+change an initialized identity. To move configuration to a renamed host, keep
+the `host-id` and matching host directory together rather than renaming either
+implicitly.
+
+Legacy global configuration can be inspected with `cc config validate` and
+migrated with `cc config migrate`. Migration previews unless `--apply` is given,
+backs up the original, retains unknown keys, and does not rewrite an already
+current file. Installer and toolkit-update workflows preserve global config,
+stable identity, every host profile, plugins, reports, and assets.
+
 ## Persistent Resource Retention
 
 Use `cc maintenance inventory` to inspect every cataloged persistent resource.

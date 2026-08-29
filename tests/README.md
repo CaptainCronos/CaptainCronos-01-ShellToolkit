@@ -88,7 +88,12 @@ Focused shell tests supplement `cc selftest`:
 - `data.sh` validates JSON/YAML compatibility, parsing, validation, querying,
   safe expressions, YAML mutation, and required/optional capability behavior.
 - `config.sh` validates safe configuration expansion, literal data handling,
-  quoting, and configuration-key validation.
+  quoting, layered precedence, schema migration, identity overrides, ownership,
+  atomic writes, redaction, and configuration-key validation.
+- `config-host.sh` validates zero-write init preview, private first apply,
+  idempotent preservation, stable identity across hostname changes, role/profile
+  validation, symlink confinement, command status, and doctor integration using
+  only disposable homes.
 - `storage.sh` validates stable `lsblk` field parsing, unmounted drives, and
   CSV escaping for device metadata.
 - `smart.sh` validates ATA/NVMe temperature, hours, lifetime, and integrated

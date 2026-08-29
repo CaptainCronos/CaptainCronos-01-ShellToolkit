@@ -82,6 +82,14 @@ layer in `lib/cc-reports.sh` consumes family metadata from `cc-retention`, build
 a bounded in-memory plan, previews by default, and exposes mutation only through
 `cc reports prune --apply` for recognized current-host report history.
 
+`lib/cc-config.sh` owns the data-only configuration parser, schema version,
+layer precedence, stable identity, validation, migration, path safety, and
+atomic writes. The layers are `config/defaults.conf`, `CC_HOME/config`, and the
+selected host's config, in increasing precedence. `CC_HOST_ID` is the explicit
+runtime/test identity override and precedes the stored `CC_HOME/host-id`; tests
+of stored identity must clear it. Status and validation must disclose the
+override so an inherited value cannot change host context silently.
+
 ---
 
 ## Program Management

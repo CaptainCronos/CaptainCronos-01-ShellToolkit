@@ -211,12 +211,25 @@ Discovery:
 ~~~text
 Usage:
   cc config show
+  cc config status
+  cc config validate
   cc config init
   cc config get KEY [DEFAULT]
   cc config set KEY VALUE
+  cc config migrate [--apply]
 
 Configuration file:
-  ~/.captaincronos/config
+  Global: ~/.captaincronos/config
+  Host:   ~/.captaincronos/hosts/<host-id>/config
+
+Host identity precedence:
+  CC_HOST_ID runtime/test override -> stored host-id -> legacy global HOST_ID
+  -> hostname fallback. An inherited CC_HOST_ID intentionally selects another
+  host tree; unset it to use the stored identity. Status/validate report it.
+
+Mutation safety:
+  set and init use private atomic writes. Migration is preview-only unless
+  --apply is supplied and creates a private backup before replacement.
 ~~~
 
 ### Switch discovery
@@ -235,10 +248,13 @@ Switches:
   --version......... Show toolkit version information.
 
 Subcommands:
-  show........ Show resolved toolkit configuration.
-  init........ Initialize the user configuration file.
-  get......... Read one key with an optional default.
-  set......... Set one configuration key and value.
+  show............ Show redacted configuration layers and their sources.
+  status.......... Show configuration ownership, schema, identity, and health.
+  validate........ Validate configuration without writing.
+  init............ Initialize missing global configuration and stable identity.
+  get............. Read one key with an optional default.
+  set............. Atomically set one global user configuration key.
+  migrate......... Preview or explicitly apply the supported schema migration.
 
 Discovery:
   cc config <subcommand> switches
@@ -837,6 +853,10 @@ Profiles:
   default
 
 Default is dry-run.
+
+CC_HOST_ID is an explicit runtime/test override with precedence over the stored
+identity. Prefer --host-id for initialization; an existing different stored
+identity is never replaced implicitly.
 ~~~
 
 ### Switch discovery

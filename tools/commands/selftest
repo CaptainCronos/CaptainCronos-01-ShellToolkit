@@ -286,6 +286,7 @@ selftest_suite() {
     "$runner" "Data library" data check_library cc-data.sh
     "$runner" "Structured data" data bash "$PROJECT_ROOT/tests/data.sh"
     "$runner" "Configuration safety" configuration bash "$PROJECT_ROOT/tests/config.sh"
+    "$runner" "Configuration host profiles" configuration bash "$PROJECT_ROOT/tests/config-host.sh"
     "$runner" "Mutation safety contracts" maintenance bash "$PROJECT_ROOT/tests/safety-contracts.sh"
     "$runner" "Developer update contracts" maintenance bash "$PROJECT_ROOT/tests/dev-updates.sh"
     "$runner" "Maintenance operation contracts" maintenance bash "$PROJECT_ROOT/tests/maintenance-operations.sh"

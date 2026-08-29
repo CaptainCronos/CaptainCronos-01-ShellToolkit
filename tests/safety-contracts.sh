@@ -204,6 +204,17 @@ printf 'old aliases\n' > "$install_home/.bash_aliases"
 printf 'old functions\n' > "$install_home/.bash_functions"
 printf 'old launcher\n' > "$install_home/bin/cc"
 chmod 755 "$install_home/bin/cc"
+mkdir -p "$install_home/.captaincronos/hosts/preserve-host/plugins" \
+    "$install_home/.captaincronos/hosts/preserve-host/reports" \
+    "$install_home/.captaincronos/hosts/preserve-host/assets"
+printf 'CONFIG_VERSION="1"\nEDITOR="operator"\n' >"$install_home/.captaincronos/config"
+printf 'preserve-host\n' >"$install_home/.captaincronos/host-id"
+printf 'HOST_ROLE="server"\nHOST_PROFILE="server"\nCUSTOM="keep"\n' >"$install_home/.captaincronos/hosts/preserve-host/config"
+printf plugin >"$install_home/.captaincronos/hosts/preserve-host/plugins/operator.plugin"
+printf report >"$install_home/.captaincronos/hosts/preserve-host/reports/operator.report"
+printf asset >"$install_home/.captaincronos/hosts/preserve-host/assets/operator.asset"
+chmod 600 "$install_home/.captaincronos/config" "$install_home/.captaincronos/host-id" \
+    "$install_home/.captaincronos/hosts/preserve-host/config"
 
 for mode in default explicit; do
     installer_args=()
@@ -216,6 +227,8 @@ for mode in default explicit; do
     assert_file_content "$install_home/.bash_aliases" "old aliases" "installer $mode dry-run replaced aliases"
     assert_file_content "$install_home/.bash_functions" "old functions" "installer $mode dry-run replaced functions"
     assert_file_content "$install_home/bin/cc" "old launcher" "installer $mode dry-run replaced launcher"
+    assert_file_content "$install_home/.captaincronos/config" $'CONFIG_VERSION="1"\nEDITOR="operator"' "installer $mode changed global config"
+    assert_file_content "$install_home/.captaincronos/hosts/preserve-host/config" $'HOST_ROLE="server"\nHOST_PROFILE="server"\nCUSTOM="keep"' "installer $mode changed host config"
     [ ! -e "$install_home/.captaincronos/backups" ] || fail "installer $mode dry-run created backups"
 done
 
@@ -227,6 +240,12 @@ cmp -s "$PROJECT_ROOT/bash/bashrc" "$install_home/.bashrc" || fail "installer ap
 cmp -s "$PROJECT_ROOT/tools/cc" "$install_home/bin/cc" || fail "installer apply did not install launcher"
 find "$install_home/.captaincronos/backups" -type f -name .bashrc -print -quit | grep -q . \
     || fail "installer apply did not back up bashrc"
+assert_file_content "$install_home/.captaincronos/config" $'CONFIG_VERSION="1"\nEDITOR="operator"' "installer apply changed global config"
+assert_file_content "$install_home/.captaincronos/host-id" "preserve-host" "installer apply changed host identity"
+assert_file_content "$install_home/.captaincronos/hosts/preserve-host/config" $'HOST_ROLE="server"\nHOST_PROFILE="server"\nCUSTOM="keep"' "installer apply changed host config"
+assert_file_content "$install_home/.captaincronos/hosts/preserve-host/plugins/operator.plugin" plugin "installer apply changed plugin"
+assert_file_content "$install_home/.captaincronos/hosts/preserve-host/reports/operator.report" report "installer apply changed report"
+assert_file_content "$install_home/.captaincronos/hosts/preserve-host/assets/operator.asset" asset "installer apply changed asset"
 
 # Launcher installation follows the same default-preview/explicit-apply contract.
 launcher_home="$TEST_DIR/launcher-home"
@@ -253,6 +272,13 @@ printf 'toolkit old aliases\n' > "$toolkit_home/.bash_aliases"
 printf 'toolkit old functions\n' > "$toolkit_home/.bash_functions"
 printf 'toolkit old launcher\n' > "$toolkit_home/bin/cc"
 chmod 755 "$toolkit_home/bin/cc"
+mkdir -p "$toolkit_home/.captaincronos/hosts/update-host/plugins"
+printf 'CONFIG_VERSION="1"\nEDITOR="update-operator"\n' >"$toolkit_home/.captaincronos/config"
+printf 'update-host\n' >"$toolkit_home/.captaincronos/host-id"
+printf 'HOST_ROLE="server"\nHOST_PROFILE="server"\n' >"$toolkit_home/.captaincronos/hosts/update-host/config"
+printf plugin >"$toolkit_home/.captaincronos/hosts/update-host/plugins/operator.plugin"
+chmod 600 "$toolkit_home/.captaincronos/config" "$toolkit_home/.captaincronos/host-id" \
+    "$toolkit_home/.captaincronos/hosts/update-host/config"
 rm -f "$GIT_TRACE_FILE"
 toolkit_output="$(env "${common_env[@]}" HOME="$toolkit_home" \
     bash "$PROJECT_ROOT/tools/commands/toolkit-update")" || fail "toolkit-update default preview failed"
@@ -268,6 +294,10 @@ env "${common_env[@]}" HOME="$toolkit_home" CC_SAFETY_ALLOW_GIT_MUTATION=1 \
     bash "$PROJECT_ROOT/tools/commands/toolkit-update" --apply >/dev/null || fail "mocked toolkit-update apply failed"
 grep -Fq $'pull\t--ff-only\torigin\tmain' "$GIT_TRACE_FILE" || fail "toolkit apply did not use a bounded fast-forward pull"
 cmp -s "$PROJECT_ROOT/bash/bashrc" "$toolkit_home/.bashrc" || fail "toolkit apply did not reach installer apply"
+assert_file_content "$toolkit_home/.captaincronos/config" $'CONFIG_VERSION="1"\nEDITOR="update-operator"' "toolkit update changed global config"
+assert_file_content "$toolkit_home/.captaincronos/host-id" update-host "toolkit update changed identity"
+assert_file_content "$toolkit_home/.captaincronos/hosts/update-host/config" $'HOST_ROLE="server"\nHOST_PROFILE="server"' "toolkit update changed host config"
+assert_file_content "$toolkit_home/.captaincronos/hosts/update-host/plugins/operator.plugin" plugin "toolkit update changed plugin"
 
 # Apply refuses unsafe repository state before any Git or installer mutation.
 toolkit_guard="$TEST_DIR/toolkit-guard"

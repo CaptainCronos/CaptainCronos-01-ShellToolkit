@@ -151,6 +151,7 @@ audit|--strict|0|Require executable bits plus Category and Requires headers.
 audit/summary|--strict|0|Require executable bits plus Category and Requires headers.
 audit/commands|--strict|0|Require executable bits plus Category and Requires headers.
 audit/fix|--apply|0|Repair managed command metadata and executable bits; omission is preview-only. [default: preview]
+config/migrate|--apply|0|Back up and atomically add the current schema marker; omission is preview-only. [default: preview]
 dev-update|--dry-run|0|Report supported update operations without mutation. [default]
 dev-update|--apply|0|Authorize only the developer ecosystem updates implemented as mutable.
 dev-update|--status-only|0|Report manager availability and policy without running update commands.
@@ -277,10 +278,13 @@ audit|commands|Show per-command audit detail.|audit/commands
 audit|fix|Preview or apply managed audit repairs.|audit/fix
 capability|list|List platform capabilities.|capability/list
 capability|check|Check one named capability.|capability/check
-config|show|Show resolved toolkit configuration.|config/show
-config|init|Initialize the user configuration file.|config/init
+config|show|Show redacted configuration layers and their sources.|config/show
+config|status|Show configuration ownership, schema, identity, and health.|config/status
+config|validate|Validate configuration without writing.|config/validate
+config|init|Initialize missing global configuration and stable identity.|config/init
 config|get|Read one key with an optional default.|config/get
-config|set|Set one configuration key and value.|config/set
+config|set|Atomically set one global user configuration key.|config/set
+config|migrate|Preview or explicitly apply the supported schema migration.|config/migrate
 deps|summary|Show the default dependency summary.|deps/summary
 deps|command|Show dependencies for one registered command.|deps/command
 deps|core|Show core dependencies.|deps/core
