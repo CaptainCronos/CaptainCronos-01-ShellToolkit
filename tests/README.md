@@ -27,7 +27,11 @@ Focused shell tests supplement `cc selftest`:
   resolution, dependency/platform/enablement states, duplicate and core
   collisions, entrypoint confinement, symlink and permission failures, unknown
   material isolation, host isolation, deterministic order, repeated sourcing,
-  redirected output, and zero-write plugin/help/switch inspection.
+  explicit runtime boundaries, redirected output, and zero-write
+  plugin/help/switch inspection.
+- `truenas-readonly.sh` validates SCALE platform evidence, the fixed read-only
+  middleware allowlist, JSON normalization, bounded failures/timeouts, and
+  passive capability resolution using disposable fixtures only.
 - `path-environment.sh` validates canonical managed PATH repair, known legacy
   normalization, five-source and fresh-shell idempotency, NVM/custom ordering,
   guarded profile interaction, ambiguous-line preservation, atomic no-op

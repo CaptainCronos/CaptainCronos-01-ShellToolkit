@@ -84,6 +84,8 @@ assert_contains "$output" $'unsupported\tunsupported fixture\tSKIP' 'unsupported
 assert_contains "$output" 'missing required dependency' 'required dependency failure was absent'
 assert_contains "$output" $'optional\toptional fixture\tWARN' 'optional dependency warning was absent'
 assert_contains "$output" $'group-writable\tgroup-writable fixture\tWARN' 'group-writable plugin was not reported'
+result="$(TOOLKIT_ROOT="$toolkit" CC_HOST_HOME="$host" cc_capability_result group-writable-cap)"
+assert_contains "$result" $'unavailable\tFAIL' 'group-writable capability was reported available'
 
 # Strict data-only schema rejects malformed, unknown, and future metadata.
 make_plugin "$host/plugins" malformed malformed-cap
@@ -213,6 +215,110 @@ assert_contains "$(inventory "$isolated_toolkit" "$host_a")" 'only-a-cap' 'repea
 source "$PROJECT_ROOT/lib/cc-platform.sh"
 result="$(TOOLKIT_ROOT="$isolated_toolkit" CC_HOST_HOME="$host_a" cc_capability_result only-a-cap)"
 assert_contains "$result" $'available\tPASS\tplugin/only-a' 'platform re-source replaced authoritative resolution'
+
+# Runtime is explicit, resolves one exact absolute entrypoint, and performs a
+# complete fresh inventory validation immediately before direct execution.
+runtime_toolkit="$TEST_DIR/runtime-toolkit" runtime_host="$TEST_DIR/runtime-host"
+make_roots "$runtime_toolkit" "$runtime_host"
+make_plugin "$runtime_host/plugins" runtime-plugin runtime-cap
+runtime_trace="$TEST_DIR/runtime.args"
+runtime_stdout="$TEST_DIR/runtime.stdout" runtime_stderr="$TEST_DIR/runtime.stderr"
+cat >"$runtime_host/plugins/runtime-plugin/run" <<'EOF_RUNTIME'
+#!/usr/bin/env bash
+printf 'runtime stdout\n'
+printf 'runtime stderr\n' >&2
+printf '<%s>\n' "$@" >"${CC_RUNTIME_ARG_TRACE:?}"
+exit 23
+EOF_RUNTIME
+chmod 700 "$runtime_host/plugins/runtime-plugin/run"
+mkdir "$TEST_DIR/runtime-path"
+cat >"$TEST_DIR/runtime-path/run" <<'EOF_PATH_RUN'
+#!/usr/bin/env bash
+printf 'PATH substitute executed\n' >"${CC_RUNTIME_PATH_TRACE:?}"
+EOF_PATH_RUN
+chmod 700 "$TEST_DIR/runtime-path/run"
+runtime_path_trace="$TEST_DIR/runtime-path.trace"
+runtime_status=0
+TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" \
+    CC_RUNTIME_ARG_TRACE="$runtime_trace" CC_RUNTIME_PATH_TRACE="$runtime_path_trace" \
+    PATH="$TEST_DIR/runtime-path:$PATH" \
+    cc_plugin_run runtime-plugin operation 'argument with spaces' '*' '--literal=value' \
+    >"$runtime_stdout" 2>"$runtime_stderr" || runtime_status=$?
+[ "$runtime_status" -eq 23 ] || fail 'plugin exit status was not propagated'
+assert_contains "$(cat "$runtime_stdout")" 'runtime stdout' 'plugin stdout was not preserved'
+assert_contains "$(cat "$runtime_stderr")" 'runtime stderr' 'plugin stderr was not preserved'
+[ "$(cat "$runtime_trace")" = $'<operation>\n<argument with spaces>\n<*>\n<--literal=value>' ] || fail 'plugin arguments were not preserved'
+[ ! -e "$runtime_path_trace" ] || fail 'PATH substituted for the validated entrypoint'
+
+runtime_status=0
+env CC_HOST_HOME="$runtime_host" CC_RUNTIME_ARG_TRACE="$runtime_trace" \
+    CC_RUNTIME_PATH_TRACE="$runtime_path_trace" PATH="$TEST_DIR/runtime-path:$PATH" \
+    CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT" \
+    bash "$PROJECT_ROOT/tools/cc" plugin run runtime-plugin public-operation 'public argument' \
+    >"$runtime_stdout" 2>"$runtime_stderr" || runtime_status=$?
+[ "$runtime_status" -eq 23 ] || fail 'public plugin runtime did not propagate status'
+[ "$(cat "$runtime_trace")" = $'<public-operation>\n<public argument>' ] || fail 'public plugin runtime changed arguments'
+[ ! -e "$runtime_path_trace" ] || fail 'public runtime used a PATH entrypoint substitute'
+
+make_plugin "$runtime_host/plugins" runtime-disabled disabled-runtime-cap no
+if TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" cc_plugin_run runtime-disabled operation >/dev/null 2>&1; then
+    fail 'disabled plugin executed'
+fi
+make_plugin "$runtime_host/plugins" runtime-unsupported unsupported-runtime-cap yes impossible-platform
+if TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" cc_plugin_run runtime-unsupported operation >/dev/null 2>&1; then
+    fail 'unsupported plugin executed'
+fi
+make_plugin "$runtime_host/plugins" runtime-missing missing-runtime-cap yes any definitely-missing-plugin-program
+if TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" cc_plugin_run runtime-missing operation >/dev/null 2>&1; then
+    fail 'plugin with a missing dependency executed'
+fi
+make_plugin "$runtime_host/plugins" runtime-optional optional-runtime-cap yes any '' definitely-missing-optional-program
+CC_PLUGIN_EXEC_TRACE="$runtime_trace" TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" \
+    cc_plugin_run runtime-optional operation >/dev/null || fail 'optional dependency warning blocked runtime'
+make_plugin "$runtime_host/plugins" runtime-invalid invalid-runtime-cap
+printf 'unknown_runtime_field=yes\n' >>"$runtime_host/plugins/runtime-invalid/plugin.conf"
+if TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" cc_plugin_run runtime-invalid operation >/dev/null 2>&1; then
+    fail 'invalid plugin executed'
+fi
+
+make_plugin "$runtime_host/plugins" changed-after-discovery changed-runtime-cap
+inventory "$runtime_toolkit" "$runtime_host" >/dev/null
+printf 'changed=yes\n' >>"$runtime_host/plugins/changed-after-discovery/plugin.conf"
+if TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" cc_plugin_run changed-after-discovery operation >/dev/null 2>&1; then
+    fail 'manifest changed after discovery executed without revalidation'
+fi
+make_plugin "$runtime_host/plugins" entry-changed entry-changed-cap
+inventory "$runtime_toolkit" "$runtime_host" >/dev/null
+chmod 702 "$runtime_host/plugins/entry-changed/run"
+if TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" cc_plugin_run entry-changed operation >/dev/null 2>&1; then
+    fail 'entrypoint changed after discovery executed without revalidation'
+fi
+make_plugin "$runtime_host/plugins" wrong-owner wrong-owner-cap
+mkdir "$TEST_DIR/ownership-bin"
+cat >"$TEST_DIR/ownership-bin/stat" <<EOF_OWNERSHIP_STAT
+#!/usr/bin/env bash
+if [ "\${1:-}" = -c ] && [ "\${2:-}" = %u ] && [ "\${4:-}" = "$runtime_host/plugins/wrong-owner/run" ]; then
+    printf '999999\n'
+    exit 0
+fi
+exec /usr/bin/stat "\$@"
+EOF_OWNERSHIP_STAT
+chmod 700 "$TEST_DIR/ownership-bin/stat"
+if PATH="$TEST_DIR/ownership-bin:$PATH" TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" \
+    cc_plugin_run wrong-owner operation >/dev/null 2>&1; then
+    fail 'wrong-owner runtime entrypoint executed'
+fi
+make_plugin "$runtime_host/plugins" runtime-linked linked-runtime-cap
+mv "$runtime_host/plugins/runtime-linked/run" "$TEST_DIR/runtime-outside"
+ln -s "$TEST_DIR/runtime-outside" "$runtime_host/plugins/runtime-linked/run"
+if TOOLKIT_ROOT="$runtime_toolkit" CC_HOST_HOME="$runtime_host" cc_plugin_run runtime-linked operation >/dev/null 2>&1; then
+    fail 'symlinked runtime entrypoint executed'
+fi
+
+# Calling inventory again proves runtime was not smuggled into discovery.
+rm -f "$runtime_trace"
+CC_PLUGIN_EXEC_TRACE="$runtime_trace" inventory "$runtime_toolkit" "$runtime_host" >/dev/null
+[ ! -e "$runtime_trace" ] || fail 'discovery executed plugin code after runtime was added'
 
 # Public plugin/capability inspection and help/switch discovery leave the
 # disposable host tree byte-for-byte unchanged and emit no redirected ANSI.

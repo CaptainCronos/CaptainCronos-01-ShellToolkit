@@ -3,8 +3,9 @@
 ## Scope
 
 Plugin API 1 is an experimental local contract for the beta3 development line.
-It makes discovery and capability declarations real without adding a runtime,
-command loader, installer, remote repository, or marketplace.
+It provides data-only discovery, capability declarations, and one bounded,
+explicit runtime without a command loader, installer, remote repository, or
+marketplace.
 
 ## Concepts
 
@@ -12,8 +13,8 @@ command loader, installer, remote repository, or marketplace.
   core platform detection, a configured program interface, or one enabled and
   healthy plugin.
 - A **plugin** is an optional extension described by a validated manifest. It
-  may declare capabilities and has a bounded entrypoint, but API 1 does not
-  invoke it.
+  may declare capabilities and has one bounded entrypoint that can be invoked
+  only through `cc plugin run`.
 - A **dependency** is an external executable or registered Program Management
   interface required or optionally used by a plugin.
 - A **command** is a user-facing interface in the toolkit registry. API 1
@@ -125,16 +126,39 @@ cc plugin switches
 cc capability switches
 ```
 
-API 1 has no plugin execution or command-registration interface. An entrypoint
-is validated now so a later runtime contract can start from a bounded identity.
-Core command dispatch remains unchanged and a broken plugin cannot remove or
-shadow core commands.
+An entrypoint is validated during discovery but never invoked by it. Runtime is
+a separate, explicit operation:
+
+```text
+cc plugin run <plugin-id> <operation> [argument ...]
+```
+
+Immediately before execution, the runtime reloads discovery and requires one
+unique `PASS` record or a `WARN` caused only by a missing optional dependency.
+Group-writable material remains non-executable and its capability is
+unavailable. Validation repeats manifest, platform, dependency, ownership,
+permission, symlink, and entrypoint checks. It then invokes the exact
+absolute entrypoint directly with the remaining arguments as an array. It does
+not use PATH entrypoint lookup, `eval`, a generated shell command, sourcing,
+`sudo`, or dependency installation.
+
+The child inherits the caller environment except that shell startup hooks
+`BASH_ENV` and `ENV`, `CDPATH`, caller program configuration, and PATH are
+reset. PATH is `/usr/sbin:/usr/bin:/sbin:/bin`. The runtime supplies
+`CC_PLUGIN_ID`, `CC_PLUGIN_API`, `CC_PLUGIN_ROOT`, and the trusted
+`CC_TOOLKIT_ROOT`. Standard output, standard error, and exit status are
+preserved. Core command dispatch remains unchanged, and a broken plugin cannot
+remove or shadow core commands.
+
+Completing this bounded execution contract does not require plugin API 2. The
+API 1 manifest schema, entrypoint identity, discovery semantics, and existing
+plugin validity are unchanged; API 1 already required the executable
+entrypoint that this runtime invokes.
 
 ## Deferred Work
 
 The following are intentional deferments, not implicit capabilities:
 
-- plugin invocation and argument/exit propagation
 - command registration and collision-aware dispatcher integration
 - enable/disable or install/remove mutation commands
 - profile-driven plugin policy

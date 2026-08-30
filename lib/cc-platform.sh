@@ -32,6 +32,28 @@ cc_platform_name() { local v; v="$(cc_platform_os_value PRETTY_NAME)"; echo "${v
 cc_platform_kernel() { uname -r 2>/dev/null || echo unknown; }
 cc_platform_arch() { uname -m 2>/dev/null || echo unknown; }
 
+cc_platform_truenas_version() {
+    if [ -f /etc/version ]; then
+        awk 'NR == 1 {print; exit}' /etc/version
+    fi
+}
+
+_cc_platform_truenas_midclt_path() {
+    printf '%s\n' /usr/bin/midclt
+}
+
+cc_platform_is_truenas_scale() {
+    local id kernel version midclt
+    id="$(cc_platform_os_id)"
+    kernel="$(cc_platform_kernel)"
+    version="$(cc_platform_truenas_version)"
+    midclt="$(_cc_platform_truenas_midclt_path)"
+    [ "$id" = debian ] || return 1
+    [[ "$kernel" == *production+truenas* ]] || return 1
+    [[ "$version" =~ ^[0-9]+\.[0-9]+([.A-Za-z0-9_+-]*)?$ ]] || return 1
+    [ -x "$midclt" ] && [ ! -L "$midclt" ]
+}
+
 cc_platform_package_manager() {
     local manager
     if command -v apt-get >/dev/null 2>&1; then manager=apt-get
@@ -62,7 +84,7 @@ cc_platform_type() {
     local id like
     id="$(cc_platform_os_id)"
     like="$(cc_platform_os_like)"
-    if command -v midclt >/dev/null 2>&1; then echo truenas-scale
+    if cc_platform_is_truenas_scale; then echo truenas-scale
     elif [ "$id" = "linuxmint" ]; then echo linuxmint
     elif [ "$id" = "ubuntu" ]; then echo ubuntu
     elif [ "$id" = "debian" ]; then echo debian
@@ -85,7 +107,7 @@ cc_platform_capability_exists() {
         sockets) cc_program_exists sockets ;;
         storage) command -v lsblk >/dev/null 2>&1 ;;
         systemd) [ "$(cc_platform_init_system)" = "systemd" ] ;;
-        truenas) command -v midclt >/dev/null 2>&1 ;;
+        truenas) cc_platform_is_truenas_scale ;;
         zfs) command -v zpool >/dev/null 2>&1 || command -v zfs >/dev/null 2>&1 ;;
         *) command -v "$cap" >/dev/null 2>&1 ;;
     esac

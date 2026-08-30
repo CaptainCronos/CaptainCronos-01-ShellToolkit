@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ "${CC_PLUGIN_ID:-}" = truenas-readonly ]; then
+    MIDCLT=/usr/bin/midclt
+    TIMEOUT=/usr/bin/timeout
+    TIMEOUT_SECONDS=15
+else
+    MIDCLT="${CC_TRUENAS_MIDCLT_PATH:-/usr/bin/midclt}"
+    TIMEOUT="${CC_TRUENAS_TIMEOUT_PATH:-/usr/bin/timeout}"
+    TIMEOUT_SECONDS="${CC_TRUENAS_TIMEOUT_SECONDS:-15}"
+fi
+
+[ -n "${CC_TOOLKIT_ROOT:-}" ] && [ -f "$CC_TOOLKIT_ROOT/lib/cc-data.sh" ] || {
+    printf 'Captain Cronos JSON helpers are unavailable.\n' >&2
+    exit 127
+}
+# Runtime supplies a validated toolkit root; the plugin remains a separate
+# process and does not source plugin material into the Captain Cronos shell.
+# shellcheck disable=SC1090
+source "$CC_TOOLKIT_ROOT/lib/cc-data.sh"
+
+usage() {
+    cat >&2 <<'EOF_HELP'
+Usage: cc plugin run truenas-readonly <system|pools|datasets|disks|network>
+EOF_HELP
+}
+
+approved_method() {
+    case "$1" in
+        system) printf '%s\n' system.info ;;
+        pools) printf '%s\n' pool.query ;;
+        datasets) printf '%s\n' pool.dataset.query ;;
+        disks) printf '%s\n' disk.query ;;
+        network) printf '%s\n' interface.query ;;
+        *) return 2 ;;
+    esac
+}
+
+normalizer() {
+    case "$1" in
+        system)
+            printf '%s\n' 'if type != "object" then error("system.info returned a non-object") else {operation: "system", data: {version, hostname, uptime_seconds, physmem, model, cores}} end'
+            ;;
+        pools)
+            printf '%s\n' 'if type != "array" then error("pool.query returned a non-array") else {operation: "pools", data: map({name, status, healthy, size, allocated, free})} end'
+            ;;
+        datasets)
+            printf '%s\n' 'def walkds: .[] | ({name: .id, type, pool, encrypted, locked, used: .used.parsed, available: .available.parsed}), ((.children // []) | walkds); if type != "array" then error("pool.dataset.query returned a non-array") else {operation: "datasets", data: [walkds]} end'
+            ;;
+        disks)
+            printf '%s\n' 'if type != "array" then error("disk.query returned a non-array") else {operation: "disks", data: map({name, model, serial, size, type, bus, pool})} end'
+            ;;
+        network)
+            printf '%s\n' 'if type != "array" then error("interface.query returned a non-array") else {operation: "network", data: map({name, type, description, mtu: .state.mtu, link_state: .state.link_state, addresses: [.state.aliases[]? | {type, address, netmask}]})} end'
+            ;;
+    esac
+}
+
+main() {
+    local operation="${1:-}" method expression raw status
+    [ "$#" -eq 1 ] || { usage; return 2; }
+    method="$(approved_method "$operation")" || { usage; return 2; }
+    [[ "$TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || {
+        printf 'Invalid timeout configuration.\n' >&2
+        return 2
+    }
+    for executable in "$MIDCLT" "$TIMEOUT"; do
+        [ -x "$executable" ] || {
+            printf 'Required executable is unavailable: %s\n' "$executable" >&2
+            return 127
+        }
+    done
+
+    status=0
+    raw="$("$TIMEOUT" --signal=TERM --kill-after=2 "${TIMEOUT_SECONDS}s" \
+        "$MIDCLT" call "$method")" || status=$?
+    [ "$status" -eq 0 ] || return "$status"
+    expression="$(normalizer "$operation")"
+    # No filename argument intentionally makes the shared helper validate stdin.
+    # shellcheck disable=SC2119
+    printf '%s\n' "$raw" | _cc_json_validate || {
+        printf 'TrueNAS returned malformed JSON for %s.\n' "$operation" >&2
+        return 65
+    }
+    printf '%s\n' "$raw" | _cc_json_query "$expression" || {
+        printf 'TrueNAS returned malformed or unexpected JSON for %s.\n' "$operation" >&2
+        return 65
+    }
+}
+
+main "$@"

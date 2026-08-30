@@ -63,7 +63,14 @@ cc_capability_result() {
     fi
     case "$selected_state" in
         PASS) printf 'available\tPASS\tplugin/%s\t%s\n' "$selected_id" "$selected_reason" ;;
-        WARN) printf 'available\tWARN\tplugin/%s\t%s\n' "$selected_id" "$selected_reason" ;;
+        WARN)
+            case "$selected_reason" in
+                plugin\ material\ is\ group-writable)
+                    printf 'unavailable\tFAIL\tplugin/%s\t%s\n' "$selected_id" "$selected_reason"
+                    ;;
+                *) printf 'available\tWARN\tplugin/%s\t%s\n' "$selected_id" "$selected_reason" ;;
+            esac
+            ;;
         SKIP)
             case "$selected_reason" in
                 disabled*) printf 'disabled\tSKIP\tplugin/%s\t%s\n' "$selected_id" "$selected_reason" ;;

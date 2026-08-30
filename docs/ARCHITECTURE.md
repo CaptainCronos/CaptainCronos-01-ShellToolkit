@@ -571,10 +571,29 @@ available, unavailable, unsupported, disabled, and missing-dependency results.
 Required and optional plugin dependency checks reuse `lib/cc-deps.sh`; nothing
 is installed automatically.
 
-Plugin command registration and entrypoint invocation are intentionally
-deferred. API 1 rejects command declarations, so plugins cannot shadow core or
-one another. Remote repositories, download/install, signing, auto-update, and a
-marketplace are also outside this local foundation.
+Plugin API 1 includes one explicit runtime surface:
+
+```text
+cc plugin run <plugin-id> <operation> [argument ...]
+```
+
+Discovery remains data-only. Runtime reloads and revalidates the selected
+manifest and exact entrypoint, requires one unique PASS record or an
+optional-dependency-only WARN, resets shell startup hooks and PATH, and invokes
+that absolute entrypoint directly while preserving arguments, standard
+streams, and status. There is no sourcing,
+shell command construction, PATH entrypoint lookup, implicit privilege, or
+dependency installation. API 1 rejects command declarations, so plugins cannot
+shadow core or one another. Remote repositories, download/install, signing,
+auto-update, lifecycle hooks, and a marketplace remain outside the contract.
+
+The repository `truenas-readonly` consumer uses this runtime for five static
+read-only operations. Its adapter maps `system`, `pools`, `datasets`, `disks`,
+and `network` to fixed middleware methods, bounds each local `midclt` call,
+validates the response as JSON, and presents a reduced JSON schema. It remains
+fixture-validated until the read-only verification in
+[`TRUENAS_READONLY_RUNTIME.md`](TRUENAS_READONLY_RUNTIME.md) succeeds on an
+actual TrueNAS SCALE host.
 
 ### Prompt Engine
 The internal prompt engine lives in:

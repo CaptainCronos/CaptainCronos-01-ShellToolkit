@@ -1,0 +1,1 @@
+[{"id":"tank","type":"FILESYSTEM","pool":"tank","encrypted":false,"locked":false,"used":{"parsed":400},"available":{"parsed":600},"children":[{"id":"tank/media","type":"FILESYSTEM","pool":"tank","encrypted":false,"locked":false,"used":{"parsed":250},"available":{"parsed":600},"children":[]}]}]

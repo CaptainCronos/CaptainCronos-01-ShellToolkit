@@ -8,7 +8,7 @@
 # Category    : Core
 # Requires    : bash find sort stat
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Inspect trusted local plugin manifests without executing plugins.
+# Purpose     : Inspect plugins and explicitly run one validated entrypoint.
 # ==============================================================================
 
 set -euo pipefail
@@ -26,15 +26,17 @@ usage() {
 Usage:
   cc plugin [list|status]
   cc plugin info ID
+  cc plugin run ID OPERATION [ARGUMENT ...]
 
 Actions:
   list        List repository and current-host plugins with semantic state.
   status      Alias for list.
   info ID     Show validated inventory detail for one plugin ID.
+  run         Revalidate and explicitly execute one exact plugin entrypoint.
 
 Discovery reads data-only plugin.conf manifests. It never sources or executes
-plugin entrypoints. Plugin installation, enable/disable mutation, command
-registration, and remote update are not implemented.
+plugin entrypoints. Runtime does not use PATH entrypoint lookup, eval, shell
+command strings, sourcing, sudo, dependency installation, or lifecycle hooks.
 EOF_HELP
 }
 
@@ -43,6 +45,7 @@ case "$ACTION" in
     --version) cc_version; exit 0 ;;
     list|status) [ "$#" -le 1 ] || { usage; exit 2; } ;;
     info) [ -n "$NAME" ] && [ "$#" -eq 2 ] || { usage; exit 2; } ;;
+    run) [ -n "$NAME" ] && [ "$#" -ge 3 ] || { usage; exit 2; } ;;
     *) usage; exit 2 ;;
 esac
 
@@ -82,4 +85,5 @@ plugin_info() {
 case "$ACTION" in
     list|status) plugin_table ;;
     info) plugin_info ;;
+    run) cc_plugin_run "$NAME" "${@:3}" ;;
 esac

@@ -1181,15 +1181,17 @@ Discovery:
 Usage:
   cc plugin [list|status]
   cc plugin info ID
+  cc plugin run ID OPERATION [ARGUMENT ...]
 
 Actions:
   list        List repository and current-host plugins with semantic state.
   status      Alias for list.
   info ID     Show validated inventory detail for one plugin ID.
+  run         Revalidate and explicitly execute one exact plugin entrypoint.
 
 Discovery reads data-only plugin.conf manifests. It never sources or executes
-plugin entrypoints. Plugin installation, enable/disable mutation, command
-registration, and remote update are not implemented.
+plugin entrypoints. Runtime does not use PATH entrypoint lookup, eval, shell
+command strings, sourcing, sudo, dependency installation, or lifecycle hooks.
 ~~~
 
 ### Switch discovery
@@ -1211,6 +1213,7 @@ Subcommands:
   list.......... List validated local plugins and semantic state.
   status........ Alias for the validated plugin inventory.
   info.......... Show validated details for one plugin ID.
+  run........... Revalidate and explicitly execute one exact plugin entrypoint.
 
 Discovery:
   cc plugin <subcommand> switches

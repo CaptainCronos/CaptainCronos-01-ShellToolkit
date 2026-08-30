@@ -10,6 +10,10 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ### Added
 
+- Bounded plugin API 1 execution with fresh pre-execution trust validation and
+  direct exact-entrypoint invocation.
+- Fixture-validated TrueNAS SCALE read-only inventory for system, pool,
+  dataset, disk, and network queries.
 - Strict data-only plugin API 1 discovery for repository and current-host roots,
   with explicit enablement, dependency/platform state, bounded entrypoint
   validation, failure isolation, and conservative unknown-material reporting.

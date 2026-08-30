@@ -342,9 +342,11 @@ platform detection, configured Program Management interfaces, and validated
 plugin providers. Duplicate IDs/providers and core namespace collisions fail
 closed without affecting built-in command dispatch.
 
-Plugin command declarations and runtime execution remain deferred. The core
-dispatcher still searches only `tools/commands/`, which makes command collision
-impossible in plugin API 1.
+Plugin API 1 runtime execution is explicit through `cc plugin run`. It performs
+a fresh trust/dependency/platform validation and directly invokes only the
+selected absolute entrypoint. Plugin command declarations remain deferred. The
+core dispatcher still searches only `tools/commands/`, which makes command
+collision impossible in plugin API 1.
 
 ---
 

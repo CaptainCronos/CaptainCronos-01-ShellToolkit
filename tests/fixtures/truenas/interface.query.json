@@ -1,0 +1,1 @@
+[{"name":"eno1","type":"PHYSICAL","description":"fixture uplink","state":{"mtu":1500,"link_state":"LINK_STATE_UP","aliases":[{"type":"INET","address":"192.0.2.10","netmask":24}]}}]

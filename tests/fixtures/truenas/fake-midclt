@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+[ "$#" -eq 2 ] && [ "$1" = call ] || exit 2
+method="$2"
+case "$method" in
+    system.info|pool.query|pool.dataset.query|disk.query|interface.query) ;;
+    *)
+        printf 'mutation or unknown method rejected: %s\n' "$method" >&2
+        exit 90
+        ;;
+esac
+printf '%s\n' "$method" >>"${CC_FAKE_MIDCLT_TRACE:?}"
+if [ "${CC_FAKE_MIDCLT_SLEEP_METHOD:-}" = "$method" ]; then
+    sleep 5
+fi
+if [ "${CC_FAKE_MIDCLT_FAIL_METHOD:-}" = "$method" ]; then
+    printf 'fixture midclt failure: %s\n' "$method" >&2
+    exit 42
+fi
+if [ "${CC_FAKE_MIDCLT_MALFORMED_METHOD:-}" = "$method" ]; then
+    exec /bin/cat "${CC_TRUENAS_FIXTURE_ROOT:?}/malformed.json"
+fi
+exec /bin/cat "${CC_TRUENAS_FIXTURE_ROOT:?}/$method.json"

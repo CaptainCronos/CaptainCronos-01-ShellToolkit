@@ -123,7 +123,7 @@ maintenance|namespace-with-switches|cc maintenance [subcommand] [switches]|Inspe
 monthly-health|flat-with-switches|cc monthly-health [switches]|Generate a host health and maintenance report without kernel cleanup.|none
 monthly-health-timer|namespace|cc monthly-health-timer <subcommand>|Manage the optional user-scoped monthly-health timer.|namespace
 platform|namespace|cc platform [summary|capabilities]|Show platform identity and capabilities.|namespace
-plugin|namespace|cc plugin [list|status|info ID]|Inspect validated local plugin manifests without executing plugins.|namespace
+plugin|namespace|cc plugin [list|status|info ID|run ID OPERATION]|Inspect plugins or explicitly run one validated entrypoint.|namespace
 programs|namespace|cc programs [subcommand] [arguments]|Report configured semantic program interfaces.|namespace
 prompt|interactive|cc prompt [TEMPLATE]|Run the interactive, metadata-discovered prompt engine.|any
 registry|namespace|cc registry [table|tsv|markdown]|Show the command header metadata registry.|namespace
@@ -345,6 +345,7 @@ platform|capabilities|Show detected platform capabilities.|platform/capabilities
 plugin|list|List validated local plugins and semantic state.|plugin/list
 plugin|status|Alias for the validated plugin inventory.|plugin/status
 plugin|info|Show validated details for one plugin ID.|plugin/info
+plugin|run|Revalidate and explicitly execute one exact plugin entrypoint.|plugin/run
 programs|check|Check required and optional program interfaces.|programs/check
 programs|show|Show the implementation for one capability.|programs/show
 registry|table|Render the metadata registry as a table.|registry/table

@@ -223,6 +223,7 @@ _cc_plugin_add_record() {
     CC_PLUGIN_VERSIONS[index]="$4" CC_PLUGIN_PROVIDES_LIST[index]="$5"
     CC_PLUGIN_ORIGINS[index]="$6" CC_PLUGIN_PATHS[index]="$escaped_path" CC_PLUGIN_REASONS[index]="$8"
     CC_PLUGIN_ENTRYPOINTS[index]="${9:-}"
+    CC_PLUGIN_RAW_PATHS[index]="$7"
 }
 
 _cc_plugin_scan_directory() {
@@ -301,7 +302,7 @@ _cc_plugin_inventory_load() {
     declare -A capability_counts=()
     CC_PLUGIN_IDS=() CC_PLUGIN_NAMES=() CC_PLUGIN_STATES=() CC_PLUGIN_VERSIONS=()
     CC_PLUGIN_PROVIDES_LIST=() CC_PLUGIN_ORIGINS=() CC_PLUGIN_PATHS=() CC_PLUGIN_REASONS=()
-    CC_PLUGIN_ENTRYPOINTS=()
+    CC_PLUGIN_ENTRYPOINTS=() CC_PLUGIN_RAW_PATHS=()
 
     for origin in repository host; do
         if [ "$origin" = repository ]; then root="$(cc_plugin_repository_root)"; else root="$(cc_plugin_host_root)"; fi
@@ -381,4 +382,62 @@ cc_plugin_capability_tsv() {
                 "${CC_PLUGIN_STATES[index]}" "${CC_PLUGIN_ORIGINS[index]}" "${CC_PLUGIN_REASONS[index]}"
         done
     done
+}
+
+cc_plugin_runtime_resolve() {
+    local requested="$1" index match=-1 count=0
+    CC_PLUGIN_RUNTIME_ERROR=""
+    _cc_plugin_safe_token "$requested" || {
+        CC_PLUGIN_RUNTIME_ERROR="invalid plugin id"
+        return 2
+    }
+    _cc_plugin_inventory_load
+    for index in "${!CC_PLUGIN_IDS[@]}"; do
+        [ "${CC_PLUGIN_IDS[index]}" = "$requested" ] || continue
+        match="$index"
+        count=$((count + 1))
+    done
+    [ "$count" -gt 0 ] || {
+        CC_PLUGIN_RUNTIME_ERROR="plugin not found: $requested"
+        return 1
+    }
+    [ "$count" -eq 1 ] || {
+        CC_PLUGIN_RUNTIME_ERROR="plugin id is not unique: $requested"
+        return 1
+    }
+    case "${CC_PLUGIN_STATES[match]}:${CC_PLUGIN_REASONS[match]}" in
+        PASS:*|WARN:missing\ optional\ dependency:*) ;;
+        *)
+            CC_PLUGIN_RUNTIME_ERROR="plugin is not executable: ${CC_PLUGIN_STATES[match]} (${CC_PLUGIN_REASONS[match]})"
+            return 1
+            ;;
+    esac
+    CC_PLUGIN_RUNTIME_ID="${CC_PLUGIN_IDS[match]}"
+    CC_PLUGIN_RUNTIME_ROOT="${CC_PLUGIN_RAW_PATHS[match]}"
+    CC_PLUGIN_RUNTIME_ENTRYPOINT="$CC_PLUGIN_RUNTIME_ROOT/${CC_PLUGIN_ENTRYPOINTS[match]}"
+}
+
+cc_plugin_run() {
+    local plugin_id="${1:-}" toolkit_root
+    [ "$#" -ge 2 ] || {
+        printf 'Plugin ID and operation are required.\n' >&2
+        return 2
+    }
+    shift
+    if ! cc_plugin_runtime_resolve "$plugin_id"; then
+        printf '%s\n' "$CC_PLUGIN_RUNTIME_ERROR" >&2
+        return 126
+    fi
+    toolkit_root="${TOOLKIT_ROOT:-${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}}"
+
+    # Resolution above deliberately performs a new manifest, platform,
+    # dependency, ownership, permission, and entrypoint-path validation. The
+    # exact absolute entrypoint is then executed directly without a shell
+    # command string, PATH lookup, sourcing, privilege elevation, or eval.
+    BASH_ENV='' ENV='' CDPATH='' PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+        CC_PLUGIN_ID="$CC_PLUGIN_RUNTIME_ID" \
+        CC_PLUGIN_API="$CC_PLUGIN_API_VERSION" \
+        CC_PLUGIN_ROOT="$CC_PLUGIN_RUNTIME_ROOT" \
+        CC_TOOLKIT_ROOT="$toolkit_root" CC_PROGRAMS_CONFIG='' CC_PROGRAMS_LOADED='' \
+        "$CC_PLUGIN_RUNTIME_ENTRYPOINT" "$@"
 }
