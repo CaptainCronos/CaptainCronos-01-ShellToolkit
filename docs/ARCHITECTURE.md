@@ -594,13 +594,22 @@ Local acceptance is orchestrated by the canonical `ccvalidate` function from
 Its `fast`, `full`, and `release` modes are validation-only. Full mode relies on
 the selftest's default release gate rather than repeating its verify, audit, and
 documentation stages. Release mode delegates that internal gate and invokes it
-once as an explicit final stage. Explicit `finish` and `publish` modes form the
-Git-mutation boundary. Finish owns the feature checkout, fast-forward main
-update/merge, and post-merge validation. After the verified merge it records
-Git-private continuation evidence containing repository/remote identity,
-feature branch and tip, merged main, and the observed origin/main. A post-merge
-failure leaves local main, the retained feature, and that marker intact without
-pushing or resetting.
+once as an explicit final stage. Successful full and release runs atomically
+record separate private evidence under `.git/ccvalidate/`, bound to a hashed
+physical repository/Git-directory identity, exact HEAD, and a fully clean
+tracked/index/untracked state. Evidence is mode-specific and strict-parsed;
+stale, malformed, incomplete, or permissively stored state fails closed.
+Release may reuse engineering evidence but never skips its unique readiness
+gate.
+
+Explicit `finish` and `publish` modes form the Git-mutation boundary. Finish
+accepts supported work branches, including `feature/*` and `release/*`, and owns
+the work checkout, fast-forward main update/merge, and post-merge validation.
+After the verified merge it records Git-private continuation evidence containing
+repository/remote identity,
+work branch and tip, merged main, and the observed origin/main. A post-merge
+failure leaves local main, the retained work branch, and that marker intact
+without pushing or resetting.
 
 Publish owns continuation from clean local main. It accepts only equal or
 strictly-ahead, non-diverged main topology; runs release validation; rejects a

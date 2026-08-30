@@ -80,8 +80,11 @@ Use `ccvalidate fast` for inexpensive development feedback. Bare `ccvalidate`
 means `ccvalidate full`. Full mode runs the authoritative engineering selftest,
 whose default suite includes the release gate, followed by the independent Git
 diff check. Release mode delegates the release test out of that selftest run and
-then invokes `cc release check` explicitly, so the same broad coverage and final
-release gate execute without running identical expensive checks twice.
+then invokes `cc release check` explicitly. Successful full and release runs
+record separate Git-private PASS evidence for the exact clean repository and
+HEAD. Release may reuse unchanged engineering evidence, but it always executes
+its own release-readiness gate; full evidence alone never represents release
+readiness.
 
 Generated command references use the repository dispatcher and canonical
 metadata under a fixed locale/color context. Help rendering bypasses
@@ -90,11 +93,21 @@ shell startup hooks, and propagates generation failures instead of treating
 partial help output as a stale committed document.
 
 The `fast`, `full`, and `release` modes are validation-only. The explicit
-`ccvalidate finish` mode owns the feature-branch workflow: it requires the
-ShellToolkit repository, an approved origin, a clean committed
-feature/fix/development branch, and fast-forward-only history. It validates
-before switching branches, updates and merges main with `--ff-only`, records a
-local continuation marker after the verified merge, and runs release validation.
+`ccvalidate finish` mode owns the work-branch workflow: it requires the
+ShellToolkit repository, an approved origin, a clean committed supported branch
+(including `feature/*` and `release/*`), and fast-forward-only history. It may
+reuse authoritative validation for the exact unchanged state before switching,
+updates and merges main with `--ff-only`, records a local continuation marker
+after the verified merge, and runs release validation.
+
+Reusable validation evidence lives under `.git/ccvalidate/` with private
+permissions and atomic updates. It binds the physical repository/Git-directory
+identity, exact HEAD, clean tracked worktree, clean index, absence of untracked
+files, and validation mode/result. A different commit, any dirty state, missing
+or permissive state, malformed content, or an incomplete temporary file fails
+closed and runs validation normally. A fast-forward to the already validated
+commit may reuse its engineering PASS on main, while post-merge release and
+publication readiness gates still run.
 
 If that post-merge validation stops the workflow, repair and commit on local
 main, then use `ccvalidate publish`. Publish never merges: it requires clean
@@ -103,14 +116,14 @@ fast-forward descendant of `origin/main`. It refreshes the remote, runs the
 authoritative release validation, refreshes again, stops if the remote changed,
 pushes only `refs/heads/main:refs/heads/main`, and proves local main,
 `origin/main`, and live remote main are identical. Only then may it delete the
-marker-owned local feature branch with `git branch -d`, and only when the branch
+marker-owned local work branch with `git branch -d`, and only when the branch
 still has its recorded tip and Git proves it merged. Missing or invalid ownership
 evidence produces a cleanup warning without guessing or deleting a branch.
 
 Finish reuses the same publish, live-verification, and cleanup helpers. Neither
 workflow stashes, resets, rebases, forces, rewrites history, resolves conflicts,
-deletes remote feature branches, or rolls back a failed operation. A failed push
-or incomplete live verification preserves local main, the local feature branch,
+deletes remote work branches, or rolls back a failed operation. A failed push
+or incomplete live verification preserves local main, the local work branch,
 and continuation evidence for review. Repeating publish after success validates
 and verifies the equal state without pushing again.
 

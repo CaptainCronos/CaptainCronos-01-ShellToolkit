@@ -448,9 +448,9 @@ Modes:
   full     Run broad local acceptance validation (the default).
   release  Run full-equivalent coverage plus the release-readiness gate.
   finish   Validate, fast-forward main, revalidate, push main, verify the
-           remote commit, and safely delete the local feature branch.
+           remote commit, and safely delete the local work branch.
   publish  Validate and publish an already-merged local main, verify the
-           live remote, and clean up a proven retained feature branch.
+           live remote, and clean up a proven retained work branch.
 
 Safety:
   fast, full, and release are validation-only. Only finish and publish may
@@ -542,7 +542,7 @@ _ccvalidate_run_stage() {
 }
 
 _ccvalidate_validation() {
-    local mode="$1" repo_root
+    local mode="$1" repo_root evidence_mode
     if ! repo_root="$(_ccvalidate_git rev-parse --show-toplevel 2>/dev/null)"; then
         printf 'ccvalidate: not inside a Git repository.\n' >&2
         return 1
@@ -565,18 +565,43 @@ _ccvalidate_validation() {
         full)
             # The authoritative selftest includes the release gate, which in
             # turn owns verify, audit, docs, syntax, and ShellCheck coverage.
-            _ccvalidate_run_stage 'Engineering selftest' _ccvalidate_cc selftest || true
+            if _ccvalidate_engineering_evidence_read; then
+                _ccvalidate_record 'Engineering selftest' PASS \
+                    "reused exact-state $CCVALIDATE_EVIDENCE_MODE PASS"
+            else
+                _ccvalidate_run_stage 'Engineering selftest' _ccvalidate_cc selftest || true
+            fi
             _ccvalidate_run_stage 'Git diff check' _ccvalidate_git diff --check || true
+            evidence_mode=engineering
             ;;
         release)
             # Delegate the release gate out of selftest so this orchestration
             # can run and report it exactly once as the final release stage.
-            _ccvalidate_run_stage 'Engineering selftest' \
-                _ccvalidate_selftest_without_release || true
+            if _ccvalidate_engineering_evidence_read; then
+                _ccvalidate_record 'Engineering selftest' PASS \
+                    "reused exact-state $CCVALIDATE_EVIDENCE_MODE PASS"
+            else
+                _ccvalidate_run_stage 'Engineering selftest' \
+                    _ccvalidate_selftest_without_release || true
+            fi
+            if ! _ccvalidate_validation_evidence_clear release; then
+                _ccvalidate_record 'Release evidence reset' FAIL 'could not invalidate prior PASS'
+            fi
             _ccvalidate_run_stage 'Git diff check' _ccvalidate_git diff --check || true
             _ccvalidate_run_stage 'Release-readiness gate' _ccvalidate_cc release check || true
+            evidence_mode=release
             ;;
     esac
+
+    if [ "$CCVALIDATE_FAIL" -eq 0 ] && [ -n "${evidence_mode:-}" ]; then
+        if _ccvalidate_validation_evidence_write "$evidence_mode"; then
+            _ccvalidate_record 'Validation evidence' PASS "$evidence_mode exact-state PASS"
+        elif _ccvalidate_repository_is_clean; then
+            _ccvalidate_record 'Validation evidence' WARN 'could not record reusable PASS'
+        else
+            _ccvalidate_record 'Validation evidence' SKIP 'repository state is not clean'
+        fi
+    fi
 
     _ccvalidate_summary
 }
@@ -614,9 +639,115 @@ _ccvalidate_origin_allowed() {
 
 _ccvalidate_branch_allowed() {
     case "$1" in
-        feature/*|fix/*|bugfix/*|hotfix/*|dev/*|docs/*|refactor/*|test/*|chore/*) return 0 ;;
+        feature/?*|release/?*|fix/?*|bugfix/?*|hotfix/?*|dev/?*|docs/?*|refactor/?*|test/?*|chore/?*) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+_ccvalidate_repository_is_clean() {
+    _ccvalidate_git diff --quiet --ignore-submodules -- &&
+        _ccvalidate_git diff --cached --quiet --ignore-submodules -- &&
+        [ -z "$(_ccvalidate_git ls-files --others --exclude-standard)" ]
+}
+
+_ccvalidate_validation_evidence_path() {
+    case "$1" in
+        engineering|release)
+            _ccvalidate_git rev-parse --git-path "ccvalidate/validation-$1" 2>/dev/null
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+_ccvalidate_validation_identity() {
+    local repo_root git_dir
+    repo_root="$(_ccvalidate_git rev-parse --show-toplevel 2>/dev/null)" || return 1
+    git_dir="$(_ccvalidate_git rev-parse --absolute-git-dir 2>/dev/null)" || return 1
+    repo_root="$(cd "$repo_root" && pwd -P)" || return 1
+    git_dir="$(cd "$git_dir" && pwd -P)" || return 1
+    CCVALIDATE_VALIDATION_REPOSITORY_ID="$({
+        printf '%s\0' "$repo_root"
+        printf '%s\0' "$git_dir"
+    } | _ccvalidate_git hash-object --stdin)" || return 1
+    CCVALIDATE_VALIDATION_HEAD="$(_ccvalidate_git rev-parse --verify HEAD 2>/dev/null)" || return 1
+    _ccvalidate_repository_is_clean
+}
+
+_ccvalidate_validation_evidence_write() {
+    local mode="$1" state_file state_dir temporary timestamp
+    state_file="$(_ccvalidate_validation_evidence_path "$mode")" || return 1
+    _ccvalidate_validation_identity || return 1
+    state_dir="${state_file%/*}"
+    timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)" || return 1
+    mkdir -p -- "$state_dir" || return 1
+    chmod 700 -- "$state_dir" || return 1
+    temporary="$(mktemp "$state_dir/.validation-$mode.XXXXXX")" || return 1
+    chmod 600 -- "$temporary" || {
+        rm -f -- "$temporary"
+        return 1
+    }
+    if ! printf '%s\n' \
+        'version=1' \
+        "repository=$(_ccvalidate_expected_name)" \
+        "repository_id=$CCVALIDATE_VALIDATION_REPOSITORY_ID" \
+        "head=$CCVALIDATE_VALIDATION_HEAD" \
+        "mode=$mode" \
+        'result=PASS' \
+        "created_at=$timestamp" >"$temporary"; then
+        rm -f -- "$temporary"
+        return 1
+    fi
+    mv -f -- "$temporary" "$state_file"
+}
+
+_ccvalidate_validation_evidence_clear() {
+    local state_file
+    state_file="$(_ccvalidate_validation_evidence_path "$1")" || return 1
+    rm -f -- "$state_file"
+}
+
+_ccvalidate_validation_evidence_read() {
+    local requested_mode="$1" state_file state_dir permissions line key value
+    local version='' repository='' repository_id='' head='' mode='' result='' created_at='' seen=''
+    state_file="$(_ccvalidate_validation_evidence_path "$requested_mode")" || return 1
+    state_dir="${state_file%/*}"
+    [ -f "$state_file" ] && [ ! -L "$state_file" ] || return 1
+    [ -d "$state_dir" ] && [ ! -L "$state_dir" ] || return 1
+    permissions="$(stat -c %a -- "$state_file" 2>/dev/null)" || return 1
+    [ "$permissions" = 600 ] || return 1
+    permissions="$(stat -c %a -- "$state_dir" 2>/dev/null)" || return 1
+    [ "$permissions" = 700 ] || return 1
+    while IFS= read -r line; do
+        key="${line%%=*}"
+        value="${line#*=}"
+        case "$key" in
+            version|repository|repository_id|head|mode|result|created_at)
+                case " $seen " in *" $key "*) return 1 ;; esac
+                seen="$seen $key"
+                printf -v "$key" '%s' "$value"
+                ;;
+            *) return 1 ;;
+        esac
+    done <"$state_file"
+    _ccvalidate_validation_identity || return 1
+    [ "$version" = 1 ] &&
+        [ "$repository" = "$(_ccvalidate_expected_name)" ] &&
+        [ "$repository_id" = "$CCVALIDATE_VALIDATION_REPOSITORY_ID" ] &&
+        [ "$head" = "$CCVALIDATE_VALIDATION_HEAD" ] &&
+        [ "$mode" = "$requested_mode" ] && [ "$result" = PASS ] &&
+        [ -n "$created_at" ]
+}
+
+_ccvalidate_engineering_evidence_read() {
+    if _ccvalidate_validation_evidence_read release; then
+        CCVALIDATE_EVIDENCE_MODE=release
+        return 0
+    fi
+    if _ccvalidate_validation_evidence_read engineering; then
+        CCVALIDATE_EVIDENCE_MODE=engineering
+        return 0
+    fi
+    return 1
 }
 
 _ccvalidate_repository_context() {
@@ -680,6 +811,7 @@ _ccvalidate_state_write() {
     main_head="$(_ccvalidate_git rev-parse refs/heads/main)" || return 1
     timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)" || return 1
     mkdir -p -- "$state_dir" || return 1
+    chmod 700 -- "$state_dir" || return 1
     temporary="$(mktemp "$state_dir/.finish-state.XXXXXX")" || return 1
     chmod 600 "$temporary" || {
         rm -f -- "$temporary"
@@ -795,35 +927,35 @@ _ccvalidate_cleanup_feature() {
     local branch="${1:-}" expected_head="${2:-}" merged found=1
     if [ -z "$branch" ]; then
         if [ "${CCVALIDATE_MAIN_AHEAD:-0}" -eq 0 ]; then
-            _ccvalidate_record 'Feature cleanup' SKIP 'no retained feature cleanup is pending'
+            _ccvalidate_record 'Work branch cleanup' SKIP 'no retained work branch cleanup is pending'
         else
-            _ccvalidate_record 'Feature cleanup' WARN 'retained feature branch is unknown; no branch deleted'
+            _ccvalidate_record 'Work branch cleanup' WARN 'retained work branch is unknown; no branch deleted'
         fi
         return 0
     fi
     if ! _ccvalidate_git show-ref --verify --quiet "refs/heads/$branch"; then
-        _ccvalidate_record 'Feature cleanup' SKIP "$branch is already absent"
+        _ccvalidate_record 'Work branch cleanup' SKIP "$branch is already absent"
         _ccvalidate_state_clear || true
         return 0
     fi
     if [ -z "$expected_head" ] ||
        [ "$(_ccvalidate_git rev-parse "refs/heads/$branch" 2>/dev/null || true)" != "$expected_head" ]; then
-        _ccvalidate_record 'Feature cleanup' WARN "$branch no longer matches recorded feature HEAD"
+        _ccvalidate_record 'Work branch cleanup' WARN "$branch no longer matches recorded work HEAD"
         return 0
     fi
     while IFS= read -r merged; do
         [ "$merged" = "$branch" ] && found=0
     done < <(_ccvalidate_git branch --format='%(refname:short)' --merged main)
     if [ "$found" -ne 0 ]; then
-        _ccvalidate_record 'Feature cleanup' WARN "$branch is not proven merged into main"
+        _ccvalidate_record 'Work branch cleanup' WARN "$branch is not proven merged into main"
         return 0
     fi
-    if _ccvalidate_finish_command 'Feature cleanup' _ccvalidate_git branch -d "$branch"; then
+    if _ccvalidate_finish_command 'Work branch cleanup' _ccvalidate_git branch -d "$branch"; then
         _ccvalidate_state_clear ||
             _ccvalidate_record 'Workflow state cleanup' WARN 'publication marker could not be removed'
         return 0
     fi
-    _ccvalidate_record 'Feature cleanup result' WARN "$branch remains after verified publication"
+    _ccvalidate_record 'Work branch cleanup result' WARN "$branch remains after verified publication"
     return 0
 }
 
@@ -858,7 +990,7 @@ _ccvalidate_finish_stop() {
         printf 'Current branch: %s\n' "$(_ccvalidate_git branch --show-current 2>/dev/null || printf 'detached HEAD')"
         printf 'Current HEAD:   %s\n' "$(_ccvalidate_git rev-parse --verify HEAD 2>/dev/null || printf 'unavailable')"
         if [ -n "${branch:-}" ] && _ccvalidate_git show-ref --verify --quiet "refs/heads/$branch"; then
-            printf 'Feature branch: %s (retained)\n' "$branch"
+            printf 'Work branch:    %s (retained)\n' "$branch"
         fi
     fi
     _ccvalidate_summary
@@ -887,9 +1019,9 @@ _ccvalidate_finish() {
     branch="$(_ccvalidate_git branch --show-current 2>/dev/null)"
     if [ -n "$branch" ] && [ "$branch" != main ] && _ccvalidate_branch_allowed "$branch" &&
        _ccvalidate_git show-ref --verify --quiet "refs/heads/$branch"; then
-        _ccvalidate_record 'Feature branch' PASS "$branch"
+        _ccvalidate_record 'Work branch' PASS "$branch"
     else
-        _ccvalidate_record 'Feature branch' FAIL "${branch:-detached HEAD}"
+        _ccvalidate_record 'Work branch' FAIL "${branch:-detached HEAD}"
     fi
 
     _ccvalidate_clean_repository
@@ -907,15 +1039,15 @@ _ccvalidate_finish() {
         ahead="$(_ccvalidate_git rev-list --count "main..$feature_head" 2>/dev/null || printf '0')"
     fi
     if [ "$ahead" -gt 0 ] 2>/dev/null; then
-        _ccvalidate_record 'Committed feature work' PASS "$ahead commit(s)"
+        _ccvalidate_record 'Committed work' PASS "$ahead commit(s)"
     else
-        _ccvalidate_record 'Committed feature work' FAIL 'no committed work beyond main'
+        _ccvalidate_record 'Committed work' FAIL 'no committed work beyond main'
     fi
 
     if [ -n "$feature_head" ] && _ccvalidate_git merge-base --is-ancestor main "$feature_head" 2>/dev/null; then
         _ccvalidate_record 'Fast-forward candidate' PASS
     else
-        _ccvalidate_record 'Fast-forward candidate' FAIL 'main and feature require a non-fast-forward merge'
+        _ccvalidate_record 'Fast-forward candidate' FAIL 'main and work branch require a non-fast-forward merge'
     fi
 
     if [ "$CCVALIDATE_FAIL" -gt 0 ]; then
@@ -923,10 +1055,15 @@ _ccvalidate_finish() {
         return 1
     fi
 
-    if (ccvalidate full); then
-        _ccvalidate_record 'Feature validation' PASS
+    if _ccvalidate_validation_evidence_read release; then
+        _ccvalidate_record 'Work validation' PASS 'reused exact-state release PASS'
+    elif _ccvalidate_engineering_evidence_read; then
+        _ccvalidate_record 'Work validation' PASS \
+            "reused exact-state $CCVALIDATE_EVIDENCE_MODE PASS"
+    elif (ccvalidate full); then
+        _ccvalidate_record 'Work validation' PASS
     else
-        _ccvalidate_record 'Feature validation' FAIL
+        _ccvalidate_record 'Work validation' FAIL
         _ccvalidate_finish_stop
         return 1
     fi
@@ -946,18 +1083,18 @@ _ccvalidate_finish() {
         return 1
     fi
     if ! _ccvalidate_git merge-base --is-ancestor main "$feature_head" 2>/dev/null; then
-        _ccvalidate_record 'Main fast-forward' FAIL 'updated main diverged from feature'
+        _ccvalidate_record 'Main fast-forward' FAIL 'updated main diverged from work branch'
         _ccvalidate_finish_stop
         return 1
     fi
     _ccvalidate_record 'Main fast-forward' PASS
 
-    if ! _ccvalidate_finish_command 'Merge feature (ff-only)' _ccvalidate_git merge --ff-only "$branch"; then
+    if ! _ccvalidate_finish_command 'Merge work branch (ff-only)' _ccvalidate_git merge --ff-only "$branch"; then
         _ccvalidate_finish_stop
         return 1
     fi
     if [ "$(_ccvalidate_git rev-parse HEAD)" != "$feature_head" ]; then
-        _ccvalidate_record 'Merged commit verification' FAIL 'local main did not reach feature HEAD'
+        _ccvalidate_record 'Merged commit verification' FAIL 'local main did not reach work HEAD'
         _ccvalidate_finish_stop
         return 1
     fi
@@ -966,7 +1103,7 @@ _ccvalidate_finish() {
     if _ccvalidate_state_write "$branch" "$feature_head" "$origin_head"; then
         _ccvalidate_record 'Workflow continuation state' PASS "$branch"
     else
-        _ccvalidate_record 'Workflow continuation state' FAIL 'could not record retained feature ownership'
+        _ccvalidate_record 'Workflow continuation state' FAIL 'could not record retained work-branch ownership'
         _ccvalidate_finish_stop
         return 1
     fi
@@ -1038,11 +1175,11 @@ _ccvalidate_publish() {
     else
         state_file="$(_ccvalidate_state_path 2>/dev/null || true)"
         if [ -n "$state_file" ] && [ -e "$state_file" ]; then
-            _ccvalidate_record 'Workflow continuation state' WARN 'retained-feature marker is invalid; cleanup will be conservative'
+            _ccvalidate_record 'Workflow continuation state' WARN 'retained-work marker is invalid; cleanup will be conservative'
         elif [ "$CCVALIDATE_MAIN_AHEAD" -eq 0 ]; then
             _ccvalidate_record 'Workflow continuation state' SKIP 'no continuation marker or unpublished commits'
         else
-            _ccvalidate_record 'Workflow continuation state' WARN 'no retained-feature marker; cleanup will be conservative'
+            _ccvalidate_record 'Workflow continuation state' WARN 'no retained-work marker; cleanup will be conservative'
         fi
     fi
 

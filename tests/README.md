@@ -45,10 +45,12 @@ Focused shell tests supplement `cc selftest`:
   config/asset/qualification/unknown protection, host isolation, symlink and
   traversal confinement, identity-change skips, and truthful partial failure.
 - `ccvalidate.sh` validates bare/fast/full/release orchestration, failure
-  aggregation and continuation, help and ANSI-free output, repeated sourcing,
-  and the explicit finish workflow with disposable repositories and bare
-  remotes. It covers clean fast-forward success, post-push verification and
-  branch cleanup, plus main/dirty/staged/untracked/origin/repository/divergence/
+  aggregation and continuation, exact-state evidence creation/reuse/invalidation,
+  fail-closed private state, help and ANSI-free output, repeated sourcing, and
+  the explicit finish workflow with disposable repositories and bare remotes.
+  It covers feature/release branch acceptance, clean fast-forward success,
+  post-push verification and branch cleanup, plus main/detached/unrelated/dirty/
+  staged/untracked/origin/repository/divergence/
   conflict/validation/push/verification refusal boundaries. It also exercises
   post-merge `publish` continuation, exact main-only refspecs, ahead/equal/
   behind/diverged topology, mid-validation remote changes, failed validation/

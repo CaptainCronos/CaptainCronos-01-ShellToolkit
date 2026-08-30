@@ -301,16 +301,22 @@ Use `ccvalidate fast` for inexpensive feedback and `ccvalidate full` for the
 normal local acceptance gate after implementation. Bare `ccvalidate` defaults
 to full. Use `ccvalidate release` for release-equivalent coverage plus the
 release-readiness gate. These three modes are read-only validation workflows.
+Successful full/release validation records private Git-local exact-state
+evidence. An unchanged release run can reuse engineering coverage from full,
+but still runs its release-readiness gate. Any HEAD, tracked, staged, untracked,
+repository-identity, permission, or state-format mismatch fails closed.
 
-After reviewing a clean committed feature, fix, or development branch, run
+After reviewing a clean committed supported work branch, including `feature/*`
+or `release/*`, run
 `ccvalidate finish` to perform the explicit ShellToolkit Git completion flow.
 It refuses main, dirty/staged/untracked work, missing or suspicious origins,
-uncommitted feature work, and any history that cannot fast-forward. It validates
-the feature before changing branches, updates and merges main with `--ff-only`,
-revalidates before pushing only main to origin/main, verifies the remote commit,
-and deletes the local feature branch with `git branch -d` only after success.
+uncommitted work, and any history that cannot fast-forward. It validates or
+reuses exact-state evidence before changing branches, updates and merges main
+with `--ff-only`, revalidates before pushing only main to origin/main, verifies
+the remote commit, and deletes the local work branch with `git branch -d` only
+after success.
 
-If finish has already fast-forwarded the feature into local main but stops at
+If finish has already fast-forwarded the work branch into local main but stops at
 post-merge release validation, correct and commit the defect on local main and
 run `ccvalidate publish`. Publish is a constrained continuation, not a general
 push or merge command. It requires the recognized ShellToolkit repository,
@@ -325,16 +331,16 @@ workflow state. That marker helps publish identify cleanup ownership but never
 overrides current Git topology. After verified publication, publish deletes the
 local retained branch only when its tip still matches the marker and
 `git branch --merged main` proves it merged. Invalid or missing state, a moved
-branch, or failed safe deletion is reported without guessing; remote feature
+branch, or failed safe deletion is reported without guessing; remote work
 branches are never deleted. An already-published main is verified idempotently
 and is not pushed again.
 
-If validation fails before the branch switch, nothing is pushed and the feature
+If validation fails before the branch switch, nothing is pushed and the work
 checkout is left untouched. If validation fails after a local merge, nothing is
-pushed or reset and the feature branch remains for `ccvalidate publish` or
+pushed or reset and the work branch remains for `ccvalidate publish` or
 operator review. There is no automatic rollback. The workflows never
 auto-stash, force-push, rebase, rewrite history, resolve conflicts, delete remote
-feature branches, or change packages, kernels, bootloaders, browsers, services,
+work branches, or change packages, kernels, bootloaders, browsers, services,
 PATH configuration, or unrelated repositories.
 
 ## Configuration and Host Profiles

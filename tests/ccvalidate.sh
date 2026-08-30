@@ -120,7 +120,7 @@ delegated_selftest_count="$(CC_SELFTEST_SKIP_RELEASE_CHECK=1 bash -c '
     fail 'release delegation changed default selftest authority or test accounting'
 
 new_fixture() {
-    local name="$1" repo origin
+    local name="$1" work_branch="${2:-feature/work}" repo origin
     repo="$TEST_DIR/$name"
     origin="$TEST_DIR/$name-origin.git"
     "$REAL_GIT" init -q --bare "$origin"
@@ -133,7 +133,7 @@ new_fixture() {
     commit_all "$repo" 'initial main'
     git_in "$repo" remote add origin "$origin"
     git_in "$repo" push -q -u origin main
-    git_in "$repo" switch -q -c feature/work
+    git_in "$repo" switch -q -c "$work_branch"
     printf '%s\n' "$name" >"$repo/feature.txt"
     commit_all "$repo" 'feature work'
     printf '%s\n' "$repo"
@@ -165,6 +165,27 @@ run_validation "$validation_repo" "$TEST_DIR/bare.out"
 assert_contains "$TEST_DIR/bare.out" 'Mode: full' 'bare ccvalidate did not default to full'
 assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'full mode omitted selftest'
 [ "$(wc -l <"$CCVALIDATE_CC_LOG")" -eq 1 ] || fail 'full mode duplicated selftest-owned acceptance gates'
+engineering_evidence="$validation_repo/.git/ccvalidate/validation-engineering"
+[ -f "$engineering_evidence" ] || fail 'successful full did not create engineering evidence'
+[ "$(stat -c %a "$validation_repo/.git/ccvalidate")" = 700 ] || fail 'validation state directory is not private'
+[ "$(stat -c %a "$engineering_evidence")" = 600 ] || fail 'engineering evidence is not private'
+assert_contains "$engineering_evidence" 'mode=engineering' 'full evidence recorded the wrong mode'
+assert_contains "$engineering_evidence" 'result=PASS' 'full evidence omitted its authoritative result'
+[ ! -e "$validation_repo/.git/ccvalidate/validation-release" ] ||
+    fail 'full evidence falsely represented release readiness'
+if grep -Fq -- "$validation_repo" "$engineering_evidence" ||
+   grep -Fq -- "$CCVALIDATE_EXPECTED_ORIGIN" "$engineering_evidence"; then
+    fail 'validation evidence exposed a repository path or origin'
+fi
+if [ -n "$(git_in "$validation_repo" status --porcelain)" ]; then
+    fail 'Git-private validation evidence appeared in repository status'
+fi
+
+run_validation "$validation_repo" "$TEST_DIR/full.out" full
+assert_contains "$TEST_DIR/full.out" 'reused exact-state engineering PASS' 'full did not reuse exact engineering evidence'
+if grep -Fq '|selftest' "$CCVALIDATE_CC_LOG"; then
+    fail 'unchanged full repeated the expensive selftest'
+fi
 
 run_validation "$validation_repo" "$TEST_DIR/fast.out" fast
 assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|verify' 'fast mode omitted verify'
@@ -174,30 +195,105 @@ if grep -Fq '|selftest' "$CCVALIDATE_CC_LOG"; then
     fail 'fast mode ran the expensive selftest'
 fi
 
-run_validation "$validation_repo" "$TEST_DIR/full.out" full
-[ "$(wc -l <"$CCVALIDATE_CC_LOG")" -eq 1 ] || fail 'full mode duplicated selftest-owned acceptance gates'
-[ ! -e "$CCVALIDATE_RELEASE_DELEGATED_MARKER" ] || fail 'full mode incorrectly delegated its authoritative release test'
-
 rm -f "$CCVALIDATE_RELEASE_DELEGATED_MARKER"
 run_validation "$validation_repo" "$TEST_DIR/release.out" release
-assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'release mode omitted selftest coverage'
+assert_contains "$TEST_DIR/release.out" 'reused exact-state engineering PASS' 'release did not reuse engineering coverage'
 assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|release check' 'release mode omitted the release gate'
-[ "$(wc -l <"$CCVALIDATE_CC_LOG")" -eq 2 ] || fail 'release mode duplicated checks owned by the release gate'
-[ -f "$CCVALIDATE_RELEASE_DELEGATED_MARKER" ] || fail 'release mode did not delegate the nested selftest release gate'
+[ "$(wc -l <"$CCVALIDATE_CC_LOG")" -eq 1 ] || fail 'release mode repeated reusable engineering coverage'
+[ ! -e "$CCVALIDATE_RELEASE_DELEGATED_MARKER" ] || fail 'reused release mode invoked delegated selftest'
+[ -f "$validation_repo/.git/ccvalidate/validation-release" ] || fail 'release did not create distinct release evidence'
+assert_contains "$validation_repo/.git/ccvalidate/validation-release" 'mode=release' 'release evidence recorded the wrong mode'
 # shellcheck disable=SC2031
 [ "${CC_SELFTEST_SKIP_RELEASE_CHECK+x}" != x ] || fail 'release delegation leaked into caller environment'
 
+export CCVALIDATE_FAIL_MATCH='release check'
+# shellcheck disable=SC2016
+assert_failure 'failed release returned zero' \
+    bash -c 'cd "$1"; source "$2/bash/bash_functions"; ccvalidate release' bash "$validation_repo" "$PROJECT_ROOT" \
+    >"$TEST_DIR/release-failure.out" 2>&1
+unset CCVALIDATE_FAIL_MATCH
+[ ! -e "$validation_repo/.git/ccvalidate/validation-release" ] ||
+    fail 'failed release retained reusable release PASS evidence'
+
+delegated_repo="$(new_fixture validation-release-delegated)"
+set_fixture_contract "$delegated_repo"
+rm -f "$CCVALIDATE_RELEASE_DELEGATED_MARKER"
+run_validation "$delegated_repo" "$TEST_DIR/release-delegated.out" release
+assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'uncached release omitted engineering coverage'
+assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|release check' 'uncached release omitted its unique readiness gate'
+[ -f "$CCVALIDATE_RELEASE_DELEGATED_MARKER" ] || fail 'uncached release did not delegate the nested selftest release gate'
+
+failed_state_repo="$(new_fixture validation-failed-state)"
+set_fixture_contract "$failed_state_repo"
 export CCVALIDATE_FAIL_MATCH=selftest
 : >"$CCVALIDATE_CC_LOG"
 : >"$CCVALIDATE_GIT_LOG"
 # shellcheck disable=SC2016
 assert_failure 'required validation failure returned zero' \
-    bash -c 'cd "$1"; source "$2/bash/bash_functions"; ccvalidate full' bash "$validation_repo" "$PROJECT_ROOT" \
+    bash -c 'cd "$1"; source "$2/bash/bash_functions"; ccvalidate full' bash "$failed_state_repo" "$PROJECT_ROOT" \
     >"$TEST_DIR/failure.out" 2>&1
 unset CCVALIDATE_FAIL_MATCH
 assert_contains "$TEST_DIR/failure.out" 'Engineering selftest' 'failure result was not rendered'
 assert_contains "$TEST_DIR/failure.out" 'Overall Status:  FAIL' 'aggregate failure was not reported'
 assert_contains "$CCVALIDATE_GIT_LOG" 'diff --check' 'independent checks did not continue after failure'
+[ ! -e "$failed_state_repo/.git/ccvalidate/validation-engineering" ] || fail 'failed full produced reusable PASS evidence'
+
+incomplete_repo="$(new_fixture validation-incomplete-state)"
+set_fixture_contract "$incomplete_repo"
+mkdir -p "$incomplete_repo/.git/ccvalidate"
+chmod 700 "$incomplete_repo/.git/ccvalidate"
+printf 'version=1\nresult=PASS\n' >"$incomplete_repo/.git/ccvalidate/.validation-engineering.incomplete"
+chmod 600 "$incomplete_repo/.git/ccvalidate/.validation-engineering.incomplete"
+run_validation "$incomplete_repo" "$TEST_DIR/incomplete.out" full
+assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'incomplete state was reused'
+
+corrupt_repo="$(new_fixture validation-corrupt-state)"
+set_fixture_contract "$corrupt_repo"
+mkdir -p "$corrupt_repo/.git/ccvalidate"
+chmod 700 "$corrupt_repo/.git/ccvalidate"
+printf 'version=corrupt\nmode=engineering\nresult=PASS\n' >"$corrupt_repo/.git/ccvalidate/validation-engineering"
+chmod 600 "$corrupt_repo/.git/ccvalidate/validation-engineering"
+run_validation "$corrupt_repo" "$TEST_DIR/corrupt.out" full
+assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'corrupt state was reused'
+
+changed_head_repo="$(new_fixture validation-changed-head)"
+set_fixture_contract "$changed_head_repo"
+run_validation "$changed_head_repo" "$TEST_DIR/changed-head-first.out" full
+printf 'next\n' >"$changed_head_repo/next.txt"
+commit_all "$changed_head_repo" 'advance validation HEAD'
+run_validation "$changed_head_repo" "$TEST_DIR/changed-head-second.out" full
+assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'changed HEAD inherited validation evidence'
+
+dirty_state_repo="$(new_fixture validation-dirty-state)"
+set_fixture_contract "$dirty_state_repo"
+run_validation "$dirty_state_repo" "$TEST_DIR/dirty-state-first.out" full
+printf 'dirty\n' >>"$dirty_state_repo/feature.txt"
+run_validation "$dirty_state_repo" "$TEST_DIR/dirty-state-second.out" full
+assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'dirty tracked worktree inherited validation evidence'
+if (cd "$dirty_state_repo" && _ccvalidate_validation_evidence_read engineering); then
+    fail 'dirty tracked worktree accepted clean validation evidence'
+fi
+
+staged_state_repo="$(new_fixture validation-staged-state)"
+set_fixture_contract "$staged_state_repo"
+run_validation "$staged_state_repo" "$TEST_DIR/staged-state-first.out" full
+printf 'staged\n' >>"$staged_state_repo/feature.txt"
+git_in "$staged_state_repo" add feature.txt
+run_validation "$staged_state_repo" "$TEST_DIR/staged-state-second.out" full
+assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'staged index inherited validation evidence'
+if (cd "$staged_state_repo" && _ccvalidate_validation_evidence_read engineering); then
+    fail 'staged index accepted clean validation evidence'
+fi
+
+untracked_state_repo="$(new_fixture validation-untracked-state)"
+set_fixture_contract "$untracked_state_repo"
+run_validation "$untracked_state_repo" "$TEST_DIR/untracked-state-first.out" full
+printf 'untracked\n' >"$untracked_state_repo/untracked.txt"
+run_validation "$untracked_state_repo" "$TEST_DIR/untracked-state-second.out" full
+assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'untracked state inherited validation evidence'
+if (cd "$untracked_state_repo" && _ccvalidate_validation_evidence_read engineering); then
+    fail 'untracked state accepted clean validation evidence'
+fi
 
 ccvalidate help >"$TEST_DIR/help.out"
 ccvalidate --help >>"$TEST_DIR/help.out"
@@ -219,15 +315,15 @@ if LC_ALL=C grep -q $'\033' "$TEST_DIR/bare.out" "$TEST_DIR/fast.out" "$TEST_DIR
 fi
 
 run_finish_failure() {
-    local repo="$1" output="$2"
+    local repo="$1" output="$2" retained_branch="${3:-feature/work}"
     set_fixture_contract "$repo"
     : >"$CCVALIDATE_CC_LOG"
     : >"$CCVALIDATE_GIT_LOG"
     if (cd "$repo" && ccvalidate finish) >"$output" 2>&1; then
         fail "finish unexpectedly succeeded for $(basename "$repo")"
     fi
-    git_in "$repo" show-ref --verify --quiet refs/heads/feature/work ||
-        fail "feature branch was removed after failure in $(basename "$repo")"
+    git_in "$repo" show-ref --verify --quiet "refs/heads/$retained_branch" ||
+        fail "work branch was removed after failure in $(basename "$repo")"
 }
 
 # Successful completion: full validation on feature, release-equivalent
@@ -249,6 +345,9 @@ if git_in "$success_repo" show-ref --verify --quiet refs/heads/feature/work; the
 fi
 assert_contains "$CCVALIDATE_CC_LOG" 'feature/work|selftest' 'feature full validation did not run'
 assert_contains "$CCVALIDATE_CC_LOG" 'main|release check' 'post-merge release gate did not run on main'
+if [ "$(grep -Fc '|selftest' "$CCVALIDATE_CC_LOG")" -ne 1 ]; then
+    fail 'finish duplicated expensive engineering validation across the fast-forward'
+fi
 assert_contains "$TEST_DIR/finish-success.out" 'Remote verification' 'finish did not report remote verification'
 assert_contains "$TEST_DIR/finish-success.out" 'Overall Status:  PASS' 'successful finish did not return PASS'
 while IFS='|' read -r directory arguments; do
@@ -259,10 +358,56 @@ while IFS='|' read -r directory arguments; do
     esac
 done <"$CCVALIDATE_GIT_LOG"
 
+# The measured operator sequence leaves exact-state full and release evidence.
+# Finish reuses it before the merge, then still runs the release-specific gate
+# on main without repeating engineering selftest coverage.
+prevalidated_repo="$(new_fixture finish-prevalidated)"
+set_fixture_contract "$prevalidated_repo"
+run_validation "$prevalidated_repo" "$TEST_DIR/prevalidated-full.out" full
+run_validation "$prevalidated_repo" "$TEST_DIR/prevalidated-release.out" release
+: >"$CCVALIDATE_CC_LOG"
+: >"$CCVALIDATE_GIT_LOG"
+(cd "$prevalidated_repo" && ccvalidate finish) >"$TEST_DIR/finish-prevalidated.out" 2>&1 ||
+    fail 'finish rejected authoritative unchanged validation evidence'
+assert_contains "$TEST_DIR/finish-prevalidated.out" 'reused exact-state release PASS' \
+    'finish did not report pre-merge release evidence reuse'
+assert_contains "$CCVALIDATE_CC_LOG" 'main|release check' \
+    'prevalidated finish omitted the post-merge release-readiness gate'
+if grep -Fq '|selftest' "$CCVALIDATE_CC_LOG"; then
+    fail 'prevalidated finish repeated expensive engineering selftest coverage'
+fi
+
+release_repo="$(new_fixture finish-release release/1.3.0-beta2)"
+release_head="$(git_in "$release_repo" rev-parse HEAD)"
+release_origin="$(git_in "$release_repo" remote get-url origin)"
+set_fixture_contract "$release_repo"
+: >"$CCVALIDATE_CC_LOG"
+: >"$CCVALIDATE_GIT_LOG"
+(cd "$release_repo" && ccvalidate finish) >"$TEST_DIR/finish-release.out" 2>&1 ||
+    fail 'finish rejected a supported release work branch'
+[ "$(git_in "$release_repo" rev-parse main)" = "$release_head" ] || fail 'release finish did not fast-forward main'
+[ "$(git_in "$release_origin" rev-parse refs/heads/main)" = "$release_head" ] || fail 'release finish did not publish main'
+assert_contains "$TEST_DIR/finish-release.out" 'Work branch' 'release finish used incorrect branch terminology'
+
+_ccvalidate_branch_allowed feature/example || fail 'feature branch class was rejected'
+_ccvalidate_branch_allowed release/1.3.0 || fail 'release branch class was rejected'
+if _ccvalidate_branch_allowed 'release/'; then fail 'malformed release branch was accepted'; fi
+if _ccvalidate_branch_allowed main; then fail 'main was accepted as a work branch'; fi
+
 main_repo="$(new_fixture finish-main)"
 git_in "$main_repo" switch -q main
 run_finish_failure "$main_repo" "$TEST_DIR/refuse-main.out"
-assert_contains "$TEST_DIR/refuse-main.out" 'Feature branch' 'main-branch refusal was not explained'
+assert_contains "$TEST_DIR/refuse-main.out" 'Work branch' 'main-branch refusal was not explained'
+
+detached_repo="$(new_fixture finish-detached)"
+git_in "$detached_repo" checkout -q --detach
+run_finish_failure "$detached_repo" "$TEST_DIR/refuse-detached.out"
+assert_contains "$TEST_DIR/refuse-detached.out" 'detached HEAD' 'detached-HEAD refusal was not explained'
+
+unrelated_repo="$(new_fixture finish-unrelated)"
+git_in "$unrelated_repo" branch -m experiment/work
+run_finish_failure "$unrelated_repo" "$TEST_DIR/refuse-unrelated.out" experiment/work
+assert_contains "$TEST_DIR/refuse-unrelated.out" 'Work branch' 'unrelated branch refusal was not explained'
 
 no_work_repo="$(new_fixture finish-no-committed-work)"
 git_in "$no_work_repo" switch -q main
@@ -343,7 +488,7 @@ printf 'remote-main\n' >"$peer/remote-main.txt"
 commit_all "$peer" 'advance remote main'
 git_in "$peer" push -q origin main
 run_finish_failure "$diverged_repo" "$TEST_DIR/refuse-diverged-main.out"
-assert_contains "$TEST_DIR/refuse-diverged-main.out" 'updated main diverged from feature' 'updated-main divergence was not reported'
+assert_contains "$TEST_DIR/refuse-diverged-main.out" 'updated main diverged from work branch' 'updated-main divergence was not reported'
 
 feature_fail_repo="$(new_fixture finish-feature-validation-fail)"
 feature_fail_head="$(git_in "$feature_fail_repo" rev-parse HEAD)"
@@ -358,13 +503,13 @@ unset CCVALIDATE_FAIL_BRANCH CCVALIDATE_FAIL_BRANCH_COMMAND
 [ "$(git_in "$feature_fail_repo" rev-parse HEAD)" = "$feature_fail_head" ] || fail 'feature validation failure changed feature HEAD'
 [ "$(git_in "$feature_fail_repo" rev-parse main)" = "$feature_fail_main" ] || fail 'feature validation failure changed main'
 [ "$(git_in "$feature_fail_origin" rev-parse refs/heads/main)" = "$feature_fail_remote" ] || fail 'feature validation failure pushed origin/main'
-assert_contains "$TEST_DIR/feature-validation-fail.out" 'Feature validation' 'feature validation failure was not reported'
+assert_contains "$TEST_DIR/feature-validation-fail.out" 'Work validation' 'work validation failure was not reported'
 
 post_fail_repo="$(new_fixture finish-post-validation-fail)"
 post_fail_origin="$(git_in "$post_fail_repo" remote get-url origin)"
 post_fail_remote_before="$(git_in "$post_fail_origin" rev-parse refs/heads/main)"
 export CCVALIDATE_FAIL_BRANCH=main
-export CCVALIDATE_FAIL_BRANCH_COMMAND=selftest
+export CCVALIDATE_FAIL_BRANCH_COMMAND='release check'
 run_finish_failure "$post_fail_repo" "$TEST_DIR/post-validation-fail.out"
 unset CCVALIDATE_FAIL_BRANCH CCVALIDATE_FAIL_BRANCH_COMMAND
 [ "$(git_in "$post_fail_repo" branch --show-current)" = main ] || fail 'post-merge failure did not preserve exact local main state'
@@ -400,7 +545,7 @@ run_publish_failure() {
 make_interrupted_finish() {
     local repo="$1" output="$2"
     export CCVALIDATE_FAIL_BRANCH=main
-    export CCVALIDATE_FAIL_BRANCH_COMMAND=selftest
+    export CCVALIDATE_FAIL_BRANCH_COMMAND='release check'
     run_finish_failure "$repo" "$output"
     unset CCVALIDATE_FAIL_BRANCH CCVALIDATE_FAIL_BRANCH_COMMAND
     [ "$(git_in "$repo" branch --show-current)" = main ] ||
@@ -434,7 +579,7 @@ fi
 assert_contains "$TEST_DIR/publish-success.out" 'Release validation' 'publish omitted release validation'
 assert_contains "$TEST_DIR/publish-success.out" 'Remote unchanged' 'publish omitted remote stability verification'
 assert_contains "$TEST_DIR/publish-success.out" 'Remote verification' 'publish omitted live remote verification'
-assert_contains "$TEST_DIR/publish-success.out" 'Feature cleanup' 'publish omitted retained-feature cleanup'
+assert_contains "$TEST_DIR/publish-success.out" 'Work branch cleanup' 'publish omitted retained-work cleanup'
 assert_contains "$TEST_DIR/publish-success.out" 'Overall Status:  PASS' 'publish success did not report PASS'
 assert_contains "$CCVALIDATE_GIT_LOG" 'push origin refs/heads/main:refs/heads/main' 'publish used an unexpected main refspec'
 if grep -E '\|push .*feature|\|push .*tags|\|push .*force' "$CCVALIDATE_GIT_LOG"; then
@@ -562,7 +707,7 @@ publish_validation_repo="$(new_fixture publish-validation-fail)"
 publish_validation_origin="$(git_in "$publish_validation_repo" remote get-url origin)"
 publish_validation_remote="$(git_in "$publish_validation_origin" rev-parse refs/heads/main)"
 make_interrupted_finish "$publish_validation_repo" "$TEST_DIR/publish-validation-interrupted.out"
-export CCVALIDATE_FAIL_BRANCH=main CCVALIDATE_FAIL_BRANCH_COMMAND=selftest
+export CCVALIDATE_FAIL_BRANCH=main CCVALIDATE_FAIL_BRANCH_COMMAND='release check'
 run_publish_failure "$publish_validation_repo" "$TEST_DIR/publish-validation-fail.out"
 unset CCVALIDATE_FAIL_BRANCH CCVALIDATE_FAIL_BRANCH_COMMAND
 [ "$(git_in "$publish_validation_origin" rev-parse refs/heads/main)" = "$publish_validation_remote" ] ||
@@ -620,7 +765,7 @@ set_fixture_contract "$publish_unknown_repo"
 (cd "$publish_unknown_repo" && ccvalidate publish) >"$TEST_DIR/publish-unknown.out" 2>&1 ||
     fail 'publication with unknown cleanup ownership failed'
 git_in "$publish_unknown_repo" show-ref --verify --quiet refs/heads/feature/work || fail 'publish guessed and deleted an unknown branch'
-assert_contains "$TEST_DIR/publish-unknown.out" 'retained feature branch is unknown' 'unknown cleanup was not reported'
+assert_contains "$TEST_DIR/publish-unknown.out" 'retained work branch is unknown' 'unknown cleanup was not reported'
 
 publish_unmerged_repo="$(new_fixture publish-unmerged-feature)"
 make_interrupted_finish "$publish_unmerged_repo" "$TEST_DIR/publish-unmerged-interrupted.out"
@@ -632,7 +777,7 @@ set_fixture_contract "$publish_unmerged_repo"
 (cd "$publish_unmerged_repo" && ccvalidate publish) >"$TEST_DIR/publish-unmerged.out" 2>&1 ||
     fail 'publication should succeed while unsafe cleanup warns'
 git_in "$publish_unmerged_repo" show-ref --verify --quiet refs/heads/feature/work || fail 'publish deleted an altered feature branch'
-assert_contains "$TEST_DIR/publish-unmerged.out" 'no longer matches recorded feature HEAD' 'altered feature cleanup was not refused'
+assert_contains "$TEST_DIR/publish-unmerged.out" 'no longer matches recorded work HEAD' 'altered work cleanup was not refused'
 
 publish_cleanup_fail_repo="$(new_fixture publish-cleanup-fail)"
 publish_cleanup_fail_origin="$(git_in "$publish_cleanup_fail_repo" remote get-url origin)"
