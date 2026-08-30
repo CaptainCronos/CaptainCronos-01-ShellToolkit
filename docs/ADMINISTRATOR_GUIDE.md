@@ -103,6 +103,22 @@ These functions remain discoverable through `helpme` metadata and are not
 kernel cleanup candidate does not make the system unhealthy. Pending reboot or
 a newer installed kernel is a `WARN` maintenance advisory, not corruption.
 
+On Debian-family systems, `ORPHAN_MODULES` means an installed, release-specific
+module package cannot be associated with an installed kernel image set. Ordinary
+`linux-modules-<release>` and `linux-modules-extra-<release>` packages use their
+exact release suffix. Flavor or vendor companion packages may use a longer name;
+Captain Cronos associates one only when installed-package metadata directly
+depends on exactly one matching `linux-image-<release>` or
+`linux-image-unsigned-<release>` and the package name ends in that same release.
+Missing, incomplete, ambiguous, or inconsistent metadata fails closed and keeps
+the warning. A companion never creates an installed or bootable kernel release.
+
+`ORPHAN_MODULES` is a health diagnostic only. Kernel cleanup candidates still
+come exclusively from verified image sets, and cleanup package plans remain
+limited to the existing exact image, ordinary modules, extra modules, headers,
+and tools mappings for an already selected obsolete release. Orphan diagnostics
+do not feed removal planning.
+
 `cc monthly-health --stdout` provides the detailed view: running and newest
 kernels, reboot state, package/initramfs/bootloader/EFI platform information,
 installed/protected/candidate counts, boot and EFI utilization, artifact-state

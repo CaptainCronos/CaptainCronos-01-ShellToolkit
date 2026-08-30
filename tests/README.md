@@ -5,6 +5,12 @@ commands to verify kernel discovery, version ordering, protection, candidate
 selection, ownership fail-safe behavior, status/list output, reboot state,
 unsupported platforms, dry-run immutability, and the explicit apply path.
 
+`tests/kernel-package-classification.sh` validates ordinary, extra, and
+metadata-backed flavor/vendor companion module families across running,
+fallback, additional, and absent kernel releases. It also proves fail-closed
+behavior for unavailable, incomplete, ambiguous, mismatched, unrelated, and
+malformed package information without broadening cleanup package plans.
+
 `tests/kernel-artifacts.sh` validates root-backed and dedicated `/boot`
 filesystems, mounted and absent EFI paths, non-crossing usage, symlink safety,
 kernel/initramfs/package correlation, every artifact state, shared kernel

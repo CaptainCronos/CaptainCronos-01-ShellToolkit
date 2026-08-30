@@ -980,13 +980,65 @@ _cc_kernel_package_issue_records() {
         awk -F '\t' '$2 ~ /^linux-(image(-unsigned)?|modules(-extra)?|headers)-[0-9]/ && $1 != "installed" {print}'
 }
 
+_cc_kernel_direct_image_dependency_releases() {
+    [ "$#" -eq 1 ] || return 2
+    local query package="$1"
+    query="${CC_KERNEL_DPKG_QUERY_PROGRAM:-dpkg-query}"
+    command -v "$query" >/dev/null 2>&1 || return 1
+    # A companion association is trustworthy only when the installed package's
+    # own metadata directly names an exact signed or unsigned kernel image.
+    # shellcheck disable=SC2016
+    "$query" -W -f='${db:Status-Status}\t${Depends}\n' -- "$package" 2>/dev/null |
+        awk -F '\t' '$1 == "installed" {
+            dependencies = substr($0, index($0, "\t") + 1)
+            count = split(dependencies, alternatives, /[,|]/)
+            for (field_index = 1; field_index <= count; field_index++) {
+                dependency = alternatives[field_index]
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", dependency)
+                sub(/[[:space:]]*\(.*/, "", dependency)
+                sub(/:[[:alnum:]-]+$/, "", dependency)
+                if (dependency ~ /^linux-image-unsigned-[0-9]/) {
+                    sub(/^linux-image-unsigned-/, "", dependency)
+                    if (!seen[dependency]++) print dependency
+                } else if (dependency ~ /^linux-image-[0-9]/) {
+                    sub(/^linux-image-/, "", dependency)
+                    if (!seen[dependency]++) print dependency
+                }
+            }
+        }'
+}
+
+_cc_kernel_companion_module_release() {
+    [ "$#" -eq 1 ] || return 2
+    local package="$1" release stem
+    local -a releases=()
+    case "$package" in
+        linux-modules-*-*[0-9].*) ;;
+        *) return 1 ;;
+    esac
+    mapfile -t releases < <(_cc_kernel_direct_image_dependency_releases "$package") || return 1
+    [ "${#releases[@]}" -eq 1 ] || return 1
+    release="${releases[0]}"
+    case "$release" in [0-9]*.*) ;; *) return 1 ;; esac
+    stem="${package%-"$release"}"
+    [ "$stem" != "$package" ] || return 1
+    case "$stem" in
+        linux-modules-?*) printf '%s\n' "$release" ;;
+        *) return 1 ;;
+    esac
+}
+
 _cc_kernel_orphan_component_records() {
     local package release image
     _cc_kernel_inventory_capture
     for package in "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"; do
         case "$package" in
-            linux-modules-extra-*) release="${package#linux-modules-extra-}" ;;
-            linux-modules-*) release="${package#linux-modules-}" ;;
+            linux-modules-extra-[0-9]*.*) release="${package#linux-modules-extra-}" ;;
+            linux-modules-[0-9]*.*) release="${package#linux-modules-}" ;;
+            linux-modules-*-*[0-9].*)
+                release="$(_cc_kernel_companion_module_release "$package" 2>/dev/null || true)"
+                [ -n "$release" ] || { printf '%s\n' "$package"; continue; }
+                ;;
             linux-headers-[0-9]*-*) release="${package#linux-headers-}" ;;
             *) continue ;;
         esac
