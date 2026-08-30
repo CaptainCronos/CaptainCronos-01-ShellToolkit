@@ -36,6 +36,7 @@ Initializes a portable Captain Cronos host identity.
 
 Roles:
   developer   Development workstation
+  workstation Legacy/default workstation role
   workbench   Live USB / drive qualification bench
   server      General Linux server
   nas         NAS appliance or NAS-adjacent host
@@ -104,13 +105,39 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+guard_identity_transition() {
+    local requested="$1" prior_id prior_source prior_home
+    prior_id="$(CC_HOST_ID='' cc_config_host_id)" || return 1
+    prior_source="$(CC_HOST_ID='' cc_config_identity_source)"
+    [ "$requested" != "$prior_id" ] || return 0
+
+    case "$prior_source" in
+        'stored identity'|'legacy global HOST_ID')
+            cc_error "Requested host ID differs from authoritative $prior_source ($prior_id)."
+            return 1
+            ;;
+        'hostname fallback')
+            prior_home="$(cc_config_dir)/hosts/$prior_id"
+            if [ -e "$prior_home" ] || [ -L "$prior_home" ]; then
+                cc_error "Requested host ID would strand the existing hostname-fallback host root: $prior_home"
+                cc_error "Use --host-id $prior_id to preserve current host selection and persistent state."
+                return 1
+            fi
+            ;;
+    esac
+}
+
 if [ -n "$HOST_ID_INPUT" ]; then
-    export CC_HOST_ID
-    CC_HOST_ID="$(cc_env_safe_id "$HOST_ID_INPUT")"
-    [ -n "$CC_HOST_ID" ] && [ "$CC_HOST_ID" = "$HOST_ID_INPUT" ] || {
+    requested_host_id="$(cc_env_safe_id "$HOST_ID_INPUT")"
+    [ -n "$requested_host_id" ] && [ "$requested_host_id" = "$HOST_ID_INPUT" ] || {
         cc_error "Host ID must already be a safe lowercase identifier."
         exit 2
     }
+    guard_identity_transition "$requested_host_id" || exit 1
+    export CC_HOST_ID="$requested_host_id"
+elif [ -n "${CC_HOST_ID:-}" ]; then
+    requested_host_id="$(cc_env_safe_id "$CC_HOST_ID")"
+    guard_identity_transition "$requested_host_id" || exit 1
 fi
 
 infer_role() {

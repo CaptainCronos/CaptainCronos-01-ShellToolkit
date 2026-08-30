@@ -837,6 +837,7 @@ Initializes a portable Captain Cronos host identity.
 
 Roles:
   developer   Development workstation
+  workstation Legacy/default workstation role
   workbench   Live USB / drive qualification bench
   server      General Linux server
   nas         NAS appliance or NAS-adjacent host

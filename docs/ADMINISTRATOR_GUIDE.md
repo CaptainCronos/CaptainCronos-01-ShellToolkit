@@ -362,17 +362,45 @@ stored identity.
 `cc init` previews by default. `cc init --apply --host-id ID --role ROLE
 --profile PROFILE` creates missing private state and preserves existing host
 configuration on later runs. It refuses an unsafe path or a host ID different
-from the stored identity. Roles describe host purpose; profiles select one of
-the supported initialization policies. Changing the machine hostname does not
-change an initialized identity. To move configuration to a renamed host, keep
-the `host-id` and matching host directory together rather than renaming either
-implicitly.
+from the stored identity. When an uninitialized hostname-fallback host directory
+already exists, init also refuses a different ID so that reports, assets,
+plugins, and configuration cannot be stranded under the old selection. Use the
+currently selected fallback ID to establish identity in place. Roles describe
+host purpose; profiles select one of the supported initialization policies.
+Changing the machine hostname does not change an initialized identity. To move
+configuration to a renamed host, keep the `host-id` and matching host directory
+together rather than renaming either implicitly.
 
 Legacy global configuration can be inspected with `cc config validate` and
 migrated with `cc config migrate`. Migration previews unless `--apply` is given,
 backs up the original, retains unknown keys, and does not rewrite an already
 current file. Installer and toolkit-update workflows preserve global config,
 stable identity, every host profile, plugins, reports, and assets.
+
+For a legacy workstation already using its hostname-fallback directory, unset
+any runtime host override and omit `--host-id` so init selects and stores the
+currently reported fallback ID in place. Preview both operations before
+applying either one:
+
+```bash
+env -u CC_HOST_ID cc config status
+env -u CC_HOST_ID cc config migrate
+env -u CC_HOST_ID cc init --role workstation --profile default
+```
+
+If the previews select the existing host directory, apply in the same order:
+
+```bash
+env -u CC_HOST_ID cc config migrate --apply
+env -u CC_HOST_ID cc init --apply --role workstation --profile default
+env -u CC_HOST_ID cc config validate
+```
+
+Schema migration creates a private global-config backup under
+`~/.captaincronos/backups/config/`. Init creates the identity, preserves or
+creates the host config in place, hardens only its explicitly managed
+configuration/resource directories, and does not recursively change persistent
+content.
 
 ## Persistent Resource Retention
 

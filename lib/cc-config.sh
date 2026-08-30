@@ -420,8 +420,13 @@ cc_config_show() {
 
 cc_config_migrate() {
     local apply="${1:-0}" cfg version backup_dir backup tmp=""
-    cfg="$(cc_config_file)"; [ -f "$cfg" ] && [ ! -L "$cfg" ] || { printf 'No legacy global config to migrate.\n'; return; }
-    _cc_config_validate_file 'Global config' "$cfg" yes | grep -q '^FAIL' && return 1
+    cfg="$(cc_config_file)"
+    if [ -L "$cfg" ] || { [ -e "$cfg" ] && [ ! -f "$cfg" ]; }; then
+        printf 'Unsafe global config target; refusing migration: %s\n' "$cfg" >&2
+        return 1
+    fi
+    [ -f "$cfg" ] || { printf 'No legacy global config to migrate.\n'; return; }
+    _cc_config_validate_file 'Global config' "$cfg" yes >/dev/null || return 1
     version="$(_cc_config_value_from_file "$cfg" CONFIG_VERSION 2>/dev/null || true)"
     if [ "$version" = "$CC_CONFIG_SCHEMA_VERSION" ]; then printf 'Configuration already uses schema v%s.\n' "$version"; return; fi
     [ -z "$version" ] || { [[ "$version" =~ ^[0-9]+$ ]] && [ "$version" -lt "$CC_CONFIG_SCHEMA_VERSION" ]; } || return 1

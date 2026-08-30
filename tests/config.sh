@@ -105,16 +105,45 @@ mkdir -p "$migrate_dir"
 printf 'REPO_ROOT="$HOME/Legacy"\nCUSTOM_LEGACY="preserve"\n' >"$migrate_dir/config"
 chmod 600 "$migrate_dir/config"
 migrate_before="$(cat "$migrate_dir/config")"
+migrate_before_hash="$(sha256sum "$migrate_dir/config" | cut -d' ' -f1)"
 CAPTAIN_CRONOS_CONFIG_DIR="$migrate_dir" cc_config_migrate 0 >/dev/null
 [ "$(cat "$migrate_dir/config")" = "$migrate_before" ] || fail 'migration preview changed config'
 CAPTAIN_CRONOS_CONFIG_DIR="$migrate_dir" cc_config_migrate 1 >/dev/null
 grep -q '^CONFIG_VERSION="1"$' "$migrate_dir/config" || fail 'migration did not add schema marker'
 grep -q '^CUSTOM_LEGACY="preserve"$' "$migrate_dir/config" || fail 'migration discarded unknown key'
 [ "$(find "$migrate_dir/backups/config" -type f | wc -l)" -eq 1 ] || fail 'migration backup missing'
+[ "$(sha256sum "$(find "$migrate_dir/backups/config" -type f -print -quit)" | cut -d' ' -f1)" = "$migrate_before_hash" ] \
+    || fail 'migration backup did not preserve the original bytes'
 [ "$(stat -c %a "$migrate_dir/config")" = 600 ] || fail 'migration config mode was not private'
 [ "$(stat -c %a "$(find "$migrate_dir/backups/config" -type f -print -quit)")" = 600 ] || fail 'migration backup mode was not private'
 CAPTAIN_CRONOS_CONFIG_DIR="$migrate_dir" cc_config_migrate 1 >/dev/null
 [ "$(find "$migrate_dir/backups/config" -type f | wc -l)" -eq 1 ] || fail 'idempotent migration created another backup'
+
+old_schema_dir="$TEST_DIR/old-schema"
+mkdir -p "$old_schema_dir"
+printf 'CONFIG_VERSION="0"\nEDITOR="old-schema-operator"\n' >"$old_schema_dir/config"
+chmod 600 "$old_schema_dir/config"
+CAPTAIN_CRONOS_CONFIG_DIR="$old_schema_dir" cc_config_migrate 1 >/dev/null
+grep -q '^CONFIG_VERSION="1"$' "$old_schema_dir/config" || fail 'old schema was not advanced'
+grep -q '^EDITOR="old-schema-operator"$' "$old_schema_dir/config" || fail 'old schema value was reinterpreted'
+
+unsupported_dir="$TEST_DIR/unsupported-schema"
+mkdir -p "$unsupported_dir"
+printf 'CONFIG_VERSION="99"\nEDITOR="future"\n' >"$unsupported_dir/config"
+chmod 600 "$unsupported_dir/config"
+unsupported_before="$(sha256sum "$unsupported_dir/config")"
+if CAPTAIN_CRONOS_CONFIG_DIR="$unsupported_dir" cc_config_migrate 1 >/dev/null 2>&1; then
+    fail 'future schema migration was accepted'
+fi
+[ "$(sha256sum "$unsupported_dir/config")" = "$unsupported_before" ] || fail 'future schema refusal changed config'
+[ ! -e "$unsupported_dir/backups" ] || fail 'future schema refusal created backup state'
+printf 'CONFIG_VERSION="1"\nBROKEN LINE\n' >"$unsupported_dir/config"
+unsupported_before="$(sha256sum "$unsupported_dir/config")"
+if CAPTAIN_CRONOS_CONFIG_DIR="$unsupported_dir" cc_config_migrate 1 >/dev/null 2>&1; then
+    fail 'malformed schema migration was accepted'
+fi
+[ "$(sha256sum "$unsupported_dir/config")" = "$unsupported_before" ] || fail 'malformed schema refusal changed config'
+[ ! -e "$unsupported_dir/backups" ] || fail 'malformed schema refusal created backup state'
 
 # Unsafe targets and failed atomic replacement leave the original untouched.
 symlink_dir="$TEST_DIR/symlink"
@@ -125,10 +154,34 @@ ln -s "$external" "$symlink_dir/config"
 if CAPTAIN_CRONOS_CONFIG_DIR="$symlink_dir" cc_config_set EDITOR unsafe; then
     fail 'symlink config target was accepted'
 fi
+if CAPTAIN_CRONOS_CONFIG_DIR="$symlink_dir" cc_config_migrate 1 >/dev/null 2>&1; then
+    fail 'migration reported success for a symlink config target'
+fi
 grep -q '^CONFIG_VERSION="1"$' "$external" || fail 'symlink refusal changed external config'
 if CAPTAIN_CRONOS_CONFIG_DIR="$TEST_DIR/safe/../escape" cc_config_init; then
     fail 'path traversal configuration root was accepted'
 fi
+
+wrong_owner_dir="$TEST_DIR/wrong-owner"
+mkdir -p "$wrong_owner_dir"
+printf 'EDITOR="operator"\n' >"$wrong_owner_dir/config"
+chmod 600 "$wrong_owner_dir/config"
+wrong_owner_before="$(sha256sum "$wrong_owner_dir/config")"
+if CAPTAIN_CRONOS_CONFIG_DIR="$wrong_owner_dir" bash -c '
+    set -o pipefail
+    source "$1"
+    stat() {
+        case "${1:-} ${2:-}" in
+            "-c %u") printf "999999\\n" ;;
+            *) command /usr/bin/stat "$@" ;;
+        esac
+    }
+    cc_config_migrate 1
+' _ "$PROJECT_ROOT/lib/cc-config.sh" >/dev/null 2>&1; then
+    fail 'wrong-owner migration was accepted'
+fi
+[ "$(sha256sum "$wrong_owner_dir/config")" = "$wrong_owner_before" ] || fail 'wrong-owner refusal changed config'
+[ ! -e "$wrong_owner_dir/backups" ] || fail 'wrong-owner refusal created backup state'
 
 atomic_dir="$TEST_DIR/atomic"
 mock_bin="$TEST_DIR/mock-bin"
