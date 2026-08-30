@@ -20,7 +20,10 @@ separately and are never installed or replaced automatically.
 
 System package behavior is implemented in `lib/cc-packages.sh`. On Debian-family
 systems it resolves package operations, repository queries, and the installed
-package database through `pkg-manager`, `pkg-query`, and `pkg-database`.
+package database through `pkg-manager` (`apt-get`), `pkg-query` (`apt-cache`),
+and `pkg-database` (`dpkg-query`). Debian version ordering is a distinct
+`pkg-version-compare` interface provided by `dpkg`; it is not an installed
+package database query.
 Configuration contains executable choices only; dry-run behavior, arguments,
 and privilege escalation remain in the library.
 

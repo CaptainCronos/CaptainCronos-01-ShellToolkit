@@ -105,7 +105,8 @@ _cc_kernel_can_inspect_artifacts() {
 _cc_kernel_can_correlate_packages() {
     _cc_kernel_supported && [ "$(_cc_kernel_distribution_family)" = debian ] &&
         [ "$(_cc_pkg_family 2>/dev/null || true)" = apt-get ] &&
-        command -v "$(_cc_pkg_database_program 2>/dev/null || printf cc-missing-package-database)" >/dev/null 2>&1
+        command -v "$(_cc_pkg_database_program 2>/dev/null || printf cc-missing-package-database)" >/dev/null 2>&1 &&
+        command -v "$(_cc_pkg_version_compare_program 2>/dev/null || printf cc-missing-version-compare)" >/dev/null 2>&1
 }
 
 _cc_kernel_can_cleanup() {
@@ -369,7 +370,7 @@ _cc_kernel_version_compare_program() {
     if [ -n "${CC_KERNEL_DPKG_PROGRAM:-}" ]; then
         printf '%s\n' "$CC_KERNEL_DPKG_PROGRAM"
     else
-        _cc_pkg_database_program
+        _cc_pkg_version_compare_program
     fi
 }
 
@@ -503,12 +504,17 @@ _cc_kernel_artifact_unsafe_count() {
 }
 
 _cc_kernel_inventory_capture() {
-    local package release
-    [ "${_CC_KERNEL_INVENTORY_READY:-0}" -eq 0 ] || return 0
+    local package release installed_output status
+    if [ "${_CC_KERNEL_INVENTORY_READY:-0}" -ne 0 ]; then
+        [ "${_CC_KERNEL_INVENTORY_STATE:-failed}" = ready ]
+        return
+    fi
     declare -ga _CC_KERNEL_INSTALLED_PACKAGES=()
     declare -ga _CC_KERNEL_PACKAGE_RELEASES=()
     _CC_KERNEL_INSTALLED_PACKAGES=()
     _CC_KERNEL_PACKAGE_RELEASES=()
+    _CC_KERNEL_INVENTORY_STATE=failed
+    installed_output="$(_cc_pkg_list_installed 2>/dev/null)" || { status=$?; return "$status"; }
     while IFS= read -r package; do
         [ -n "$package" ] || continue
         _CC_KERNEL_INSTALLED_PACKAGES+=("$package")
@@ -518,24 +524,26 @@ _cc_kernel_inventory_capture() {
             *) continue ;;
         esac
         case "$release" in [0-9]*.*) _CC_KERNEL_PACKAGE_RELEASES+=("$release") ;; esac
-    done < <(_cc_pkg_list_installed 2>/dev/null || true)
+    done <<< "$installed_output"
     if [ "${#_CC_KERNEL_PACKAGE_RELEASES[@]}" -gt 0 ]; then
         mapfile -t _CC_KERNEL_PACKAGE_RELEASES < <(
             printf '%s\n' "${_CC_KERNEL_PACKAGE_RELEASES[@]}" | _cc_kernel_version_order
         )
     fi
     _CC_KERNEL_INVENTORY_READY=1
+    _CC_KERNEL_INVENTORY_STATE=ready
 }
 
 _cc_kernel_inventory_reset() {
     _CC_KERNEL_INVENTORY_READY=0
+    _CC_KERNEL_INVENTORY_STATE=unprepared
     _CC_KERNEL_INSTALLED_PACKAGES=()
     _CC_KERNEL_PACKAGE_RELEASES=()
 }
 
 _cc_kernel_package_releases() {
     _cc_kernel_can_correlate_packages || return 0
-    _cc_kernel_inventory_capture
+    _cc_kernel_inventory_capture || return
     [ "${#_CC_KERNEL_PACKAGE_RELEASES[@]}" -eq 0 ] || printf '%s\n' "${_CC_KERNEL_PACKAGE_RELEASES[@]}"
 }
 
@@ -590,7 +598,7 @@ _cc_kernel_set_mapping_state() {
 
 _cc_kernel_verified_sets() {
     local release
-    _cc_kernel_inventory_capture
+    _cc_kernel_inventory_capture || return
     for release in "${_CC_KERNEL_PACKAGE_RELEASES[@]}"; do
         [ -n "$release" ] || continue
         [ "$(_cc_kernel_set_mapping_state "$release")" = verified ] && printf '%s\n' "$release"
@@ -655,7 +663,7 @@ _cc_kernel_protected() {
     local -a verified=()
     _cc_kernel_validate_keep_count "$keep_count" || return 2
     running="$(_cc_kernel_running)" || return 1
-    _cc_kernel_inventory_capture
+    _cc_kernel_inventory_capture || return
     mapfile -t verified < <(_cc_kernel_verified_sets)
     pending="$(_cc_kernel_select_pending "$running" "${verified[@]}" 2>/dev/null || true)"
     fallback="$(_cc_kernel_select_fallback "$running" "${verified[@]}" 2>/dev/null || true)"
@@ -722,7 +730,7 @@ _cc_kernel_cleanup_candidates() {
 _cc_kernel_primary_packages_for_version() {
     [ "$#" -eq 1 ] || return 2
     local version="$1" package
-    _cc_kernel_inventory_capture
+    _cc_kernel_inventory_capture || return
     for package in "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"; do
         case "$package" in
             "linux-image-$version"|"linux-image-unsigned-$version") printf '%s\n' "$package" ;;
@@ -734,7 +742,7 @@ _cc_kernel_companion_packages_for_version() {
     [ "$#" -eq 1 ] || return 2
     local version="$1" package header_base
     header_base="${version%-*}"
-    _cc_kernel_inventory_capture
+    _cc_kernel_inventory_capture || return
     for package in "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"; do
         case "$package" in
             "linux-image-$version"|"linux-image-unsigned-$version"|\
@@ -872,7 +880,7 @@ _cc_kernel_component_state() {
     [ "$#" -eq 2 ] || return 2
     local release="$1" component="$2" package header_base
     header_base="${release%-*}"
-    _cc_kernel_inventory_capture
+    _cc_kernel_inventory_capture || return
     case "$component" in
         image)
             [ "$(_cc_kernel_set_mapping_state "$release")" = verified ] && printf '%s\n' present || printf '%s\n' missing
@@ -924,7 +932,7 @@ _cc_kernel_package_matches_release() {
         "linux-headers-$release"|"linux-tools-$release"|\
         "linux-cloud-tools-$release") return 0 ;;
         "linux-headers-$header_base")
-            _cc_kernel_inventory_capture
+            _cc_kernel_inventory_capture || return 1
             _cc_kernel_in_list "linux-headers-$release" "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"
             ;;
         *) return 1 ;;
@@ -958,12 +966,12 @@ _cc_kernel_set_mark_state() {
 
 _cc_kernel_package_installed_kib() {
     [ "$#" -gt 0 ] || { printf '0\n'; return 0; }
-    local database package line total=0
+    local database package line status total=0
     database="$(_cc_pkg_database_program)" || return 1
     for package in "$@"; do
         # dpkg-query expands this format expression; the shell must not.
         # shellcheck disable=SC2016
-        line="$("$database" -W -f='${Installed-Size}\n' "$package" 2>/dev/null || true)"
+        line="$("$database" -W -f='${Installed-Size}\n' "$package" 2>/dev/null)" || { status=$?; return "$status"; }
         case "$line" in ''|*[!0-9]*) return 1 ;; esac
         total=$((total + line))
     done
@@ -971,24 +979,26 @@ _cc_kernel_package_installed_kib() {
 }
 
 _cc_kernel_package_issue_records() {
-    local database
+    local database output status
     _cc_kernel_can_correlate_packages || return 0
     database="$(_cc_pkg_database_program)" || return 1
     # dpkg-query expands these fields; the shell must not.
     # shellcheck disable=SC2016
-    "$database" -W -f='${db:Status-Status}\t${Package}\n' 2>/dev/null |
+    output="$("$database" -W -f='${db:Status-Status}\t${Package}\n' 2>/dev/null)" || { status=$?; return "$status"; }
+    printf '%s\n' "$output" |
         awk -F '\t' '$2 ~ /^linux-(image(-unsigned)?|modules(-extra)?|headers)-[0-9]/ && $1 != "installed" {print}'
 }
 
 _cc_kernel_direct_image_dependency_releases() {
     [ "$#" -eq 1 ] || return 2
-    local query package="$1"
-    query="${CC_KERNEL_DPKG_QUERY_PROGRAM:-dpkg-query}"
+    local query package="$1" output status
+    query="$(_cc_pkg_database_program)" || return 1
     command -v "$query" >/dev/null 2>&1 || return 1
     # A companion association is trustworthy only when the installed package's
     # own metadata directly names an exact signed or unsigned kernel image.
     # shellcheck disable=SC2016
-    "$query" -W -f='${db:Status-Status}\t${Depends}\n' -- "$package" 2>/dev/null |
+    output="$("$query" -W -f='${db:Status-Status}\t${Depends}\n' -- "$package" 2>/dev/null)" || { status=$?; return "$status"; }
+    printf '%s\n' "$output" |
         awk -F '\t' '$1 == "installed" {
             dependencies = substr($0, index($0, "\t") + 1)
             count = split(dependencies, alternatives, /[,|]/)
@@ -1030,7 +1040,7 @@ _cc_kernel_companion_module_release() {
 
 _cc_kernel_orphan_component_records() {
     local package release image
-    _cc_kernel_inventory_capture
+    _cc_kernel_inventory_capture || return
     for package in "${_CC_KERNEL_INSTALLED_PACKAGES[@]}"; do
         case "$package" in
             linux-modules-extra-[0-9]*.*) release="${package#linux-modules-extra-}" ;;
@@ -1107,7 +1117,7 @@ _cc_kernel_bootloader_environment() {
 _cc_kernel_health_findings() {
     local keep_count="${1:-${KEEP_COUNT:-2}}" boot_dir running release state severity
     local boot_usage efi_path efi_source efi_type efi_usage unsafe_count issue_count=0 warn_threshold
-    local artifact_states="${2:-}" mapping package_issue orphan
+    local artifact_states="${2:-}" mapping package_issue orphan package_query_failed=0
     boot_dir="$(_cc_kernel_boot_dir)"
     warn_threshold="${CC_KERNEL_USAGE_WARN_PERCENT:-90}"
     case "$warn_threshold" in
@@ -1131,7 +1141,12 @@ _cc_kernel_health_findings() {
         printf 'FAIL\tRUNNING_KERNEL_ARTIFACT_FAILURE\tRunning kernel image is missing or unsafe: %s\n' "$running"
         issue_count=$((issue_count + 1))
     fi
-    if _cc_kernel_can_correlate_packages && [ -n "$running" ]; then
+    if _cc_kernel_can_correlate_packages && [ "${_CC_KERNEL_INVENTORY_STATE:-unprepared}" = failed ]; then
+        printf 'FAIL\tPACKAGE_QUERY_FAILURE\tInstalled package database query failed; kernel package correlation is unavailable.\n'
+        issue_count=$((issue_count + 1))
+        package_query_failed=1
+    fi
+    if _cc_kernel_can_correlate_packages && [ "$package_query_failed" -eq 0 ] && [ -n "$running" ]; then
         mapping="$(_cc_kernel_set_mapping_state "$running")"
         if [ "$mapping" != verified ]; then
             printf 'FAIL\tRUNNING_KERNEL_PACKAGE_FAILURE\tRunning kernel package mapping is %s: %s\n' "$mapping" "$running"
@@ -1143,7 +1158,7 @@ _cc_kernel_health_findings() {
         artifact_states="$(_cc_kernel_artifact_states)"
     fi
 
-    if _cc_kernel_can_correlate_packages; then
+    if _cc_kernel_can_correlate_packages && [ "$package_query_failed" -eq 0 ]; then
         while IFS=$'\t' read -r release state; do
             [ -n "$release" ] || continue
             [ "$state" = MATCHED ] && continue
@@ -1165,7 +1180,7 @@ _cc_kernel_health_findings() {
             esac
             issue_count=$((issue_count + 1))
         done < <(_cc_kernel_orphan_component_records)
-    else
+    elif [ "$package_query_failed" -eq 0 ]; then
         printf 'WARN\tPACKAGE_CORRELATION_UNSUPPORTED\tPackage correlation is unsupported for the %s kernel package family.\n' "$(_cc_kernel_distribution_family)"
         issue_count=$((issue_count + 1))
         while IFS=$'\t' read -r release state; do
@@ -1264,6 +1279,9 @@ _cc_kernel_snapshot_capture() {
     _CC_KERNEL_SNAPSHOT_FINDINGS=()
 
     _cc_kernel_validate_keep_count "$keep_count" || return 2
+    if _cc_kernel_can_correlate_packages; then
+        _cc_kernel_inventory_capture >/dev/null 2>&1 || true
+    fi
     running="$(_cc_kernel_running 2>/dev/null || printf unknown)"
     mapfile -t kernels < <(_cc_kernel_list 2>/dev/null || true)
     newest="$(_cc_kernel_newest 2>/dev/null || true)"

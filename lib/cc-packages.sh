@@ -49,6 +49,11 @@ _cc_pkg_database_program() {
     cc_program_get pkg-database
 }
 
+_cc_pkg_version_compare_program() {
+    [ "$(_cc_pkg_family)" = "apt-get" ] || return 1
+    cc_program_get pkg-version-compare
+}
+
 _cc_pkg_manager_exists() {
     local manager
     manager="$(_cc_pkg_manager)" || return 1
@@ -215,13 +220,16 @@ _cc_pkg_clean() {
 
 _cc_pkg_is_installed() {
     [ "$#" -eq 1 ] || return 2
-    local family database
+    local family database output status
     family="$(_cc_pkg_family)" || return 1
     case "$family" in
         apt-get)
             database="$(_cc_pkg_database_program)" || return 1
-            "$database" -s "$1" 2>/dev/null |
-                awk '$0 == "Status: install ok installed" {found=1} END {exit !found}'
+            command -v "$database" >/dev/null 2>&1 || return 127
+            output="$("$database" -s "$1" 2>/dev/null)" || { status=$?; return "$status"; }
+            if printf '%s\n' "$output" | grep -Fxq 'Status: install ok installed'; then return 0; fi
+            printf '%s\n' "$output" | grep -Eq '^Status: [[:graph:]]+ [[:graph:]]+ [[:graph:]]+$' && return 1
+            return 2
             ;;
         dnf|yum) rpm -q "$1" >/dev/null 2>&1 ;;
         zypper) rpm -q "$1" >/dev/null 2>&1 ;;
@@ -238,6 +246,7 @@ _cc_pkg_is_available() {
     case "$family" in
         apt-get)
             query="$(_cc_pkg_query_program)" || return 1
+            command -v "$query" >/dev/null 2>&1 || return 127
             "$query" show "$1" >/dev/null 2>&1
             ;;
         dnf) dnf -q list --available "$1" >/dev/null 2>&1 ;;
@@ -251,13 +260,14 @@ _cc_pkg_is_available() {
 
 _cc_pkg_find_removable_matching() {
     [ "$#" -eq 1 ] || return 2
-    local family database
+    local family database output status
     family="$(_cc_pkg_family)" || return 1
     case "$family" in
         apt-get)
             database="$(_cc_pkg_database_program)" || return 1
-            "$database" -l 2>/dev/null |
-                awk -v pattern="$1" '$1 ~ /^(ii|rc)$/ && $2 ~ pattern {print $2}'
+            command -v "$database" >/dev/null 2>&1 || return 127
+            output="$("$database" -l 2>/dev/null)" || { status=$?; return "$status"; }
+            printf '%s\n' "$output" | awk -v pattern="$1" '$1 ~ /^(ii|rc)$/ && $2 ~ pattern {print $2}'
             ;;
         dnf|yum|zypper) rpm -qa | awk -v pattern="$1" '$0 ~ pattern {print}' ;;
         pacman) pacman -Qq | awk -v pattern="$1" '$0 ~ pattern {print}' ;;
@@ -267,13 +277,14 @@ _cc_pkg_find_removable_matching() {
 }
 
 _cc_pkg_list_installed() {
-    local family database
+    local family database output status
     family="$(_cc_pkg_family)" || return 1
     case "$family" in
         apt-get)
             database="$(_cc_pkg_database_program)" || return 1
-            "$database" -l 2>/dev/null |
-                awk '$1 == "ii" {print $2}'
+            command -v "$database" >/dev/null 2>&1 || return 127
+            output="$("$database" -l 2>/dev/null)" || { status=$?; return "$status"; }
+            printf '%s\n' "$output" | awk '$1 == "ii" {print $2}'
             ;;
         dnf|yum|zypper) rpm -qa | sort ;;
         pacman) pacman -Qq ;;
@@ -284,12 +295,14 @@ _cc_pkg_list_installed() {
 
 _cc_pkg_owners_of_path() {
     [ "$#" -eq 1 ] || return 2
-    local family database
+    local family database output status
     family="$(_cc_pkg_family)" || return 1
     case "$family" in
         apt-get)
             database="$(_cc_pkg_database_program)" || return 1
-            "$database" -S "$1" 2>/dev/null |
+            command -v "$database" >/dev/null 2>&1 || return 127
+            output="$("$database" -S "$1" 2>/dev/null)" || { status=$?; return "$status"; }
+            printf '%s\n' "$output" |
                 awk -F': ' 'NF >= 2 {split($1, names, ", "); for (name in names) print names[name]}' |
                 sort -u
             ;;

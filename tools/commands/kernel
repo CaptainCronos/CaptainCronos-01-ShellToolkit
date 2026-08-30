@@ -79,14 +79,17 @@ kernel_require_linux() {
 
 kernel_prepare_inventory() {
     _cc_kernel_can_correlate_packages || return 0
-    _cc_kernel_inventory_capture
+    _cc_kernel_inventory_capture || {
+        cc_error "Installed package database query failed; refusing kernel package correlation."
+        return 5
+    }
 }
 
 kernel_status() {
     local keep_count running severity image_state modules_state headers_state artifact_status
     local newer reboot boot_usage boot_usage_status=INFO cleanup_detail efi_path
     keep_count="$(kernel_keep_count)" || return
-    kernel_prepare_inventory
+    kernel_prepare_inventory || return
     _cc_kernel_snapshot_capture "$keep_count"
     running="$(_cc_kernel_snapshot_get running)"
     severity="$(_cc_kernel_snapshot_get health_status)"
@@ -213,7 +216,7 @@ kernel_list() {
     local keep_count kernel state mark mapping
     local -a kernels=()
     keep_count="$(kernel_keep_count)" || return
-    kernel_prepare_inventory
+    kernel_prepare_inventory || return
     mapfile -t kernels < <(_cc_kernel_list)
 
     cc_banner
@@ -235,7 +238,7 @@ kernel_artifacts() {
     local keep_count release kernel initramfs system_map config package ownership state classification bytes size
     kernel_require_linux || return
     keep_count="$(kernel_keep_count)" || return
-    kernel_prepare_inventory
+    kernel_prepare_inventory || return
     cc_banner
     echo
     echo "Kernel Boot Artifacts"
@@ -267,7 +270,7 @@ kernel_artifacts() {
 kernel_health() {
     local keep_count severity finding code message
     keep_count="$(kernel_keep_count)" || return
-    kernel_prepare_inventory
+    kernel_prepare_inventory || return
     _cc_kernel_snapshot_capture "$keep_count"
     severity="$(_cc_kernel_snapshot_get health_status)"
     cc_banner
@@ -291,7 +294,7 @@ kernel_health() {
 kernel_running() {
     local running package
     local -a packages=()
-    kernel_prepare_inventory
+    kernel_prepare_inventory || return
     running="$(_cc_kernel_running)" || {
         cc_error "Unable to determine the running kernel."
         return 1
@@ -344,7 +347,7 @@ kernel_cleanup() {
         return 3
     }
     keep_count="$(kernel_keep_count)" || return
-    kernel_prepare_inventory
+    kernel_prepare_inventory || return
     running="$(_cc_kernel_running)" || return 1
     mapfile -t kernels < <(_cc_kernel_list)
     newest="$(_cc_kernel_newest 2>/dev/null || true)"

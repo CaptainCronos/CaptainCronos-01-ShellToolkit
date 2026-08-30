@@ -1,5 +1,10 @@
 # Tests
 
+`tests/package-query-robustness.sh` validates the distinct Debian `apt-get`,
+`apt-cache`, `dpkg-query`, and `dpkg --compare-versions` contracts. Negative
+fixtures cover one-tool-only hosts, invalid configured providers, missing APT
+interfaces, command failure, malformed output, and fail-closed kernel inventory.
+
 `tests/kernel.sh` uses temporary boot artifacts and mocked package/privilege
 commands to verify kernel discovery, version ordering, protection, candidate
 selection, ownership fail-safe behavior, status/list output, reboot state,

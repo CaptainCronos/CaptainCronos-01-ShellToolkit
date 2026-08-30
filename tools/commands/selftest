@@ -276,6 +276,7 @@ selftest_suite() {
     "$runner" "Programs library" programs check_library cc-programs.sh
     "$runner" "Packages library" packages check_library cc-packages.sh
     "$runner" "Package operations" packages bash "$PROJECT_ROOT/tests/package-management.sh"
+    "$runner" "Debian package-query robustness" packages bash "$PROJECT_ROOT/tests/package-query-robustness.sh"
     "$runner" "Kernel library" kernel check_library cc-kernel.sh
     "$runner" "Kernel management" kernel bash "$PROJECT_ROOT/tests/kernel.sh"
     "$runner" "Kernel package classification" kernel bash "$PROJECT_ROOT/tests/kernel-package-classification.sh"

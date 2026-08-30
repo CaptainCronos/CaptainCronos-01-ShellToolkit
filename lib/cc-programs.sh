@@ -34,8 +34,9 @@ cc_program_config_file() {
 _cc_program_metadata() {
     cat <<'EOF_PROGRAMS'
 Package Management|pkg-manager|Operations|CC_PKG_MANAGER|required
-Package Management|pkg-query|Queries|CC_PKG_QUERY|required
-Package Management|pkg-database|Database|CC_PKG_DATABASE|required
+Package Management|pkg-query|APT Metadata|CC_PKG_QUERY|required
+Package Management|pkg-database|Installed DB|CC_PKG_DATABASE|required
+Package Management|pkg-version-compare|Version Compare|CC_PKG_VERSION_COMPARE|required
 Networking|network|Network|CC_NETWORK|required
 Networking|sockets|Sockets|CC_SOCKETS|required
 HTTP|download|Downloads|CC_DOWNLOAD|required

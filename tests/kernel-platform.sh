@@ -27,6 +27,7 @@ cc_platform_os_id() { printf '%s\n' "$CC_TEST_ID"; }
 cc_platform_os_like() { printf '%s\n' "$CC_TEST_LIKE"; }
 _cc_pkg_family() { printf '%s\n' "$CC_TEST_MANAGER"; }
 _cc_pkg_database_program() { printf '%s\n' true; }
+_cc_pkg_version_compare_program() { printf '%s\n' true; }
 
 CC_TEST_ID=ubuntu; CC_TEST_LIKE=debian; CC_TEST_MANAGER=apt-get
 [ "$(_cc_kernel_distribution_family)" = debian ] || fail 'Debian package family detection failed'

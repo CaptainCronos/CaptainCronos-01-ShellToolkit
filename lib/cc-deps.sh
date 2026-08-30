@@ -125,7 +125,7 @@ cc_dep_storage_list() {
 }
 
 cc_dep_kernel_list() {
-    printf '%s\n' uname find sort awk pkg-manager
+    printf '%s\n' uname find sort awk pkg-manager pkg-database pkg-version-compare
 }
 
 cc_dep_kernel_optional_list() {

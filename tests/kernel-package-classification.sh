@@ -34,7 +34,7 @@ fixture_package_database() {
         *) return 1 ;;
     esac
 }
-CC_KERNEL_DPKG_QUERY_PROGRAM=fixture_package_database
+_cc_pkg_database_program() { printf '%s\n' fixture_package_database; }
 metadata_releases="$(_cc_kernel_direct_image_dependency_releases linux-modules-vendor-7.0.0-1016-nvidia)"
 [ "$metadata_releases" = 7.0.0-1016-nvidia ] || fail 'exact alternative image dependencies were not normalized'
 [ -z "$(_cc_kernel_direct_image_dependency_releases linux-modules-vendor-incomplete)" ] ||

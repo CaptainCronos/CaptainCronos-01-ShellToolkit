@@ -63,6 +63,14 @@ EOF_DU
 
 cat > "$BIN_DIR/dpkg" <<'EOF_DPKG'
 #!/usr/bin/env bash
+if [ "${1:-}" = --compare-versions ]; then
+    /usr/bin/dpkg "$@"
+else
+    exit 2
+fi
+EOF_DPKG
+cat > "$BIN_DIR/dpkg-query" <<'EOF_DPKG_QUERY'
+#!/usr/bin/env bash
 if [ "${1:-}" = -l ]; then
     printf 'ii  linux-image-1.0-test  1  amd64  image\n'
 elif [ "${1:-}" = -S ]; then
@@ -70,8 +78,8 @@ elif [ "${1:-}" = -S ]; then
 else
     exit 2
 fi
-EOF_DPKG
-chmod 755 "$BIN_DIR/findmnt" "$BIN_DIR/du-fixture" "$BIN_DIR/dpkg"
+EOF_DPKG_QUERY
+chmod 755 "$BIN_DIR/findmnt" "$BIN_DIR/du-fixture" "$BIN_DIR/dpkg" "$BIN_DIR/dpkg-query"
 
 CC_KERNEL_OS=Linux
 CC_KERNEL_RUNNING=1.0-test

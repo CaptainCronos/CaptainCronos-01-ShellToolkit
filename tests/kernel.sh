@@ -140,7 +140,14 @@ cat > "$BIN_DIR/dpkg" <<'EOF_DPKG'
 printf '%s\n' "$*" >> "$CC_KERNEL_TEST_DPKG_LOG"
 if [ "${1:-}" = --compare-versions ]; then
     /usr/bin/dpkg "$@"
-elif [ "${1:-}" = -l ]; then
+else
+    exit 2
+fi
+EOF_DPKG
+cat > "$BIN_DIR/dpkg-query" <<'EOF_DPKG_QUERY'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CC_KERNEL_TEST_DPKG_LOG"
+if [ "${1:-}" = -l ]; then
     for version in 10 20 30 40; do
         printf 'ii  linux-image-6.8.0-%s-generic  1  amd64  image\n' "$version"
         printf 'ii  linux-modules-6.8.0-%s-generic  1  amd64  modules\n' "$version"
@@ -156,7 +163,7 @@ elif [ "${1:-}" = -W ]; then
 else
     exit 2
 fi
-EOF_DPKG
+EOF_DPKG_QUERY
 cat > "$BIN_DIR/apt-mark" <<'EOF_APT_MARK'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -169,7 +176,7 @@ cat > "$BIN_DIR/sudo" <<'EOF_SUDO'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$CC_KERNEL_TEST_MUTATION_LOG"
 EOF_SUDO
-chmod 755 "$BIN_DIR/dpkg" "$BIN_DIR/apt-mark" "$BIN_DIR/sudo"
+chmod 755 "$BIN_DIR/dpkg" "$BIN_DIR/dpkg-query" "$BIN_DIR/apt-mark" "$BIN_DIR/sudo"
 
 export CC_KERNEL_TEST_MUTATION_LOG="$MUTATION_LOG"
 export CC_KERNEL_TEST_DPKG_LOG="$DPKG_LOG"
