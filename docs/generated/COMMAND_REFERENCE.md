@@ -174,13 +174,11 @@ Switches:
 
 ~~~text
 Usage:
-  cc capability [list|check NAME]
+  cc capability [list]
+  cc capability check NAME
 
-Examples:
-  cc capability
-  cc capability list
-  cc capability check smart
-  cc capability check zfs
+The structured state is one of available, unavailable, unsupported, disabled,
+or missing-dependency. Checks exit successfully only for available capabilities.
 ~~~
 
 ### Switch discovery
@@ -199,8 +197,8 @@ Switches:
   --version......... Show toolkit version information.
 
 Subcommands:
-  list......... List platform capabilities.
-  check........ Check one named capability.
+  list......... List resolved core, program, and plugin capabilities.
+  check........ Resolve one named capability and its semantic state.
 
 Discovery:
   cc capability <subcommand> switches
@@ -1181,14 +1179,17 @@ Discovery:
 
 ~~~text
 Usage:
-  cc plugin [list|status|info NAME]
+  cc plugin [list|status]
+  cc plugin info ID
 
 Actions:
-  list        List plugin directories.
-  status      Show plugin directory status and file counts.
-  info NAME   Show detail for one plugin directory.
+  list        List repository and current-host plugins with semantic state.
+  status      Alias for list.
+  info ID     Show validated inventory detail for one plugin ID.
 
-This command only inspects plugin directories. It does not enable, disable, or execute plugins yet.
+Discovery reads data-only plugin.conf manifests. It never sources or executes
+plugin entrypoints. Plugin installation, enable/disable mutation, command
+registration, and remote update are not implemented.
 ~~~
 
 ### Switch discovery
@@ -1197,9 +1198,9 @@ This command only inspects plugin directories. It does not enable, disable, or e
 Command: cc plugin
 
 Usage:
-  cc plugin [subcommand] [arguments]
+  cc plugin [list
 
-Inspect plugin directories without executing plugins.
+status
 
 Switches:
   No command-specific switches.
@@ -1207,9 +1208,9 @@ Switches:
   --version......... Show toolkit version information.
 
 Subcommands:
-  list.......... List plugin directories.
-  status........ Show plugin directory status and file counts.
-  info.......... Show details for one plugin directory.
+  list.......... List validated local plugins and semantic state.
+  status........ Alias for the validated plugin inventory.
+  info.......... Show validated details for one plugin ID.
 
 Discovery:
   cc plugin <subcommand> switches
@@ -1554,6 +1555,7 @@ Runs the toolkit engineering self-test suite.
 Checks:
   - shared library syntax and load checks
   - prompt engine template validation
+  - plugin/capability library and safety fixtures
   - strict command audit
   - documentation lint
   - release check

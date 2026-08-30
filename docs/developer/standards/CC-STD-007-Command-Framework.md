@@ -69,12 +69,10 @@ misc
 
 ---
 
-## Future Plugins
+## Plugins
 
-Future plugin commands may live under:
-
-```text
-plugins/<plugin-name>/commands/
-```
-
-Built-in commands should take precedence over plugin commands if names conflict.
+Plugin API 1 does not register commands. The dispatcher searches only
+`tools/commands/`; manifests containing command fields are invalid. A later
+contract may add bounded command registration, but it must preserve core
+namespace precedence and fail closed for plugin/plugin collisions without
+sourcing code during registry or help discovery.

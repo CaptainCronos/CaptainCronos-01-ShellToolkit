@@ -329,15 +329,22 @@ should not require shell code changes.
 
 ---
 
-## Future Plugin Model
+## Local Plugin and Capability Foundation
 
-Future plugin directories may add their own command modules:
+`lib/cc-plugins.sh` scans only repository `plugins/` and the current host's
+`CC_HOST_HOME/plugins/`. It parses strict API 1 `plugin.conf` data without
+sourcing plugin code, validates ownership, permissions, platform, dependencies,
+and bounded entrypoint identity, then emits structured inventory records.
+Unknown material is reported and never recursively interpreted.
 
-```text
-plugins/<plugin-name>/commands/
-```
+`lib/cc-capabilities.sh` is the authoritative availability query across core
+platform detection, configured Program Management interfaces, and validated
+plugin providers. Duplicate IDs/providers and core namespace collisions fail
+closed without affecting built-in command dispatch.
 
-The dispatcher can later search built-in commands first, then enabled plugin commands.
+Plugin command declarations and runtime execution remain deferred. The core
+dispatcher still searches only `tools/commands/`, which makes command collision
+impossible in plugin API 1.
 
 ---
 

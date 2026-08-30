@@ -51,7 +51,7 @@ After Milestone M2, this top-level layout should be considered stable.
 | `assets/` | Images and static assets. |
 | `config/` | Project configuration. |
 | `examples/` | Example files and usage patterns. |
-| `plugins/` | Future optional modules. |
+| `plugins/` | Repository-shipped local plugin manifests and entrypoints. |
 | `releases/` | Release artifacts or release notes. |
 | `templates/` | Reusable templates. |
 | `tests/` | Future test scripts and fixtures. |
@@ -67,6 +67,8 @@ After Milestone M2, this top-level layout should be considered stable.
 5. Put `cc` subcommands under `tools/commands/`.
 6. Put one-time migrations under `archive/migrations/` after use.
 7. Keep documentation near the audience: `docs/user/` or `docs/developer/`.
+8. Keep host/operator plugins under the current host's private `plugins/` root;
+   do not search PATH or arbitrary directories.
 
 ---
 

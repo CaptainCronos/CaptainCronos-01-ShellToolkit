@@ -8,7 +8,7 @@ Toolkit version: 1.3.0-beta2 (Blackbeard)
 | cc asset | namespace | 1.3.0-beta2 | Manage local lifecycle asset inventory records. |
 | cc audit | namespace-with-switches | 1.3.0-beta2 | Run command consistency checks across toolkit commands. |
 | cc baseline | flat-no-switches | 1.3.0-beta2 | Capture operating-system baseline shell files. |
-| cc capability | namespace | 1.3.0-beta2 | Inspect detected host capabilities. |
+| cc capability | namespace | 1.3.0-beta2 | Resolve core, program, and plugin-provided host capabilities. |
 | cc config | namespace | 1.3.0-beta2 | View and update toolkit configuration. |
 | cc defaults | flat-no-switches | 1.3.0-beta2 | Promote active shell files into deployable defaults. |
 | cc deps | namespace | 1.3.0-beta2 | Show dependency status for toolkit commands and profiles. |
@@ -34,7 +34,7 @@ Toolkit version: 1.3.0-beta2 (Blackbeard)
 | cc monthly-health | flat-with-switches | 1.3.0-beta2 | Generate a monthly host health and maintenance report. |
 | cc monthly-health-timer | namespace | 1.3.0-beta2 | Retire or inspect the standalone monthly health user timer. |
 | cc platform | namespace | 1.3.0-beta2 | Show detected operating platform and host capabilities. |
-| cc plugin | namespace | 1.3.0-beta2 | Inspect local toolkit plugin directories. |
+| cc plugin | namespace | 1.3.0-beta2 | Inspect trusted local plugin manifests without executing plugins. |
 | cc programs | namespace | 1.3.0-beta2 | Show and validate preferred command-line program interfaces. |
 | cc prompt | interactive | 1.3.0-beta2 | Run dynamic Prompt Engine templates. |
 | cc registry | namespace | 1.3.0-beta2 | Display command metadata registry information. |

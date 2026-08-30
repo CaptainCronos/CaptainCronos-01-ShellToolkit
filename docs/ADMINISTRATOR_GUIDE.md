@@ -433,6 +433,26 @@ escaping latest pointers, insecure known-report permissions, unreadable known
 reports, and unknown entries beneath report roots are lifecycle warnings.
 Unknown files or directories are never recursively claimed or pruned.
 
+## Local Plugins and Capabilities
+
+Use `cc plugin` for read-only inventory and `cc capability check NAME` for one
+semantic availability result. Repository manifests live in `plugins/<id>/`;
+operator manifests live only in the current host's
+`~/.captaincronos/hosts/<host-id>/plugins/<id>/`. Toolkit install and update do
+not replace or remove the host root.
+
+Every manifest explicitly declares `enabled=yes` or `enabled=no`. Discovery is
+read-only: it does not create state, source an entrypoint, install dependencies,
+or enable new code. FAIL identifies invalid metadata, unsafe paths/permissions,
+required dependency failure, or a collision. SKIP identifies disabled or
+unsupported plugins. WARN includes missing optional dependencies, unknown
+material, reserved manifestless directories, and group-writable material.
+
+There is no remote plugin installation, marketplace, signing, auto-update,
+command registration, or plugin execution interface in API 1. Inspect and
+correct operator-owned files directly; Captain Cronos does not chmod arbitrary
+plugin code.
+
 ## Backups
 Preserve `~/.captaincronos/` as part of system backups. Asset records and
 history are authoritative or curated, installer generations provide recovery,

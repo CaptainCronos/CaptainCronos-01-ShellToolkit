@@ -97,7 +97,7 @@ about|flat-no-switches|cc about|Show toolkit overview, components, and documenta
 asset|namespace|cc asset <subcommand> [arguments]|Manage local lifecycle asset inventory records.|namespace
 audit|namespace-with-switches|cc audit [summary|commands] [switches]; cc audit fix [switches]|Audit command consistency and optionally repair managed command metadata.|namespace
 baseline|flat-no-switches|cc baseline|Capture operating-system baseline shell files.|none
-capability|namespace|cc capability [list|check NAME]|Inspect named platform capabilities.|namespace
+capability|namespace|cc capability [list|check NAME]|Resolve core, program, and plugin-provided capabilities.|namespace
 config|namespace|cc config <subcommand> [arguments]|Read or update toolkit configuration.|namespace
 defaults|flat-no-switches|cc defaults|Promote active shell files into defaults/v1.|none
 deps|namespace|cc deps [subcommand] [arguments]|Show dependency status by command or profile.|namespace
@@ -123,7 +123,7 @@ maintenance|namespace-with-switches|cc maintenance [subcommand] [switches]|Inspe
 monthly-health|flat-with-switches|cc monthly-health [switches]|Generate a host health and maintenance report without kernel cleanup.|none
 monthly-health-timer|namespace|cc monthly-health-timer <subcommand>|Manage the optional user-scoped monthly-health timer.|namespace
 platform|namespace|cc platform [summary|capabilities]|Show platform identity and capabilities.|namespace
-plugin|namespace|cc plugin [subcommand] [arguments]|Inspect plugin directories without executing plugins.|namespace
+plugin|namespace|cc plugin [list|status|info ID]|Inspect validated local plugin manifests without executing plugins.|namespace
 programs|namespace|cc programs [subcommand] [arguments]|Report configured semantic program interfaces.|namespace
 prompt|interactive|cc prompt [TEMPLATE]|Run the interactive, metadata-discovered prompt engine.|any
 registry|namespace|cc registry [table|tsv|markdown]|Show the command header metadata registry.|namespace
@@ -276,8 +276,8 @@ asset|export|Export assets, optionally by type.|asset/export
 audit|summary|Show the default command audit summary.|audit/summary
 audit|commands|Show per-command audit detail.|audit/commands
 audit|fix|Preview or apply managed audit repairs.|audit/fix
-capability|list|List platform capabilities.|capability/list
-capability|check|Check one named capability.|capability/check
+capability|list|List resolved core, program, and plugin capabilities.|capability/list
+capability|check|Resolve one named capability and its semantic state.|capability/check
 config|show|Show redacted configuration layers and their sources.|config/show
 config|status|Show configuration ownership, schema, identity, and health.|config/status
 config|validate|Validate configuration without writing.|config/validate
@@ -342,9 +342,9 @@ monthly-health-timer|enable|Enable the optional user timer.|monthly-health-timer
 monthly-health-timer|disable|Disable the optional user timer.|monthly-health-timer/disable
 platform|summary|Show the platform summary.|platform/summary
 platform|capabilities|Show detected platform capabilities.|platform/capabilities
-plugin|list|List plugin directories.|plugin/list
-plugin|status|Show plugin directory status and file counts.|plugin/status
-plugin|info|Show details for one plugin directory.|plugin/info
+plugin|list|List validated local plugins and semantic state.|plugin/list
+plugin|status|Alias for the validated plugin inventory.|plugin/status
+plugin|info|Show validated details for one plugin ID.|plugin/info
 programs|check|Check required and optional program interfaces.|programs/check
 programs|show|Show the implementation for one capability.|programs/show
 registry|table|Render the metadata registry as a table.|registry/table

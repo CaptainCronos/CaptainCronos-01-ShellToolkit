@@ -345,11 +345,26 @@ Candidate areas:
 
 ## Phase 5 — Plugin System
 
-Status: **Planned**
+Status: **Local discovery and capability foundation implemented; runtime and distribution planned**
 
 Purpose:
 
 Allow optional toolkit modules to be installed independently.
+
+Implemented foundation:
+
+- strict local data-only API 1 manifests
+- repository and current-host inventory with explicit enablement state
+- safe, deterministic, zero-execution discovery
+- platform and dependency health using existing semantic infrastructure
+- authoritative plugin-provided capability resolution
+- fail-closed duplicate/core collision and path/symlink policy
+
+Deferred expansion:
+
+- command registration and plugin runtime invocation
+- enable/disable mutation workflows
+- remote installation, repositories, signing, marketplaces, and auto-update
 
 Candidate plugin areas:
 

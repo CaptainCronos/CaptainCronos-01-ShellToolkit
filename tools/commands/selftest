@@ -39,6 +39,7 @@ Runs the toolkit engineering self-test suite.
 Checks:
   - shared library syntax and load checks
   - prompt engine template validation
+  - plugin/capability library and safety fixtures
   - strict command audit
   - documentation lint
   - release check
@@ -269,6 +270,9 @@ selftest_suite() {
     "$runner" "Persistent-resource retention" maintenance bash "$PROJECT_ROOT/tests/retention.sh"
     "$runner" "Report lifecycle" maintenance bash "$PROJECT_ROOT/tests/reports.sh"
     "$runner" "Semantic dependencies" dependencies bash "$PROJECT_ROOT/tests/dependencies.sh"
+    "$runner" "Plugin library" plugins check_library cc-plugins.sh
+    "$runner" "Capability library" plugins check_library cc-capabilities.sh
+    "$runner" "Plugin and capability foundation" plugins bash "$PROJECT_ROOT/tests/plugins.sh"
     "$runner" "Programs library" programs check_library cc-programs.sh
     "$runner" "Packages library" packages check_library cc-packages.sh
     "$runner" "Package operations" packages bash "$PROJECT_ROOT/tests/package-management.sh"

@@ -72,7 +72,7 @@ cc_platform_type() {
     fi
 }
 
-cc_capability_exists() {
+cc_platform_capability_exists() {
     local cap="$1"
     case "$cap" in
         pkg-manager) [ "$(cc_platform_package_manager)" != "none" ] ;;
@@ -91,8 +91,23 @@ cc_capability_exists() {
     esac
 }
 
-cc_capability_status() { if cc_capability_exists "$1"; then echo yes; else echo no; fi; }
-cc_capability_list() { printf '%s\n' git pkg-manager systemd storage smart zfs truenas docker podman network sockets battery; }
+cc_platform_capability_list() { printf '%s\n' git pkg-manager systemd storage smart zfs truenas docker podman network sockets battery; }
+
+cc_platform_capability_known() {
+    local requested="$1" capability
+    while IFS= read -r capability; do
+        [ "$capability" = "$requested" ] && return 0
+    done < <(cc_platform_capability_list)
+    return 1
+}
+
+# Compatibility for consumers that source only the platform library. The
+# authoritative cross-source resolver in cc-capabilities.sh replaces these.
+if ! declare -F cc_capability_result >/dev/null 2>&1; then
+    cc_capability_exists() { cc_platform_capability_exists "$1"; }
+    cc_capability_status() { if cc_platform_capability_exists "$1"; then echo yes; else echo no; fi; }
+    cc_capability_list() { cc_platform_capability_list; }
+fi
 
 cc_platform_infer_profile() {
     case "$(cc_platform_type)" in

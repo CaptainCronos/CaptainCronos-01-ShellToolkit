@@ -17,7 +17,7 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-environment.sh"
-source "$PROJECT_ROOT/lib/cc-platform.sh"
+source "$PROJECT_ROOT/lib/cc-capabilities.sh"
 
 usage() {
     cat <<'EOF_HELP'

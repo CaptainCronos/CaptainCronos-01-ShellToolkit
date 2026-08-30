@@ -6,9 +6,9 @@
 # Script      : capability
 # Version     : reads VERSION
 # Category    : Diagnostics
-# Requires    : bash awk grep command
+# Requires    : bash sort cut command
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Inspect detected host capabilities.
+# Purpose     : Resolve core, program, and plugin-provided host capabilities.
 # ==============================================================================
 
 set -euo pipefail
@@ -16,18 +16,16 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
-source "$PROJECT_ROOT/lib/cc-platform.sh"
+source "$PROJECT_ROOT/lib/cc-capabilities.sh"
 
 usage() {
     cat <<'EOF_HELP'
 Usage:
-  cc capability [list|check NAME]
+  cc capability [list]
+  cc capability check NAME
 
-Examples:
-  cc capability
-  cc capability list
-  cc capability check smart
-  cc capability check zfs
+The structured state is one of available, unavailable, unsupported, disabled,
+or missing-dependency. Checks exit successfully only for available capabilities.
 EOF_HELP
 }
 
@@ -37,28 +35,28 @@ NAME="${2:-}"
 case "$ACTION" in
     --help|-h) usage; exit 0 ;;
     --version) cc_version; exit 0 ;;
-    list) ;;
-    check) [ -n "$NAME" ] || { usage; exit 1; } ;;
-    *) usage; exit 1 ;;
+    list) [ "$#" -le 1 ] || { usage; exit 2; } ;;
+    check) [ -n "$NAME" ] && [ "$#" -eq 2 ] || { usage; exit 2; } ;;
+    *) usage; exit 2 ;;
 esac
+
+capability_row() {
+    local capability="$1" semantic result provider detail
+    IFS=$'\t' read -r semantic result provider detail < <(cc_capability_result "$capability")
+    printf '%-24s %-19s %-6s %-20s %s\n' "$capability" "$semantic" "$result" "$provider" "$detail"
+}
 
 case "$ACTION" in
     list)
-        cc_banner
-        echo "Capabilities"
-        echo "------------"
-        while read -r cap; do
-            [ -n "$cap" ] || continue
-            printf '%-18s %s\n' "$cap" "$(cc_capability_status "$cap")"
+        printf '%-24s %-19s %-6s %-20s %s\n' Capability Availability Result Provider Detail
+        printf '%-24s %-19s %-6s %-20s %s\n' ---------- ------------ ------ -------- ------
+        while IFS= read -r capability; do
+            [ -n "$capability" ] || continue
+            capability_row "$capability"
         done < <(cc_capability_list)
         ;;
     check)
-        if cc_capability_exists "$NAME"; then
-            echo "yes"
-            exit 0
-        else
-            echo "no"
-            exit 1
-        fi
+        capability_row "$NAME"
+        cc_capability_exists "$NAME"
         ;;
 esac

@@ -42,6 +42,8 @@ Important libraries:
 - `cc-http.sh` — semantic file downloads and HTTP/API requests
 - `cc-data.sh` — compatible JSON/YAML validation, queries, and YAML mutation
 - `cc-deps.sh` — semantic capability and literal executable dependency checks
+- `cc-plugins.sh` — data-only local plugin discovery, validation, and inventory
+- `cc-capabilities.sh` — authoritative core, program, and plugin capability resolution
 - `cc-yaml.sh` — compatibility API for existing asset YAML operations
 - `cc-metadata.sh` — command metadata and registry helpers
 - `cc-assets.sh` — local asset database helpers
@@ -522,18 +524,57 @@ Current lifecycle state is stored under:
 Assets represent current inventory state.
 
 ### Plugins
-Plugins are organized under:
+The first local plugin contract is implemented by `lib/cc-plugins.sh`. A plugin
+is an optional extension with a validated data-only manifest and an executable
+entrypoint. Discovery never executes or sources that entrypoint. Repository
+plugins are inspected first under:
 
 ```text
 plugins/
 ```
 
-Current reserved plugin areas include:
+Current-host operator plugins are inspected second under:
+
+```text
+~/.captaincronos/hosts/<host-id>/plugins/
+```
+
+Duplicate IDs do not override by precedence; both records fail closed. Core
+capabilities win over plugin declarations, and duplicate active plugin
+providers also fail closed. Existing repository directories are reserved
+scaffolding until they contain a valid `plugin.conf`:
 
 - storage
 - repository
 - maintenance
 - bitcoin
+
+Plugin API 1 requires `plugin_api`, `id`, `name`, `version`, `description`,
+`entrypoint`, `provides`, `platforms`, and `enabled`. `dependencies` and
+`optional_dependencies` are the only optional fields. Manifests are parsed as
+plain `key=value` data and unknown fields are invalid. Paths must remain inside
+the plugin directory; symlinked roots, directories, manifests, or entrypoint
+paths, wrong ownership, world-writable code or metadata, and non-regular or
+non-executable entrypoints fail validation. Group-writable plugin material is
+reported as WARN and is not executed by discovery.
+
+Capabilities are host/toolkit abilities. Dependencies are external programs or
+semantic program interfaces required to make a capability usable. Commands are
+registered user-facing toolkit interfaces. Profiles are host/user policy and
+identity; they select the current host plugin root but do not currently enable
+plugins. These concepts remain separate. Manifest `enabled=yes|no` is explicit,
+host-local policy for this read-only slice; no enable/disable mutation exists.
+
+`cc plugin` inventories PASS, WARN, FAIL, and SKIP state. `cc capability` uses
+`lib/cc-capabilities.sh` as the authoritative query path and distinguishes
+available, unavailable, unsupported, disabled, and missing-dependency results.
+Required and optional plugin dependency checks reuse `lib/cc-deps.sh`; nothing
+is installed automatically.
+
+Plugin command registration and entrypoint invocation are intentionally
+deferred. API 1 rejects command declarations, so plugins cannot shadow core or
+one another. Remote repositories, download/install, signing, auto-update, and a
+marketplace are also outside this local foundation.
 
 ### Prompt Engine
 The internal prompt engine lives in:

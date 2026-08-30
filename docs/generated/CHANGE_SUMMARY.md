@@ -10,6 +10,30 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ---
 
+## Unreleased — v1.3.0-beta3
+
+### Added
+
+- Strict data-only plugin API 1 discovery for repository and current-host roots,
+  with explicit enablement, dependency/platform state, bounded entrypoint
+  validation, failure isolation, and conservative unknown-material reporting.
+- Authoritative structured capability resolution across platform detection,
+  configured program interfaces, and validated plugin providers.
+- Focused disposable plugin/capability fixtures covering collisions, malformed
+  metadata, path and symlink safety, permissions, zero-write discovery, host
+  isolation, deterministic output, and broken-plugin isolation.
+
+### Changed
+
+- `cc plugin` now reports validated PASS/WARN/FAIL/SKIP inventory instead of
+  counting placeholder directories; `cc capability` now reports semantic
+  availability, result, provider, and detail.
+
+### Deferred
+
+- Plugin command registration and execution, enable/disable mutation, remote
+  installation, repositories, signing, marketplaces, and automatic updates.
+
 ## v1.3.0-beta2 — Blackbeard (2026-08-29)
 
 ### Purpose

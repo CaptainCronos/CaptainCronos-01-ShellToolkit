@@ -23,6 +23,11 @@ or mutation paths in either consumer.
 
 Focused shell tests supplement `cc selftest`:
 
+- `plugins.sh` validates strict local manifest discovery, semantic capability
+  resolution, dependency/platform/enablement states, duplicate and core
+  collisions, entrypoint confinement, symlink and permission failures, unknown
+  material isolation, host isolation, deterministic order, repeated sourcing,
+  redirected output, and zero-write plugin/help/switch inspection.
 - `path-environment.sh` validates canonical managed PATH repair, known legacy
   normalization, five-source and fresh-shell idempotency, NVM/custom ordering,
   guarded profile interaction, ambiguous-line preservation, atomic no-op
