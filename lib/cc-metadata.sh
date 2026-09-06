@@ -44,7 +44,7 @@ cc_infer_category() {
         verify|doctor) echo "Diagnostics" ;;
         drives|smart) echo "Storage" ;;
         kernel|kernel-cleanup) echo "Maintenance" ;;
-        dev-update|system-update|update|monthly-health|monthly-health-timer|maintenance|reports) echo "Maintenance" ;;
+        desktop-reload|dev-update|system-update|update|monthly-health|monthly-health-timer|maintenance|reports) echo "Maintenance" ;;
         *) echo "General" ;;
     esac
 }
@@ -102,6 +102,7 @@ config|namespace|cc config <subcommand> [arguments]|Read or update toolkit confi
 defaults|flat-no-switches|cc defaults|Promote active shell files into defaults/v1.|none
 deps|namespace|cc deps [subcommand] [arguments]|Show dependency status by command or profile.|namespace
 dev-update|flat-with-switches|cc dev-update [TARGET] [switches]|Review or apply supported developer package-manager updates.|any
+desktop-reload|flat-no-switches|cc desktop-reload|Reload the Cinnamon desktop shell in the current X11 session.|none
 docs|namespace-with-switches|cc docs [subcommand] [switches]|Generate, lint, or verify toolkit documentation.|namespace
 doctor|flat-with-switches|cc doctor [switches]|Run repository, installation, kernel, and host health checks.|none
 drive-burnin|namespace|cc drive-burnin [subcommand] DEVICE|Run the non-destructive drive burn-in workflow framework.|namespace-or-any

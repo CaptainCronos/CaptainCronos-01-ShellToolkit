@@ -112,7 +112,7 @@ done
 cc_command_list >"$TEST_DIR/registry"
 cc_contract_commands | cut -d '|' -f1 | LC_ALL=C sort >"$TEST_DIR/contracts"
 cmp -s "$TEST_DIR/registry" "$TEST_DIR/contracts" || fail 'registered commands and contracts differ'
-[ "$(wc -l <"$TEST_DIR/contracts" | tr -d ' ')" -eq 49 ] || fail 'public command count changed unexpectedly'
+ [ "$(wc -l <"$TEST_DIR/contracts" | tr -d ' ')" -eq 50 ] || fail 'public command count changed unexpectedly'
 [ "$(sort "$TEST_DIR/contracts" | uniq -d | wc -l | tr -d ' ')" -eq 0 ] || fail 'duplicate command contracts exist'
 
 # Contract row selection must consume its producer completely.  Expanding the

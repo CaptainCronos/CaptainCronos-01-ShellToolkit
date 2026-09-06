@@ -12,6 +12,7 @@ Toolkit version: 1.3.0-beta2 (Blackbeard)
 | cc config | namespace | 1.3.0-beta2 | View and update toolkit configuration. |
 | cc defaults | flat-no-switches | 1.3.0-beta2 | Promote active shell files into deployable defaults. |
 | cc deps | namespace | 1.3.0-beta2 | Show dependency status for toolkit commands and profiles. |
+| cc desktop-reload | flat-no-switches | 1.3.0-beta2 | Reload the Cinnamon desktop shell without ending the X11 session. |
 | cc dev-update | flat-with-switches | 1.3.0-beta2 | Report and explicitly update developer package managers. |
 | cc docs | namespace-with-switches | 1.3.0-beta2 | Generate toolkit documentation and command references. |
 | cc doctor | flat-with-switches | 1.3.0-beta2 | Run repository, installation, and host health checks. |

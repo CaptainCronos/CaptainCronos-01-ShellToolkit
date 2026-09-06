@@ -325,6 +325,35 @@ Discovery:
   cc deps <subcommand> switches
 ~~~
 
+## cc desktop-reload
+
+~~~text
+Usage:
+  cc desktop-reload
+
+Reloads the Cinnamon desktop shell in the current X11 session without logging
+out. This can restore tray/status icons that fail to register at login.
+
+The command refuses to run outside Cinnamon, outside X11, or without an active
+X display. Its Cinnamon output is retained in a private, session-scoped log.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc desktop-reload
+
+Usage:
+  cc desktop-reload
+
+Reload the Cinnamon desktop shell in the current X11 session.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+~~~
+
 ## cc dev-update
 
 ~~~text

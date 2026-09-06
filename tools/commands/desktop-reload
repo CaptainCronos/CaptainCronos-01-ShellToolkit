@@ -6,7 +6,7 @@
 # Script      : desktop-reload
 # Version     : reads VERSION
 # Category    : Maintenance
-# Requires    : bash cinnamon
+# Requires    : bash cinnamon mktemp stat
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Reload the Cinnamon desktop shell without ending the X11 session.
 # ==============================================================================
@@ -23,10 +23,10 @@ Usage:
   cc desktop-reload
 
 Reloads the Cinnamon desktop shell in the current X11 session without logging
-out. This can restore tray/status icons that fail to register after desktop or
-package updates.
+out. This can restore tray/status icons that fail to register at login.
 
-The command refuses to run outside Cinnamon or outside an X11 session.
+The command refuses to run outside Cinnamon, outside X11, or without an active
+X display. Its Cinnamon output is retained in a private, session-scoped log.
 EOF_HELP
 }
 
@@ -47,26 +47,47 @@ case "${1:-}" in
         ;;
 esac
 
-case ";${XDG_CURRENT_DESKTOP:-};" in
-    *Cinnamon*|*cinnamon*) ;;
+desktop="${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION:-unknown}}"
+case "${desktop,,}" in
+    *cinnamon*) ;;
     *)
-        cc_error "desktop-reload supports Cinnamon only. Current desktop: ${XDG_CURRENT_DESKTOP:-unknown}"
+        cc_error "desktop-reload supports Cinnamon only. Current desktop: $desktop"
         exit 1
         ;;
 esac
 
-if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then
+if [ "${XDG_SESSION_TYPE,,}" != "x11" ]; then
     cc_error "desktop-reload requires an X11 session. Current session: ${XDG_SESSION_TYPE:-unknown}"
     exit 1
 fi
+
+[ -n "${DISPLAY:-}" ] || {
+    cc_error "desktop-reload requires an active X11 display."
+    exit 1
+}
 
 if ! command -v cinnamon >/dev/null 2>&1; then
     cc_error "Missing required command: cinnamon"
     exit 1
 fi
 
-LOG_FILE="${XDG_RUNTIME_DIR:-/tmp}/captaincronos-cinnamon-replace.log"
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-}"
+if [ -z "$RUNTIME_DIR" ] || [ ! -d "$RUNTIME_DIR" ] || [ -L "$RUNTIME_DIR" ] || [ ! -O "$RUNTIME_DIR" ]; then
+    cc_error "desktop-reload requires a private XDG_RUNTIME_DIR owned by the current user."
+    exit 1
+fi
+
+# Create a unique mode-600 log before launching Cinnamon.  Unlike a fixed file
+# below /tmp, this cannot overwrite an attacker-controlled path and is scoped
+# to the active graphical login.  Unregister it so the diagnostic survives the
+# short-lived launcher process.
+cc_temp_file LOG_FILE "$RUNTIME_DIR/captaincronos-cinnamon-replace.XXXXXX.log" || {
+    cc_error "Unable to create Cinnamon reload log under: $RUNTIME_DIR"
+    exit 1
+}
+cc_temp_unregister "$LOG_FILE"
 
 cc_log "Reloading Cinnamon desktop shell..."
-nohup cinnamon --replace >"$LOG_FILE" 2>&1 &
-cc_log "Reload requested. Log: $LOG_FILE"
+nohup cinnamon --replace </dev/null >"$LOG_FILE" 2>&1 &
+PID=$!
+cc_log "Reload requested (PID: $PID). Log: $LOG_FILE"
