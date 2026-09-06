@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : desktop-reload
+# Version     : reads VERSION
+# Category    : Maintenance
+# Requires    : bash cinnamon
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Reload the Cinnamon desktop shell without ending the X11 session.
+# ==============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc desktop-reload
+
+Reloads the Cinnamon desktop shell in the current X11 session without logging
+out. This can restore tray/status icons that fail to register after desktop or
+package updates.
+
+The command refuses to run outside Cinnamon or outside an X11 session.
+EOF_HELP
+}
+
+case "${1:-}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    --version)
+        cc_version
+        exit 0
+        ;;
+    "")
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac
+
+case ";${XDG_CURRENT_DESKTOP:-};" in
+    *Cinnamon*|*cinnamon*) ;;
+    *)
+        cc_error "desktop-reload supports Cinnamon only. Current desktop: ${XDG_CURRENT_DESKTOP:-unknown}"
+        exit 1
+        ;;
+esac
+
+if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then
+    cc_error "desktop-reload requires an X11 session. Current session: ${XDG_SESSION_TYPE:-unknown}"
+    exit 1
+fi
+
+if ! command -v cinnamon >/dev/null 2>&1; then
+    cc_error "Missing required command: cinnamon"
+    exit 1
+fi
+
+LOG_FILE="${XDG_RUNTIME_DIR:-/tmp}/captaincronos-cinnamon-replace.log"
+
+cc_log "Reloading Cinnamon desktop shell..."
+nohup cinnamon --replace >"$LOG_FILE" 2>&1 &
+cc_log "Reload requested. Log: $LOG_FILE"
