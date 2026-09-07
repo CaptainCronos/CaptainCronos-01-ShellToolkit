@@ -24,11 +24,12 @@ source "$PROJECT_ROOT/lib/cc-reports.sh"
 ACTION=status
 APPLY=0
 FORMAT=table
+PERMISSIONS=0
 
 usage() {
     cat <<'EOF_HELP'
 Usage:
-  cc reports [status|list|prune] [--format table|tsv] [--apply]
+  cc reports [status|list|prune] [--format table|tsv] [--permissions] [--apply]
 
 Inspects deliberately retained Captain Cronos reports for the current host.
 Inventory and preview are read-only. Only `reports prune --apply` deletes the
@@ -36,11 +37,12 @@ exact verified candidate plan displayed by that invocation.
 
 Actions:
   status  Show report families, retained size, lifecycle defects, and candidates. [default]
-  list    Show each recognized report and its retention state.
+  list    Show each recognized report and its retention state; --permissions shows violations.
   prune   Preview the exact bounded deletion plan; creates no files or logs.
 
 Options:
   --format FORMAT  Render list or prune as table or stable TSV. [default: table]
+  --permissions    With list, show recognized permission-policy violations (read-only).
   --apply          Explicitly authorize the displayed prune plan.
 
 Safety:
@@ -56,6 +58,7 @@ while [ "$#" -gt 0 ]; do
         --version) cc_version; exit 0 ;;
         status|list|prune) ACTION="$1"; shift ;;
         --apply) APPLY=1; shift ;;
+        --permissions) PERMISSIONS=1; shift ;;
         --format)
             shift
             FORMAT="${1:-}"
@@ -76,6 +79,14 @@ if [ "$FORMAT" = tsv ] && [ "$ACTION" = status ]; then
 fi
 if [ "$FORMAT" = tsv ] && [ "$APPLY" -eq 1 ]; then
     cc_error "--format tsv is read-only; apply uses the truthful human result summary."
+    exit 2
+fi
+if [ "$PERMISSIONS" -eq 1 ] && [ "$ACTION" != list ]; then
+    cc_error "--permissions is valid only with 'cc reports list'."
+    exit 2
+fi
+if [ "$PERMISSIONS" -eq 1 ] && [ "$FORMAT" = tsv ]; then
+    cc_error "--permissions uses the readable table; stable TSV inventory is unchanged."
     exit 2
 fi
 
@@ -121,6 +132,29 @@ print_item_rows() {
             fi
         done
     fi
+}
+
+print_permission_rows() {
+    local index path owner expected_uid
+    expected_uid="$(id -u)"
+    echo "Report Permission Diagnostics"
+    echo "============================="
+    if [ "${#CC_REPORT_PERMISSION_PATHS[@]}" -eq 0 ]; then
+        echo "All recognized report objects comply with the private 0700/0600 policy."
+        return 0
+    fi
+    printf '%-58s %-10s %-8s %-8s %-20s %s\n' Path Type Actual Expected Owner State
+    printf '%-58s %-10s %-8s %-8s %-20s %s\n' ---- ---- ------ -------- ----- -----
+    for index in "${!CC_REPORT_PERMISSION_PATHS[@]}"; do
+        path="${CC_REPORT_PERMISSION_PATHS[index]}"
+        path="${path#"$(cc_env_host_home)/"}"
+        owner="${CC_REPORT_PERMISSION_OWNERS[index]}"
+        if [ "${CC_REPORT_PERMISSION_OWNER_STATES[index]}" = PASS ]; then owner="PASS ($owner)"; else owner="WARN $owner != $expected_uid"; fi
+        printf '%-58s %-10s %-8s %-8s %-20s WARN\n' "$path" \
+            "${CC_REPORT_PERMISSION_KINDS[index]}" \
+            "${CC_REPORT_PERMISSION_ACTUAL_MODES[index]}" \
+            "${CC_REPORT_PERMISSION_EXPECTED_MODES[index]}" "$owner"
+    done
 }
 
 print_status() {
@@ -184,6 +218,6 @@ print_prune() {
 
 case "$ACTION" in
     status) cc_banner; print_status ;;
-    list) [ "$FORMAT" = tsv ] || { cc_banner; echo "Retained Report Inventory"; echo "========================="; }; print_item_rows no ;;
+    list) if [ "$PERMISSIONS" -eq 1 ]; then cc_banner; print_permission_rows; else [ "$FORMAT" = tsv ] || { cc_banner; echo "Retained Report Inventory"; echo "========================="; }; print_item_rows no; fi ;;
     prune) [ "$FORMAT" = tsv ] || cc_banner; print_prune ;;
 esac

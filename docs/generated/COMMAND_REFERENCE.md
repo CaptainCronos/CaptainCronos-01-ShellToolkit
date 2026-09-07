@@ -1428,7 +1428,7 @@ Switches:
 
 ~~~text
 Usage:
-  cc reports [status|list|prune] [--format table|tsv] [--apply]
+  cc reports [status|list|prune] [--format table|tsv] [--permissions] [--apply]
 
 Inspects deliberately retained Captain Cronos reports for the current host.
 Inventory and preview are read-only. Only `reports prune --apply` deletes the
@@ -1436,11 +1436,12 @@ exact verified candidate plan displayed by that invocation.
 
 Actions:
   status  Show report families, retained size, lifecycle defects, and candidates. [default]
-  list    Show each recognized report and its retention state.
+  list    Show each recognized report and its retention state; --permissions shows violations.
   prune   Preview the exact bounded deletion plan; creates no files or logs.
 
 Options:
   --format FORMAT  Render list or prune as table or stable TSV. [default: table]
+  --permissions    With list, show recognized permission-policy violations (read-only).
   --apply          Explicitly authorize the displayed prune plan.
 
 Safety:

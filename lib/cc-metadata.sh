@@ -198,6 +198,7 @@ monthly-health|--stdout|0|Write the report to standard output instead of a repor
 monthly-health|--file|0|Write the report file under the configured report directory. [default]
 reports|--format FORMAT|1|Render list or prune as a readable table or stable TSV. [default: table]
 reports/list|--format FORMAT|1|Render retained reports as a readable table or stable TSV. [default: table]
+reports/list|--permissions|0|Show recognized report permission-policy violations in a readable, read-only table.
 reports/prune|--format FORMAT|1|Render the bounded prune plan as a readable table or stable TSV. [default: table]
 reports/prune|--apply|0|Explicitly authorize deletion of the displayed, verified current-host plan; omission is preview-only. [default: preview]
 release|--apply|0|Accepted for workflow compatibility; release automation still does not bump, tag, or push.

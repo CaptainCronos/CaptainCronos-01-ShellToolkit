@@ -74,7 +74,7 @@ assert_contains "$TEST_DIR/empty-switches" '--apply' 'registry-driven prune appl
 # family overrides exercise policy without weakening documented defaults.
 mkdir -p "$REPORT_ROOT/monthly-health" "$REPORT_ROOT/drives/qualification/sda-20200101-000000" \
     "$HOST_HOME/assets/drives" "$HOST_HOME/logs" "$CC_FIXTURE_HOME/mystery" "$REPORT_ROOT/operator-notes"
-chmod 700 "$REPORT_ROOT/monthly-health" "$REPORT_ROOT/drives" "$REPORT_ROOT/drives/qualification" \
+chmod 700 "$REPORT_ROOT" "$REPORT_ROOT/monthly-health" "$REPORT_ROOT/drives" "$REPORT_ROOT/drives/qualification" \
     "$REPORT_ROOT/drives/qualification/sda-20200101-000000" "$HOST_HOME/logs"
 printf '%s\n' \
     'MONTHLY_HEALTH_RETENTION_MIN_COUNT="2"' \
@@ -108,18 +108,24 @@ printf 'asset_id: serial\nlast_report: %s\n' "$drive_one" >"$HOST_HOME/assets/dr
 # leave configuration/assets/qualification/unknown content untouched.
 fingerprint >"$TEST_DIR/populated-before"
 run_reports list --format tsv >"$TEST_DIR/list.tsv"
+run_reports list >"$TEST_DIR/list.table"
+run_reports list --permissions >"$TEST_DIR/permission-pass"
 set +e; run_reports status >"$TEST_DIR/status"; status_rc=$?; set -e
 [ "$status_rc" -ne 0 ] || fail 'unknown report material did not affect lifecycle health'
 run_reports prune >"$TEST_DIR/preview"
 fingerprint >"$TEST_DIR/populated-after"
 cmp -s "$TEST_DIR/populated-before" "$TEST_DIR/populated-after" || fail 'list/status/preview wrote persistent state'
 assert_contains "$TEST_DIR/list.tsv" $'monthly-health\t' 'monthly-health family was not classified'
+head -n 1 "$TEST_DIR/list.tsv" | grep -Fxq $'family\ttimestamp\tepoch\tbytes\tstate\tlatest\tmode\tpath' || fail 'stable TSV header changed'
+assert_contains "$TEST_DIR/list.table" 'Family' 'normal list table was not readable'
+grep -Fq 'Permission Diagnostics' "$TEST_DIR/list.table" && fail 'normal list was no longer concise'
 assert_contains "$TEST_DIR/list.tsv" $'drive-report\t' 'drive-report family was not classified'
 assert_contains "$TEST_DIR/list.tsv" $'drive-qualification\t' 'qualification evidence was not classified'
 assert_contains "$TEST_DIR/list.tsv" $'system-update\t' 'system-update current log was not classified'
 assert_contains "$TEST_DIR/list.tsv" $'kernel-cleanup\t' 'kernel-cleanup current log was not classified'
 assert_contains "$TEST_DIR/list.tsv" 'KEEP latest' 'valid latest target was not retained'
 assert_contains "$TEST_DIR/list.tsv" 'KEEP protected' 'protected evidence/current logs were not retained'
+assert_contains "$TEST_DIR/permission-pass" 'All recognized report objects comply' 'compliant known reports did not pass permission diagnostics'
 assert_contains "$TEST_DIR/status" 'Unknown persistent items' 'unknown report material was not reported'
 [ "$(grep -c 'PRUNE age' "$TEST_DIR/preview")" -eq 4 ] || fail 'bounded preview did not contain exactly four candidates'
 assert_contains "$TEST_DIR/preview" "$monthly_one" 'old monthly candidate was absent'
@@ -162,13 +168,44 @@ printf 'outside' >"$TEST_DIR/outside.log"
 run_reports prune >"$TEST_DIR/escape-preview"
 [ -f "$TEST_DIR/outside.log" ] || fail 'escaping latest pointer was followed'
 
-# Insecure and unreadable known reports are visible lifecycle warnings; report
-# cleanup never chmods them or arbitrary unknown files.
-chmod 644 "$monthly_three"
+# Insecure known directories and files are individually actionable; report
+# inspection never chmods them.  The table includes exact paths, actual and
+# expected modes, and reports every simultaneous violation.
+chmod 775 "$REPORT_ROOT/drives" "$drive_one"
+chmod 664 "$drive_one/metadata.txt"
+fingerprint >"$TEST_DIR/permission-before"
+run_reports list --permissions >"$TEST_DIR/permission-details"
+fingerprint >"$TEST_DIR/permission-after"
+cmp -s "$TEST_DIR/permission-before" "$TEST_DIR/permission-after" || fail 'permission diagnostics wrote persistent state'
+assert_contains "$TEST_DIR/permission-details" 'reports/drives' 'family directory violation lacked its path'
+assert_contains "$TEST_DIR/permission-details" "reports/drives/${drive_one##*/}" 'retained directory violation lacked its path'
+assert_contains "$TEST_DIR/permission-details" '775' 'directory actual mode was absent'
+assert_contains "$TEST_DIR/permission-details" '664' 'file actual mode was absent'
+assert_contains "$TEST_DIR/permission-details" '700' 'directory expected mode was absent'
+assert_contains "$TEST_DIR/permission-details" '600' 'file expected mode was absent'
+assert_contains "$TEST_DIR/permission-details" 'metadata.txt' 'retained file violation lacked its path'
+
+# A safely mocked stat owner proves that ownership is included in the same
+# bounded diagnostic without changing fixture ownership or requiring root.
+mkdir -p "$TEST_DIR/fake-bin"
+cat >"$TEST_DIR/fake-bin/stat" <<'EOF_STAT'
+#!/usr/bin/env bash
+if [ "${1:-}" = -c ] && [ "${2:-}" = %u ] && [ "${4:-}" = "${CC_REPORT_FAKE_OWNER_PATH:-}" ]; then
+    printf '424242\n'
+else
+    exec /usr/bin/stat "$@"
+fi
+EOF_STAT
+chmod 700 "$TEST_DIR/fake-bin/stat"
+PATH="$TEST_DIR/fake-bin:$PATH" CC_REPORT_FAKE_OWNER_PATH="$drive_one/summary.txt" run_reports list --permissions >"$TEST_DIR/owner-details"
+assert_contains "$TEST_DIR/owner-details" '424242' 'wrong owner was absent from permission diagnostics'
+assert_contains "$TEST_DIR/owner-details" 'WARN 424242' 'wrong owner state was absent from permission diagnostics'
+
 set +e; run_reports status >"$TEST_DIR/permissions"; permission_rc=$?; set -e
 [ "$permission_rc" -ne 0 ] || fail 'insecure known-report permissions were ignored'
 assert_contains "$TEST_DIR/permissions" 'Permissions' 'permission health was absent'
-[ "$(stat -c %a "$monthly_three")" = 644 ] || fail 'status changed report permissions'
+[ "$(stat -c %a "$REPORT_ROOT/drives")" = 775 ] || fail 'status changed report permissions'
+[ "$(stat -c %a "$drive_one/metadata.txt")" = 664 ] || fail 'status changed report permissions'
 
 # Current-host isolation: another host remains unobserved and unmodified.
 OTHER_REPORT="$CC_FIXTURE_HOME/hosts/other-host/reports/monthly-health/monthly-health-20100101-000000.log"
@@ -227,5 +264,9 @@ assert_status_2 "$TEST_DIR/bogus" run_reports list --bogus
 assert_contains "$TEST_DIR/bogus.err" 'Command: cc reports list' 'unknown switch help used the wrong context'
 assert_status_2 "$TEST_DIR/apply-context" run_reports status --apply
 assert_contains "$TEST_DIR/apply-context.err" 'Command: cc reports status' 'misplaced apply used the wrong context'
+assert_status_2 "$TEST_DIR/permissions-context" run_reports status --permissions
+assert_contains "$TEST_DIR/permissions-context.err" 'Command: cc reports status' 'misplaced permissions used the wrong context'
+run_reports list switches >"$TEST_DIR/list-switches"
+assert_contains "$TEST_DIR/list-switches" '--permissions' 'registry-driven permission switch was absent'
 
 printf 'Report lifecycle tests: PASS\n'

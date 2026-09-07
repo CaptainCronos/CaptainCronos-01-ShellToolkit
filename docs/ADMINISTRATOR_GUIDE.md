@@ -442,6 +442,14 @@ identity, family structure, and latest protection before deleting each known
 regular report file. Changed or uncertain entries are skipped, and partial
 failure returns nonzero with planned, deleted, failed, and safety-skipped totals.
 
+`cc reports` and `cc reports status` stay concise: a `Permissions WARN` means a
+recognized report object is not owned by the current user or does not match the
+private policy (directories `0700`, regular report files `0600`). Run `cc reports
+list --permissions` to identify each violating bounded, current-host path with
+its type, actual and expected mode, and ownership state. This diagnostic is
+read-only; Captain Cronos does not silently rewrite legacy report permissions.
+The normal `cc reports list --format tsv` inventory remains stable and unchanged.
+
 The defaults are centralized in the report-family catalog and may be overridden
 through existing configuration keys without migration or automatic config
 edits:

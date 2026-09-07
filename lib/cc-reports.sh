@@ -35,6 +35,12 @@ declare -ag CC_REPORT_UNKNOWN_PATHS=()
 declare -ag CC_REPORT_PLAN_INDEXES=()
 declare -ag CC_REPORT_APPLY_FAILED_PATHS=()
 declare -ag CC_REPORT_APPLY_SKIPPED_PATHS=()
+declare -ag CC_REPORT_PERMISSION_PATHS=()
+declare -ag CC_REPORT_PERMISSION_KINDS=()
+declare -ag CC_REPORT_PERMISSION_ACTUAL_MODES=()
+declare -ag CC_REPORT_PERMISSION_EXPECTED_MODES=()
+declare -ag CC_REPORT_PERMISSION_OWNERS=()
+declare -ag CC_REPORT_PERMISSION_OWNER_STATES=()
 declare -Ag CC_REPORT_POLICY_MIN=()
 declare -Ag CC_REPORT_POLICY_AGE=()
 declare -Ag CC_REPORT_REFERENCED_PATHS=()
@@ -63,6 +69,12 @@ _cc_reports_reset() {
     CC_REPORT_PLAN_INDEXES=()
     CC_REPORT_APPLY_FAILED_PATHS=()
     CC_REPORT_APPLY_SKIPPED_PATHS=()
+    CC_REPORT_PERMISSION_PATHS=()
+    CC_REPORT_PERMISSION_KINDS=()
+    CC_REPORT_PERMISSION_ACTUAL_MODES=()
+    CC_REPORT_PERMISSION_EXPECTED_MODES=()
+    CC_REPORT_PERMISSION_OWNERS=()
+    CC_REPORT_PERMISSION_OWNER_STATES=()
     CC_REPORT_POLICY_MIN=()
     CC_REPORT_POLICY_AGE=()
     CC_REPORT_REFERENCED_PATHS=()
@@ -88,21 +100,25 @@ _cc_reports_safe_root() {
     [ -d "$probe" ] && [ ! -L "$probe" ]
 }
 
-_cc_reports_mode_private() {
-    local mode="$1"
-    [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
-    (( (8#$mode & 077) == 0 ))
-}
-
-_cc_reports_check_known_directory() {
-    local directory="$1" mode uid
-    mode="$(stat -c %a -- "$directory" 2>/dev/null || printf unknown)"
-    uid="$(stat -c %u -- "$directory" 2>/dev/null || printf unknown)"
-    if ! _cc_reports_mode_private "$mode" || [ "$uid" != "$(id -u)" ] || [ ! -r "$directory" ]; then
+_cc_reports_check_known_object() {
+    local path="$1" kind="$2" expected_mode mode uid owner_state
+    mode="$(stat -c %a -- "$path" 2>/dev/null || printf unknown)"
+    uid="$(stat -c %u -- "$path" 2>/dev/null || printf unknown)"
+    case "$kind" in directory) expected_mode=700 ;; file) expected_mode=600 ;; *) return 1 ;; esac
+    if [ "$uid" = "$(id -u)" ]; then owner_state=PASS; else owner_state=WARN; fi
+    if [ "$mode" != "$expected_mode" ] || [ "$owner_state" = WARN ] || [ ! -r "$path" ]; then
         CC_REPORT_PERMISSION_WARNINGS=$((CC_REPORT_PERMISSION_WARNINGS + 1))
         CC_REPORT_WARNINGS=$((CC_REPORT_WARNINGS + 1))
+        CC_REPORT_PERMISSION_PATHS+=("$path")
+        CC_REPORT_PERMISSION_KINDS+=("$kind")
+        CC_REPORT_PERMISSION_ACTUAL_MODES+=("$mode")
+        CC_REPORT_PERMISSION_EXPECTED_MODES+=("$expected_mode")
+        CC_REPORT_PERMISSION_OWNERS+=("$uid")
+        CC_REPORT_PERMISSION_OWNER_STATES+=("$owner_state")
     fi
 }
+
+_cc_reports_check_known_directory() { _cc_reports_check_known_object "$1" directory; }
 
 _cc_reports_file_signature() {
     stat -c '%d:%i:%s:%Y:%f' -- "$1" 2>/dev/null
@@ -132,10 +148,9 @@ _cc_reports_directory_data() {
 
 _cc_reports_add_item() {
     local family="$1" path="$2" kind="$3" epoch="$4" bytes="$5" latest="$6" policy="$7" signature="$8"
-    local index mode uid
+    local index mode
     index="${#CC_REPORT_ITEM_PATH[@]}"
     mode="$(stat -c %a -- "$path" 2>/dev/null || printf unknown)"
-    uid="$(stat -c %u -- "$path" 2>/dev/null || printf unknown)"
     CC_REPORT_ITEM_FAMILY[index]="$family"
     CC_REPORT_ITEM_PATH[index]="$path"
     CC_REPORT_ITEM_KIND[index]="$kind"
@@ -146,19 +161,11 @@ _cc_reports_add_item() {
     CC_REPORT_ITEM_POLICY[index]="$policy"
     CC_REPORT_ITEM_STATE[index]="KEEP"
     CC_REPORT_ITEM_SIGNATURE[index]="$signature"
-    if ! _cc_reports_mode_private "$mode" || [ "$uid" != "$(id -u)" ] || [ ! -r "$path" ]; then
-        CC_REPORT_PERMISSION_WARNINGS=$((CC_REPORT_PERMISSION_WARNINGS + 1))
-        CC_REPORT_WARNINGS=$((CC_REPORT_WARNINGS + 1))
-    fi
+    _cc_reports_check_known_object "$path" "$kind"
     if [ "$kind" = directory ]; then
-        local child child_mode child_uid
+        local child
         while IFS= read -r -d '' child; do
-            child_mode="$(stat -c %a -- "$child" 2>/dev/null || printf unknown)"
-            child_uid="$(stat -c %u -- "$child" 2>/dev/null || printf unknown)"
-            if ! _cc_reports_mode_private "$child_mode" || [ "$child_uid" != "$(id -u)" ] || [ ! -r "$child" ]; then
-                CC_REPORT_PERMISSION_WARNINGS=$((CC_REPORT_PERMISSION_WARNINGS + 1))
-                CC_REPORT_WARNINGS=$((CC_REPORT_WARNINGS + 1))
-            fi
+            _cc_reports_check_known_object "$child" file
         done < <(find -P "$path" -mindepth 1 -maxdepth 1 -type f -print0 2>/dev/null)
     fi
 }
@@ -274,6 +281,8 @@ _cc_reports_scan_report_root_unknowns() {
         return 0
     fi
     [ -d "$root" ] || return 0
+    _cc_reports_safe_root "$root" || { _cc_reports_unknown "$root"; return 0; }
+    _cc_reports_check_known_directory "$root"
     while IFS= read -r -d '' entry; do
         base="${entry##*/}"
         case "$base" in monthly-health|drives) ;; *) _cc_reports_unknown "$entry" ;; esac
