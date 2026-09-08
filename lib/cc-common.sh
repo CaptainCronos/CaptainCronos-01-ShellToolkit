@@ -131,6 +131,13 @@ cc_status_line() {
     cc_status_line_fd 1 "$1" "$2" "${3:-${CC_STATUS_WIDTH:-38}}"
 }
 
+cc_status_detail_line() {
+    local label="$1" status="$2" detail="$3" width="${4:-${CC_STATUS_WIDTH:-38}}"
+    cc_dotted_leader_fd 1 "$label" "$width"
+    cc_status_word "$status"
+    printf ' %s\n' "$detail"
+}
+
 cc_summary_status() {
     local label="${1:-Overall Status:}" status="$2" width="${3:-16}"
     printf '%-*s' "$width" "$label"

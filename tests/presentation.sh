@@ -44,6 +44,9 @@ esac
 long_row="$(CC_STATUS_WIDTH=4 cc_status_line 'Meaningful long label' PASS)"
 [ "$long_row" = 'Meaningful long label PASS' ] || fail 'long status label degraded unsafely'
 
+detail_row="$(CC_STATUS_WIDTH=4 cc_status_detail_line 'Meaningful long label' WARN 'detail')"
+[ "$detail_row" = 'Meaningful long label WARN detail' ] || fail 'status detail row degraded unsafely'
+
 plain_row="$(cc_dotted_line 'Command' 'Plain description.' 12)"
 [ "$plain_row" = 'Command..... Plain description.' ] || fail 'plain dotted row presentation changed unexpectedly'
 

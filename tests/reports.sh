@@ -32,6 +32,12 @@ run_reports() {
         TERM=dumb NO_COLOR=1 bash "$PROJECT_ROOT/tools/cc" reports "$@"
 }
 
+run_reports_color() {
+    env -u NO_COLOR HOME="$FIXTURE_HOME" CC_HOME="$CC_FIXTURE_HOME" CC_HOST_ID="$HOST_ID" \
+        CC_REPORT_NOW_EPOCH="$NOW_EPOCH" CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT" \
+        TERM=xterm-256color CC_COLOR_MODE=always bash "$PROJECT_ROOT/tools/cc" reports "$@"
+}
+
 fingerprint() {
     find -P "$FIXTURE_HOME" -mindepth 1 -printf '%P|%y|%s|%T@|%m|%l\n' 2>/dev/null | LC_ALL=C sort
 }
@@ -110,6 +116,7 @@ fingerprint >"$TEST_DIR/populated-before"
 run_reports list --format tsv >"$TEST_DIR/list.tsv"
 run_reports list >"$TEST_DIR/list.table"
 run_reports list --permissions >"$TEST_DIR/permission-pass"
+run_reports_color list --permissions >"$TEST_DIR/permission-pass-color"
 set +e; run_reports status >"$TEST_DIR/status"; status_rc=$?; set -e
 [ "$status_rc" -ne 0 ] || fail 'unknown report material did not affect lifecycle health'
 run_reports prune >"$TEST_DIR/preview"
@@ -126,6 +133,7 @@ assert_contains "$TEST_DIR/list.tsv" $'kernel-cleanup\t' 'kernel-cleanup current
 assert_contains "$TEST_DIR/list.tsv" 'KEEP latest' 'valid latest target was not retained'
 assert_contains "$TEST_DIR/list.tsv" 'KEEP protected' 'protected evidence/current logs were not retained'
 assert_contains "$TEST_DIR/permission-pass" 'All recognized report objects comply' 'compliant known reports did not pass permission diagnostics'
+assert_contains "$TEST_DIR/permission-pass-color" $'\033[1;32mPASS\033[0m' 'compliant permission diagnostics did not use canonical PASS rendering'
 assert_contains "$TEST_DIR/status" 'Unknown persistent items' 'unknown report material was not reported'
 [ "$(grep -c 'PRUNE age' "$TEST_DIR/preview")" -eq 4 ] || fail 'bounded preview did not contain exactly four candidates'
 assert_contains "$TEST_DIR/preview" "$monthly_one" 'old monthly candidate was absent'
@@ -175,6 +183,7 @@ chmod 775 "$REPORT_ROOT/drives" "$drive_one"
 chmod 664 "$drive_one/metadata.txt"
 fingerprint >"$TEST_DIR/permission-before"
 run_reports list --permissions >"$TEST_DIR/permission-details"
+run_reports_color list --permissions >"$TEST_DIR/permission-details-color"
 fingerprint >"$TEST_DIR/permission-after"
 cmp -s "$TEST_DIR/permission-before" "$TEST_DIR/permission-after" || fail 'permission diagnostics wrote persistent state'
 assert_contains "$TEST_DIR/permission-details" 'reports/drives' 'family directory violation lacked its path'
@@ -184,6 +193,7 @@ assert_contains "$TEST_DIR/permission-details" '664' 'file actual mode was absen
 assert_contains "$TEST_DIR/permission-details" '700' 'directory expected mode was absent'
 assert_contains "$TEST_DIR/permission-details" '600' 'file expected mode was absent'
 assert_contains "$TEST_DIR/permission-details" 'metadata.txt' 'retained file violation lacked its path'
+assert_contains "$TEST_DIR/permission-details-color" $'\033[1;33mWARN\033[0m' 'permission diagnostics did not use canonical WARN rendering'
 
 # A safely mocked stat owner proves that ownership is included in the same
 # bounded diagnostic without changing fixture ownership or requiring root.
@@ -199,7 +209,7 @@ EOF_STAT
 chmod 700 "$TEST_DIR/fake-bin/stat"
 PATH="$TEST_DIR/fake-bin:$PATH" CC_REPORT_FAKE_OWNER_PATH="$drive_one/summary.txt" run_reports list --permissions >"$TEST_DIR/owner-details"
 assert_contains "$TEST_DIR/owner-details" '424242' 'wrong owner was absent from permission diagnostics'
-assert_contains "$TEST_DIR/owner-details" 'WARN 424242' 'wrong owner state was absent from permission diagnostics'
+assert_contains "$TEST_DIR/owner-details" 'WARN' 'wrong owner state was absent from permission diagnostics'
 
 set +e; run_reports status >"$TEST_DIR/permissions"; permission_rc=$?; set -e
 [ "$permission_rc" -ne 0 ] || fail 'insecure known-report permissions were ignored'

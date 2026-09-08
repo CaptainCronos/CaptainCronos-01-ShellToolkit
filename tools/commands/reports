@@ -140,20 +140,24 @@ print_permission_rows() {
     echo "Report Permission Diagnostics"
     echo "============================="
     if [ "${#CC_REPORT_PERMISSION_PATHS[@]}" -eq 0 ]; then
-        echo "All recognized report objects comply with the private 0700/0600 policy."
+        cc_status_detail_line "Permissions" PASS "All recognized report objects comply with the private 0700/0600 policy."
         return 0
     fi
-    printf '%-58s %-10s %-8s %-8s %-20s %s\n' Path Type Actual Expected Owner State
-    printf '%-58s %-10s %-8s %-8s %-20s %s\n' ---- ---- ------ -------- ----- -----
+    printf '%-58s %-10s %-8s %-8s %-12s %-16s %s\n' Path Type Actual Expected Owner-State Owner State
+    printf '%-58s %-10s %-8s %-8s %-12s %-16s %s\n' ---- ---- ------ -------- ----------- ----- -----
     for index in "${!CC_REPORT_PERMISSION_PATHS[@]}"; do
         path="${CC_REPORT_PERMISSION_PATHS[index]}"
         path="${path#"$(cc_env_host_home)/"}"
         owner="${CC_REPORT_PERMISSION_OWNERS[index]}"
-        if [ "${CC_REPORT_PERMISSION_OWNER_STATES[index]}" = PASS ]; then owner="PASS ($owner)"; else owner="WARN $owner != $expected_uid"; fi
-        printf '%-58s %-10s %-8s %-8s %-20s WARN\n' "$path" \
+        if [ "${CC_REPORT_PERMISSION_OWNER_STATES[index]}" = PASS ]; then owner="($owner)"; else owner="$owner != $expected_uid"; fi
+        printf '%-58s %-10s %-8s %-8s ' "$path" \
             "${CC_REPORT_PERMISSION_KINDS[index]}" \
             "${CC_REPORT_PERMISSION_ACTUAL_MODES[index]}" \
-            "${CC_REPORT_PERMISSION_EXPECTED_MODES[index]}" "$owner"
+            "${CC_REPORT_PERMISSION_EXPECTED_MODES[index]}"
+        cc_status_cell "${CC_REPORT_PERMISSION_OWNER_STATES[index]}" 12
+        printf ' %-16s ' "$owner"
+        cc_status_cell WARN 5
+        printf '\n'
     done
 }
 
@@ -168,19 +172,19 @@ print_status() {
     [ "$CC_REPORT_WARNINGS" -eq 0 ] || overall=WARN
     echo "Captain Cronos Report Status"
     echo "============================="
-    cc_dotted_line "Report families" "PASS  $family_count"
-    cc_dotted_line "Retained reports" "INFO  $report_count"
-    cc_dotted_line "Retained size" "INFO  $(cc_retention_human_bytes "$total_bytes")"
+    cc_status_detail_line "Report families" PASS "$family_count"
+    cc_status_detail_line "Retained reports" INFO "$report_count"
+    cc_status_detail_line "Retained size" INFO "$(cc_retention_human_bytes "$total_bytes")"
     if [ "$oldest" -eq 0 ]; then
-        cc_dotted_line "Oldest retained report" "INFO  -"
+        cc_status_detail_line "Oldest retained report" INFO -
     else
-        cc_dotted_line "Oldest retained report" "INFO  $(date -d "@$oldest" +%F)"
+        cc_status_detail_line "Oldest retained report" INFO "$(date -d "@$oldest" +%F)"
     fi
-    cc_dotted_line "Prune candidates" "INFO  ${#CC_REPORT_PLAN_INDEXES[@]}"
+    cc_status_detail_line "Prune candidates" INFO "${#CC_REPORT_PLAN_INDEXES[@]}"
     if [ "${#CC_REPORT_UNKNOWN_PATHS[@]}" -eq 0 ]; then
-        cc_dotted_line "Unknown persistent items" "PASS  0"
+        cc_status_detail_line "Unknown persistent items" PASS 0
     else
-        cc_dotted_line "Unknown persistent items" "WARN  ${#CC_REPORT_UNKNOWN_PATHS[@]}"
+        cc_status_detail_line "Unknown persistent items" WARN "${#CC_REPORT_UNKNOWN_PATHS[@]}"
     fi
     if [ "$CC_REPORT_BROKEN_LATEST" -eq 0 ]; then cc_status_line "Latest pointers" PASS; else cc_status_line "Latest pointers" WARN; fi
     if [ "$CC_REPORT_PERMISSION_WARNINGS" -eq 0 ]; then cc_status_line Permissions PASS; else cc_status_line Permissions WARN; fi
