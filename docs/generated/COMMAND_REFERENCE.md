@@ -1173,6 +1173,51 @@ Discovery:
   cc monthly-health-timer <subcommand> switches
 ~~~
 
+## cc mozilla
+
+~~~text
+Usage:
+  cc mozilla [status|install|repair] [firefox|thunderbird|all] [--dry-run|--apply]
+
+Manages the official Mozilla Linux archives, installed at /opt/firefox and
+/opt/thunderbird. The vendor-owned binaries perform their own subsequent
+updates; this command does not schedule or replace Mozilla updates.
+
+Actions:
+  status   Inspect archive installs, command symlinks, Snap conflicts, and desktop launchers.
+  install  Preview or install the selected official Mozilla archive deployment.
+  repair   Preview or restore the selected deployment's symlink and one canonical launcher.
+
+Safety:
+  --dry-run  Print the planned changes. This is the default.
+  --apply    Authorize Snap removal, archive installation, symlink, and launcher changes.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc mozilla
+
+Usage:
+  cc mozilla [ACTION] [TARGET] [switches]
+
+Manage official Mozilla archive deployments.
+
+Switches:
+  --dry-run......... Preview Mozilla deployment changes without mutation. [default]
+  --apply........... Authorize archive deployment, Snap removal, and canonical launcher repair.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status......... Inspect Mozilla archive installs, Snap conflicts, and launchers.
+  install........ Preview or install official Mozilla archives.
+  repair......... Preview or restore Mozilla links and canonical launchers.
+
+Discovery:
+  cc mozilla <subcommand> switches
+~~~
+
 ## cc platform
 
 ~~~text

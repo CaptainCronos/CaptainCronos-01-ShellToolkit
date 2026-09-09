@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : mozilla
+# Version     : reads VERSION
+# Category    : Maintenance
+# Requires    : bash find awk sed timeout
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Manage official Mozilla Firefox and Thunderbird archive deployments.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+ACTION="status"
+TARGET="all"
+APPLY=0
+MOZILLA_PREFIX="${CC_MOZILLA_PREFIX:-/opt}"
+MOZILLA_BIN_DIR="${CC_MOZILLA_BIN_DIR:-/usr/local/bin}"
+MOZILLA_APPLICATIONS_DIR="${CC_MOZILLA_APPLICATIONS_DIR:-/usr/share/applications}"
+MOZILLA_USER_APPLICATIONS_DIR="${CC_MOZILLA_USER_APPLICATIONS_DIR:-$HOME/.local/share/applications}"
+MOZILLA_SUDO="${CC_MOZILLA_SUDO:-sudo}"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc mozilla [status|install|repair] [firefox|thunderbird|all] [--dry-run|--apply]
+
+Manages the official Mozilla Linux archives, installed at /opt/firefox and
+/opt/thunderbird. The vendor-owned binaries perform their own subsequent
+updates; this command does not schedule or replace Mozilla updates.
+
+Actions:
+  status   Inspect archive installs, command symlinks, Snap conflicts, and desktop launchers.
+  install  Preview or install the selected official Mozilla archive deployment.
+  repair   Preview or restore the selected deployment's symlink and one canonical launcher.
+
+Safety:
+  --dry-run  Print the planned changes. This is the default.
+  --apply    Authorize Snap removal, archive installation, symlink, and launcher changes.
+EOF_HELP
+}
+
+mozilla_products() {
+    case "$TARGET" in
+        all) printf '%s\n' firefox thunderbird ;;
+        firefox|thunderbird) printf '%s\n' "$TARGET" ;;
+    esac
+}
+
+mozilla_archive_url() {
+    local product="$1" var os
+    var="CC_MOZILLA_DOWNLOAD_URL_${product^^}"
+    if [ -n "${!var:-}" ]; then
+        printf '%s\n' "${!var}"
+    else
+        case "$(uname -m)" in
+            x86_64|amd64) os=linux64 ;;
+            aarch64|arm64) os=linux64-aarch64 ;;
+            *) cc_error "Unsupported Mozilla archive architecture: $(uname -m)"; return 1 ;;
+        esac
+        if [ "$product" = firefox ]; then
+            printf 'https://download.mozilla.org/?product=firefox-latest-ssl&os=%s&lang=en-US\n' "$os"
+        else
+            printf 'https://download.mozilla.org/?product=thunderbird-latest-ssl&os=%s&lang=en-US\n' "$os"
+        fi
+    fi
+}
+
+mozilla_launcher_file() { printf '%s/%s.desktop\n' "$MOZILLA_APPLICATIONS_DIR" "$1"; }
+mozilla_install_dir() { printf '%s/%s\n' "$MOZILLA_PREFIX" "$1"; }
+mozilla_binary() { printf '%s/%s/%s\n' "$MOZILLA_PREFIX" "$1" "$1"; }
+mozilla_link() { printf '%s/%s\n' "$MOZILLA_BIN_DIR" "$1"; }
+
+mozilla_snap_state() {
+    local product="$1" snap_status
+    if ! command -v snap >/dev/null 2>&1; then
+        printf '%s\n' unavailable
+    elif timeout 5 snap list "$product" >/dev/null 2>&1; then
+        printf '%s\n' installed
+    else
+        snap_status=$?
+        [ "$snap_status" -eq 124 ] && printf '%s\n' unavailable || printf '%s\n' absent
+    fi
+}
+
+mozilla_launchers() {
+    local product="$1" root file
+    for root in "$MOZILLA_APPLICATIONS_DIR" "$MOZILLA_USER_APPLICATIONS_DIR"; do
+        [ -d "$root" ] || continue
+        while IFS= read -r -d '' file; do
+            if grep -Eqi "^(Name|Exec)=.*${product}" "$file" 2>/dev/null || [[ "${file##*/}" == *"$product"*.desktop ]]; then
+                printf '%s\n' "$file"
+            fi
+        done < <(find "$root" -maxdepth 1 \( -type f -o -type l \) -name '*.desktop' -print0 2>/dev/null)
+    done | LC_ALL=C sort -u
+}
+
+mozilla_status_product() {
+    local product="$1" binary link canonical snap_state launcher_count=0 launcher
+    binary="$(mozilla_binary "$product")"
+    link="$(mozilla_link "$product")"
+    canonical="$(mozilla_launcher_file "$product")"
+    snap_state="$(mozilla_snap_state "$product")"
+    echo "$product"
+    printf '  Archive:  %s\n' "$([ -x "$binary" ] && echo installed || echo missing)"
+    if [ -L "$link" ] && [ "$(readlink -f "$link" 2>/dev/null || true)" = "$binary" ]; then
+        echo '  Command:  canonical'
+    else
+        printf '  Command:  noncanonical (%s)\n' "$link"
+    fi
+    printf '  Snap:     %s\n' "$snap_state"
+    while IFS= read -r launcher; do
+        [ -n "$launcher" ] || continue
+        launcher_count=$((launcher_count + 1))
+        printf '  Launcher: %s\n' "$launcher"
+    done < <(mozilla_launchers "$product")
+    printf '  Launcher count: %s (canonical: %s)\n' "$launcher_count" "$canonical"
+}
+
+mozilla_preview_product() {
+    local product="$1" snap_state binary link canonical launcher
+    binary="$(mozilla_binary "$product")"; link="$(mozilla_link "$product")"; canonical="$(mozilla_launcher_file "$product")"
+    echo "[$product] $ACTION (dry run)"
+    if [ "$ACTION" = install ]; then
+        printf '  download: %s\n' "$(mozilla_archive_url "$product")"
+        printf '  replace:  %s\n' "$(mozilla_install_dir "$product")"
+    fi
+    snap_state="$(mozilla_snap_state "$product")"
+    [ "$snap_state" != installed ] || echo "  remove Snap package: $product"
+    printf '  symlink:  %s -> %s\n' "$link" "$binary"
+    printf '  launcher: %s\n' "$canonical"
+    while IFS= read -r launcher; do
+        [ -n "$launcher" ] && [ "$launcher" != "$canonical" ] && printf '  remove duplicate launcher: %s\n' "$launcher"
+    done < <(mozilla_launchers "$product")
+}
+
+mozilla_write_launcher() {
+    local product="$1" canonical temp
+    canonical="$(mozilla_launcher_file "$product")"
+    temp="$(mktemp)"
+    printf '[Desktop Entry]\nVersion=1.0\nType=Application\nName=%s\nExec=%s %%u\nTerminal=false\nIcon=%s\nCategories=Network;WebBrowser;\nMimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\nStartupNotify=true\n' \
+        "${product^}" "$(mozilla_binary "$product")" "$(mozilla_binary "$product")" >"$temp"
+    "$MOZILLA_SUDO" mkdir -p "$MOZILLA_APPLICATIONS_DIR"
+    "$MOZILLA_SUDO" install -m 0644 "$temp" "$canonical"
+    rm -f "$temp"
+}
+
+mozilla_apply_product() {
+    local product="$1" url archive unpack_dir install_dir link canonical launcher
+    install_dir="$(mozilla_install_dir "$product")"; link="$(mozilla_link "$product")"; canonical="$(mozilla_launcher_file "$product")"
+    if [ "$ACTION" = install ]; then
+        command -v curl >/dev/null 2>&1 || { cc_error 'install requires curl.'; return 1; }
+        archive="$(mktemp --suffix=.tar.bz2)"; unpack_dir="$(mktemp -d)"
+        trap 'rm -f "$archive"; rm -rf "$unpack_dir"' RETURN
+        url="$(mozilla_archive_url "$product")"
+        curl --fail --location --proto '=https' --tlsv1.2 --output "$archive" "$url"
+        tar -xjf "$archive" -C "$unpack_dir"
+        [ -x "$unpack_dir/$product/$product" ] || { cc_error "Downloaded $product archive has an unexpected layout."; return 1; }
+        "$MOZILLA_SUDO" rm -rf "$install_dir"
+        "$MOZILLA_SUDO" mv "$unpack_dir/$product" "$install_dir"
+        trap - RETURN
+        rm -f "$archive"; rm -rf "$unpack_dir"
+    fi
+    [ -x "$(mozilla_binary "$product")" ] || { cc_error "$product archive is missing; run: cc mozilla install $product --apply"; return 1; }
+    if [ "$(mozilla_snap_state "$product")" = installed ]; then "$MOZILLA_SUDO" snap remove "$product"; fi
+    "$MOZILLA_SUDO" mkdir -p "$MOZILLA_BIN_DIR"
+    "$MOZILLA_SUDO" ln -sfn "$(mozilla_binary "$product")" "$link"
+    while IFS= read -r launcher; do
+        [ -n "$launcher" ] && [ "$launcher" != "$canonical" ] && "$MOZILLA_SUDO" rm -f "$launcher"
+    done < <(mozilla_launchers "$product")
+    mozilla_write_launcher "$product"
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h) usage; exit 0 ;;
+        --version) cc_version; exit 0 ;;
+        status|install|repair) ACTION="$1" ;;
+        firefox|thunderbird|all) TARGET="$1" ;;
+        --dry-run) APPLY=0 ;;
+        --apply) APPLY=1 ;;
+        *) cc_error "Unknown mozilla argument: $1"; usage >&2; exit 2 ;;
+    esac
+    shift
+done
+
+if [ "$ACTION" = status ]; then
+    cc_banner
+    echo 'Mozilla Deployment Status'
+    echo '========================='
+    while IFS= read -r product; do mozilla_status_product "$product"; done < <(mozilla_products)
+    exit 0
+fi
+while IFS= read -r product; do
+    if [ "$APPLY" -eq 0 ]; then mozilla_preview_product "$product"; else mozilla_apply_product "$product"; fi
+done < <(mozilla_products)

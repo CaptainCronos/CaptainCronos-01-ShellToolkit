@@ -34,6 +34,7 @@ Toolkit version: 1.3.0-beta2 (Blackbeard)
 | cc maintenance | namespace-with-switches | 1.3.0-beta2 | Inspect persistent toolkit resource ownership and retention. |
 | cc monthly-health | flat-with-switches | 1.3.0-beta2 | Generate a monthly host health and maintenance report. |
 | cc monthly-health-timer | namespace | 1.3.0-beta2 | Retire or inspect the standalone monthly health user timer. |
+| cc mozilla | namespace-with-switches | 1.3.0-beta2 | Manage official Mozilla Firefox and Thunderbird archive deployments. |
 | cc platform | namespace | 1.3.0-beta2 | Show detected operating platform and host capabilities. |
 | cc plugin | namespace | 1.3.0-beta2 | Inspect plugins and explicitly run one validated entrypoint. |
 | cc programs | namespace | 1.3.0-beta2 | Show and validate preferred command-line program interfaces. |

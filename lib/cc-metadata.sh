@@ -44,7 +44,7 @@ cc_infer_category() {
         verify|doctor) echo "Diagnostics" ;;
         drives|smart) echo "Storage" ;;
         kernel|kernel-cleanup) echo "Maintenance" ;;
-        desktop-reload|dev-update|system-update|update|monthly-health|monthly-health-timer|maintenance|reports) echo "Maintenance" ;;
+        desktop-reload|dev-update|mozilla|system-update|update|monthly-health|monthly-health-timer|maintenance|reports) echo "Maintenance" ;;
         *) echo "General" ;;
     esac
 }
@@ -123,6 +123,7 @@ kernel-cleanup|compatibility-wrapper|cc kernel-cleanup [switches]|Compatibility 
 maintenance|namespace-with-switches|cc maintenance [subcommand] [switches]|Inspect persistent toolkit resource ownership and retention.|namespace
 monthly-health|flat-with-switches|cc monthly-health [switches]|Generate a host health and maintenance report without kernel cleanup.|none
 monthly-health-timer|namespace|cc monthly-health-timer <subcommand>|Manage the optional user-scoped monthly-health timer.|namespace
+mozilla|namespace-with-switches|cc mozilla [ACTION] [TARGET] [switches]|Manage official Mozilla archive deployments.|namespace
 platform|namespace|cc platform [summary|capabilities]|Show platform identity and capabilities.|namespace
 plugin|namespace|cc plugin [list|status|info ID|run ID OPERATION]|Inspect plugins or explicitly run one validated entrypoint.|namespace
 programs|namespace|cc programs [subcommand] [arguments]|Report configured semantic program interfaces.|namespace
@@ -181,6 +182,12 @@ init|--apply|0|Authorize host identity and managed environment writes; omission 
 init|--interactive|0|Collect host identity choices interactively.
 init|--selftest|0|Run the engineering selftest after initialization.
 init|--host-id ID|1|Set the normalized Captain Cronos host identifier.
+mozilla|--dry-run|0|Preview Mozilla deployment changes without mutation. [default]
+mozilla|--apply|0|Authorize archive deployment, Snap removal, and canonical launcher repair.
+mozilla/install|--dry-run|0|Preview official archive installation without mutation. [default]
+mozilla/install|--apply|0|Authorize official archive installation and conflict removal.
+mozilla/repair|--dry-run|0|Preview symlink and launcher repair without mutation. [default]
+mozilla/repair|--apply|0|Authorize symlink and canonical launcher repair.
 init|--role ROLE|1|Select a supported host role.
 init|--profile PROFILE|1|Select a supported platform profile.
 install|--dry-run|0|Preview launcher installation without changing files. [default]
@@ -342,6 +349,9 @@ monthly-health-timer|run-once|Run monthly health once.|monthly-health-timer/run-
 monthly-health-timer|install-standalone|Install the optional standalone user timer.|monthly-health-timer/install-standalone
 monthly-health-timer|enable|Enable the optional user timer.|monthly-health-timer/enable
 monthly-health-timer|disable|Disable the optional user timer.|monthly-health-timer/disable
+mozilla|status|Inspect Mozilla archive installs, Snap conflicts, and launchers.|mozilla/status
+mozilla|install|Preview or install official Mozilla archives.|mozilla/install
+mozilla|repair|Preview or restore Mozilla links and canonical launchers.|mozilla/repair
 platform|summary|Show the platform summary.|platform/summary
 platform|capabilities|Show detected platform capabilities.|platform/capabilities
 plugin|list|List validated local plugins and semantic state.|plugin/list
