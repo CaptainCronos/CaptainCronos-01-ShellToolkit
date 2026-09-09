@@ -112,7 +112,7 @@ done
 cc_command_list >"$TEST_DIR/registry"
 cc_contract_commands | cut -d '|' -f1 | LC_ALL=C sort >"$TEST_DIR/contracts"
 cmp -s "$TEST_DIR/registry" "$TEST_DIR/contracts" || fail 'registered commands and contracts differ'
- [ "$(wc -l <"$TEST_DIR/contracts" | tr -d ' ')" -eq 51 ] || fail 'public command count changed unexpectedly'
+ [ "$(wc -l <"$TEST_DIR/contracts" | tr -d ' ')" -eq 52 ] || fail 'public command count changed unexpectedly'
 [ "$(sort "$TEST_DIR/contracts" | uniq -d | wc -l | tr -d ' ')" -eq 0 ] || fail 'duplicate command contracts exist'
 
 # Contract row selection must consume its producer completely.  Expanding the
@@ -187,6 +187,7 @@ metadata_has() {
     return 1
 }
 for fixture in \
+    'chirp --dry-run 0' 'chirp --apply 0' 'chirp/update --apply 0' \
     'install --dry-run 0' 'install --apply 0' 'install --force 0' \
     'system-update --dry-run 0' 'system-update --apply 0' \
     'doctor --full 0' 'kernel/cleanup --dry-run 0' 'kernel/cleanup --apply 0' \

@@ -204,6 +204,48 @@ Discovery:
   cc capability <subcommand> switches
 ~~~
 
+## cc chirp
+
+~~~text
+Usage:
+  cc chirp [status|install|repair|update] [--dry-run|--apply]
+
+Deploys the official CHIRP-next AppImage as /opt/chirp/Chirp.AppImage. Install,
+repair, and update are previews by default; persistent changes require --apply.
+
+Safety:
+  - CHIRP AppImages are never executed by this command.
+  - Downloads are passively checked for ELF magic, file type, size, SHA-256, and mode.
+  - ~/.chirp and externally saved radio images/CSVs are never removed.
+  - A legacy pipx CHIRP is removed only after the AppImage deployment validates.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc chirp
+
+Usage:
+  cc chirp [status
+
+install
+
+Switches:
+  --dry-run......... Preview CHIRP AppImage deployment changes without mutation. [default]
+  --apply........... Authorize staged AppImage deployment, launcher/icon repair, and safe pipx CHIRP migration.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status......... Inspect CHIRP AppImage, links, launcher, icon, pipx conflict, and user data.
+  install........ Preview or install the official CHIRP-next AppImage.
+  repair......... Preview or normalize the canonical CHIRP deployment.
+  update......... Compare and safely replace with the current official CHIRP-next release.
+
+Discovery:
+  cc chirp <subcommand> switches
+~~~
+
 ## cc config
 
 ~~~text

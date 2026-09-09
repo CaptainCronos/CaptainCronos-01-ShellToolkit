@@ -9,6 +9,7 @@ Toolkit version: 1.3.0-beta2 (Blackbeard)
 | cc audit | namespace-with-switches | 1.3.0-beta2 | Run command consistency checks across toolkit commands. |
 | cc baseline | flat-no-switches | 1.3.0-beta2 | Capture operating-system baseline shell files. |
 | cc capability | namespace | 1.3.0-beta2 | Resolve core, program, and plugin-provided host capabilities. |
+| cc chirp | namespace-with-switches | 1.3.0-beta2 | Deploy and safely migrate CHIRP-next to the official AppImage. |
 | cc config | namespace | 1.3.0-beta2 | View and update toolkit configuration. |
 | cc defaults | flat-no-switches | 1.3.0-beta2 | Promote active shell files into deployable defaults. |
 | cc deps | namespace | 1.3.0-beta2 | Show dependency status for toolkit commands and profiles. |

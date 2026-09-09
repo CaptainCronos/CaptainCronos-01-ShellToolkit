@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : chirp
+# Version     : reads VERSION
+# Category    : Maintenance
+# Requires    : bash find awk sed grep file sha256sum od stat tr
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Deploy and safely migrate CHIRP-next to the official AppImage.
+# ==============================================================================
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+
+ACTION=status
+APPLY=0
+CHIRP_DIR="${CC_CHIRP_DIR:-/opt/chirp}"
+CHIRP_APPIMAGE="${CC_CHIRP_APPIMAGE:-$CHIRP_DIR/Chirp.AppImage}"
+CHIRP_BIN_DIR="${CC_CHIRP_BIN_DIR:-/usr/local/bin}"
+CHIRP_LINK="${CC_CHIRP_LINK:-$CHIRP_BIN_DIR/chirp}"
+CHIRP_APPS_DIR="${CC_CHIRP_APPLICATIONS_DIR:-/usr/share/applications}"
+CHIRP_LAUNCHER="${CC_CHIRP_LAUNCHER:-$CHIRP_APPS_DIR/chirp.desktop}"
+CHIRP_USER_APPS_DIR="${CC_CHIRP_USER_APPLICATIONS_DIR:-$HOME/.local/share/applications}"
+CHIRP_ICON="${CC_CHIRP_ICON:-/usr/local/share/icons/chirp.svg}"
+CHIRP_USER_DATA="${CC_CHIRP_USER_DATA:-$HOME/.chirp}"
+CHIRP_PIPX_HOME="${CC_CHIRP_PIPX_HOME:-$HOME/.local/pipx}"
+CHIRP_PIPX_BIN="${CC_CHIRP_PIPX_BIN:-$HOME/.local/bin/chirp}"
+CHIRP_SUDO="${CC_CHIRP_SUDO:-sudo}"
+CHIRP_MIN_SIZE="${CC_CHIRP_MIN_SIZE:-1048576}"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc chirp [status|install|repair|update] [--dry-run|--apply]
+
+Deploys the official CHIRP-next AppImage as /opt/chirp/Chirp.AppImage. Install,
+repair, and update are previews by default; persistent changes require --apply.
+
+Safety:
+  - CHIRP AppImages are never executed by this command.
+  - Downloads are passively checked for ELF magic, file type, size, SHA-256, and mode.
+  - ~/.chirp and externally saved radio images/CSVs are never removed.
+  - A legacy pipx CHIRP is removed only after the AppImage deployment validates.
+EOF_HELP
+}
+
+chirp_sha256() { sha256sum "$1" | awk '{print $1}'; }
+
+chirp_artifact_valid() {
+    local artifact="$1" size magic type
+    [ -f "$artifact" ] && [ -x "$artifact" ] || return 1
+    size="$(stat -c '%s' "$artifact" 2>/dev/null || printf 0)"
+    [ "$size" -ge "$CHIRP_MIN_SIZE" ] || return 1
+    magic="$(od -An -N4 -tx1 "$artifact" 2>/dev/null | tr -d '[:space:]')"
+    [ "$magic" = 7f454c46 ] || return 1
+    type="$(file -b "$artifact" 2>/dev/null || true)"
+    [[ "$type" == *ELF* ]] || return 1
+    chirp_sha256 "$artifact" >/dev/null
+}
+
+chirp_release_from_artifact() {
+    local artifact="$1" release
+    release="$(LC_ALL=C grep -aom1 -E 'chirp-next-[0-9]{8}' "$artifact" 2>/dev/null || true)"
+    [ -n "$release" ] && printf '%s\n' "$release" || printf 'unknown\n'
+}
+
+chirp_release_matches() {
+    local installed="$1" available="$2"
+    [ "${installed#chirp-}" = "$available" ]
+}
+
+chirp_launchers() {
+    local root entry
+    for root in "$CHIRP_APPS_DIR" "$CHIRP_USER_APPS_DIR"; do
+        [ -d "$root" ] || continue
+        while IFS= read -r -d '' entry; do
+            if [ "${entry##*/}" = chirp.desktop ] || grep -Eqi '^(Name=.*CHIRP|Exec=.*chirp)' "$entry" 2>/dev/null; then
+                printf '%s\n' "$entry"
+            fi
+        done < <(find "$root" -maxdepth 1 \( -type f -o -type l \) -name '*.desktop' -print0 2>/dev/null)
+    done | LC_ALL=C sort -u
+}
+
+chirp_pipx_state() {
+    if [ -e "$CHIRP_PIPX_HOME/venvs/chirp" ] || [ -e "$CHIRP_PIPX_BIN" ]; then printf conflict; else printf absent; fi
+}
+
+chirp_command_state() {
+    if [ -L "$CHIRP_LINK" ] && [ "$(readlink -f "$CHIRP_LINK" 2>/dev/null || true)" = "$CHIRP_APPIMAGE" ]; then
+        printf canonical
+    else
+        printf noncanonical
+    fi
+}
+
+chirp_status() {
+    local count=0 entry
+    cc_banner
+    echo 'CHIRP Deployment Status'
+    echo '======================='
+    printf '  AppImage:  %s\n' "$(chirp_artifact_valid "$CHIRP_APPIMAGE" && echo installed || echo missing)"
+    printf '  Command:   %s (%s)\n' "$(chirp_command_state)" "$CHIRP_LINK"
+    while IFS= read -r entry; do [ -n "$entry" ] && count=$((count + 1)); done < <(chirp_launchers)
+    printf '  Launchers: %s (canonical: %s)\n' "$count" "$CHIRP_LAUNCHER"
+    printf '  Icon:      %s\n' "$([ -f "$CHIRP_ICON" ] && echo present || echo missing)"
+    printf '  pipx:      %s\n' "$(chirp_pipx_state)"
+    printf '  User data: %s (%s)\n' "$([ -d "$CHIRP_USER_DATA" ] && echo present || echo absent)" "$CHIRP_USER_DATA"
+    if [ -f "$CHIRP_APPIMAGE" ]; then
+        printf '  Release:   %s (SHA-256: %s)\n' "$(chirp_release_from_artifact "$CHIRP_APPIMAGE")" "$(chirp_sha256 "$CHIRP_APPIMAGE")"
+    fi
+}
+
+chirp_release_info() {
+    local index version arch url
+    if [ -n "${CC_CHIRP_DOWNLOAD_URL:-}" ]; then
+        printf '%s\t%s\n' "${CC_CHIRP_RELEASE_VERSION:-override}" "$CC_CHIRP_DOWNLOAD_URL"
+        return
+    fi
+    command -v curl >/dev/null 2>&1 || { cc_error 'Release discovery requires curl.'; return 1; }
+    index="$(curl --fail --location --proto '=https' --tlsv1.2 --silent --show-error https://archive.chirpmyradio.com/chirp_next/)" || return
+    version="$(printf '%s\n' "$index" | grep -aoE 'next-[0-9]{8}' | LC_ALL=C sort -u | tail -n 1)"
+    [ -n "$version" ] || { cc_error 'Could not discover a current official CHIRP-next release.'; return 1; }
+    case "$(uname -m)" in x86_64|amd64) arch=x86_64 ;; aarch64|arm64) arch=aarch64 ;; *) cc_error "Unsupported CHIRP architecture: $(uname -m)"; return 1 ;; esac
+    url="https://archive.chirpmyradio.com/chirp_next/$version/chirp-$version-$arch.AppImage"
+    printf '%s\t%s\n' "$version" "$url"
+}
+
+chirp_extract_icon() {
+    local artifact="$1" destination="$2" offset icon_path
+    if [ -n "${CC_CHIRP_ICON_SOURCE:-}" ]; then
+        [ -f "$CC_CHIRP_ICON_SOURCE" ] || { cc_error "Configured icon source is missing: $CC_CHIRP_ICON_SOURCE"; return 1; }
+        cp "$CC_CHIRP_ICON_SOURCE" "$destination"
+        return
+    fi
+    command -v unsquashfs >/dev/null 2>&1 || { cc_error 'Icon extraction requires unsquashfs (or CC_CHIRP_ICON_SOURCE).'; return 1; }
+    offset="$(LC_ALL=C grep -abo -m1 'hsqs' "$artifact" | awk -F: '{print $1}')"
+    [ -n "$offset" ] || { cc_error 'AppImage has no readable SquashFS payload for icon extraction.'; return 1; }
+    icon_path="$(unsquashfs -offset "$offset" -ll "$artifact" 2>/dev/null | awk '$NF ~ /\.svg$/ && $NF ~ /(icon|chirp|DirIcon)/ {print $NF; exit}')"
+    [ -n "$icon_path" ] || { cc_error 'No SVG icon was found in the AppImage.'; return 1; }
+    unsquashfs -offset "$offset" -cat "$artifact" "$icon_path" >"$destination"
+    [ -s "$destination" ]
+}
+
+chirp_write_launcher() {
+    local temporary="$1"
+    printf '[Desktop Entry]\nVersion=1.0\nType=Application\nName=CHIRP\nComment=CHIRP-next radio programming\nExec=%s %%U\nIcon=%s\nTerminal=false\nCategories=Utility;HamRadio;\nMimeType=application/x-chirp;\nStartupNotify=true\n' "$CHIRP_APPIMAGE" "$CHIRP_ICON" >"$temporary"
+}
+
+chirp_remove_pipx() {
+    [ "$(chirp_pipx_state)" = conflict ] || return 0
+    if command -v pipx >/dev/null 2>&1; then
+        pipx uninstall chirp
+    else
+        rm -f "$CHIRP_PIPX_BIN"
+        rm -rf "$CHIRP_PIPX_HOME/venvs/chirp"
+    fi
+}
+
+chirp_preview() {
+    local release_info release url entry installed
+    echo "CHIRP $ACTION (dry run)"
+    if [ "$ACTION" = install ] || [ "$ACTION" = update ]; then
+        release_info="$(chirp_release_info)" || return
+        IFS=$'\t' read -r release url <<< "$release_info"
+        printf '  official release: %s\n  download: %s\n  stage and passively validate before promotion: %s\n' "$release" "$url" "$CHIRP_APPIMAGE"
+        if [ "$ACTION" = update ]; then
+            installed="$(chirp_release_from_artifact "$CHIRP_APPIMAGE")"
+            if chirp_release_matches "$installed" "$release"; then
+                printf '  comparison: installed %s is current\n' "$installed"
+            else
+                printf '  comparison: installed %s; current %s\n' "$installed" "$release"
+            fi
+        fi
+    fi
+    printf '  symlink: %s -> %s\n  icon: %s\n  launcher: %s\n' "$CHIRP_LINK" "$CHIRP_APPIMAGE" "$CHIRP_ICON" "$CHIRP_LAUNCHER"
+    while IFS= read -r entry; do [ -n "$entry" ] && [ "$entry" != "$CHIRP_LAUNCHER" ] && printf '  remove duplicate launcher: %s\n' "$entry"; done < <(chirp_launchers)
+    [ "$(chirp_pipx_state)" != conflict ] || echo '  remove pipx CHIRP only after deployment validation'
+    echo "  preserve user data: $CHIRP_USER_DATA"
+}
+
+chirp_deploy_artifact() {
+    local url="$1" stage icon_stage launcher_stage promoted
+    command -v curl >/dev/null 2>&1 || { cc_error 'Install/update requires curl.'; return 1; }
+    stage="$(mktemp)"; icon_stage="$(mktemp)"; launcher_stage="$(mktemp)"
+    trap 'rm -f "$stage" "$icon_stage" "$launcher_stage"' RETURN
+    curl --fail --location --proto '=https' --tlsv1.2 --output "$stage" "$url"
+    chmod 0755 "$stage"
+    chirp_artifact_valid "$stage" || { cc_error 'Downloaded AppImage failed passive validation.'; return 1; }
+    chirp_extract_icon "$stage" "$icon_stage" || return
+    chirp_write_launcher "$launcher_stage"
+    "$CHIRP_SUDO" mkdir -p "$CHIRP_DIR" "$CHIRP_BIN_DIR" "$(dirname "$CHIRP_ICON")" "$CHIRP_APPS_DIR"
+    promoted="$CHIRP_DIR/.Chirp.AppImage.new.$$"
+    "$CHIRP_SUDO" install -m 0755 "$stage" "$promoted"
+    "$CHIRP_SUDO" mv -f "$promoted" "$CHIRP_APPIMAGE"
+    "$CHIRP_SUDO" install -m 0644 "$icon_stage" "$CHIRP_ICON"
+    "$CHIRP_SUDO" install -m 0644 "$launcher_stage" "$CHIRP_LAUNCHER"
+    trap - RETURN; rm -f "$stage" "$icon_stage" "$launcher_stage"
+}
+
+chirp_repair_deployment() {
+    local icon_stage launcher_stage entry
+    chirp_artifact_valid "$CHIRP_APPIMAGE" || { cc_error 'CHIRP AppImage is missing or fails passive validation; run: cc chirp install --apply'; return 1; }
+    icon_stage="$(mktemp)"; launcher_stage="$(mktemp)"
+    trap 'rm -f "$icon_stage" "$launcher_stage"' RETURN
+    chirp_extract_icon "$CHIRP_APPIMAGE" "$icon_stage" || return
+    chirp_write_launcher "$launcher_stage"
+    "$CHIRP_SUDO" mkdir -p "$CHIRP_BIN_DIR" "$(dirname "$CHIRP_ICON")" "$CHIRP_APPS_DIR"
+    "$CHIRP_SUDO" ln -sfn "$CHIRP_APPIMAGE" "$CHIRP_LINK"
+    "$CHIRP_SUDO" install -m 0644 "$icon_stage" "$CHIRP_ICON"
+    "$CHIRP_SUDO" install -m 0644 "$launcher_stage" "$CHIRP_LAUNCHER"
+    while IFS= read -r entry; do [ -n "$entry" ] && [ "$entry" != "$CHIRP_LAUNCHER" ] && "$CHIRP_SUDO" rm -f "$entry"; done < <(chirp_launchers)
+    trap - RETURN; rm -f "$icon_stage" "$launcher_stage"
+}
+
+chirp_apply() {
+    local release_info release url entry installed
+    case "$ACTION" in
+        install|update)
+            release_info="$(chirp_release_info)" || return
+            IFS=$'\t' read -r release url <<< "$release_info"
+            if [ "$ACTION" = update ]; then
+                installed="$(chirp_release_from_artifact "$CHIRP_APPIMAGE")"
+                if chirp_release_matches "$installed" "$release"; then
+                    echo "CHIRP is already current: $installed"
+                    chirp_repair_deployment
+                    chirp_remove_pipx
+                    return
+                fi
+            fi
+            chirp_deploy_artifact "$url"
+            ;;
+        repair) chirp_repair_deployment ;;
+    esac
+    # Ensure a newly deployed artifact has its command link before declaring it
+    # valid enough to retire only the legacy chirp pipx environment.
+    if [ "$ACTION" != repair ]; then
+        "$CHIRP_SUDO" mkdir -p "$CHIRP_BIN_DIR"
+        "$CHIRP_SUDO" ln -sfn "$CHIRP_APPIMAGE" "$CHIRP_LINK"
+    fi
+    chirp_artifact_valid "$CHIRP_APPIMAGE" && [ "$(chirp_command_state)" = canonical ] || {
+        cc_error 'AppImage deployment did not validate; legacy pipx CHIRP was preserved.'; return 1;
+    }
+    while IFS= read -r entry; do
+        [ -n "$entry" ] && [ "$entry" != "$CHIRP_LAUNCHER" ] && "$CHIRP_SUDO" rm -f "$entry"
+    done < <(chirp_launchers)
+    chirp_remove_pipx
+    echo "CHIRP $ACTION complete; preserved user data: $CHIRP_USER_DATA"
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h) usage; exit 0 ;;
+        --version) cc_version; exit 0 ;;
+        status|install|repair|update) ACTION="$1" ;;
+        --dry-run) APPLY=0 ;;
+        --apply) APPLY=1 ;;
+        *) cc_error "Unknown chirp argument: $1"; usage >&2; exit 2 ;;
+    esac
+    shift
+done
+
+if [ "$ACTION" = status ]; then chirp_status; elif [ "$APPLY" -eq 0 ]; then chirp_preview; else chirp_apply; fi

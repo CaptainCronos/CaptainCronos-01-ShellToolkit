@@ -44,7 +44,7 @@ cc_infer_category() {
         verify|doctor) echo "Diagnostics" ;;
         drives|smart) echo "Storage" ;;
         kernel|kernel-cleanup) echo "Maintenance" ;;
-        desktop-reload|dev-update|mozilla|system-update|update|monthly-health|monthly-health-timer|maintenance|reports) echo "Maintenance" ;;
+        chirp|desktop-reload|dev-update|mozilla|system-update|update|monthly-health|monthly-health-timer|maintenance|reports) echo "Maintenance" ;;
         *) echo "General" ;;
     esac
 }
@@ -98,6 +98,7 @@ asset|namespace|cc asset <subcommand> [arguments]|Manage local lifecycle asset i
 audit|namespace-with-switches|cc audit [summary|commands] [switches]; cc audit fix [switches]|Audit command consistency and optionally repair managed command metadata.|namespace
 baseline|flat-no-switches|cc baseline|Capture operating-system baseline shell files.|none
 capability|namespace|cc capability [list|check NAME]|Resolve core, program, and plugin-provided capabilities.|namespace
+chirp|namespace-with-switches|cc chirp [status|install|repair|update] [switches]|Deploy and maintain the official CHIRP-next AppImage.|namespace
 config|namespace|cc config <subcommand> [arguments]|Read or update toolkit configuration.|namespace
 defaults|flat-no-switches|cc defaults|Promote active shell files into defaults/v1.|none
 deps|namespace|cc deps [subcommand] [arguments]|Show dependency status by command or profile.|namespace
@@ -154,6 +155,14 @@ audit/summary|--strict|0|Require executable bits plus Category and Requires head
 audit/commands|--strict|0|Require executable bits plus Category and Requires headers.
 audit/fix|--apply|0|Repair managed command metadata and executable bits; omission is preview-only. [default: preview]
 config/migrate|--apply|0|Back up and atomically add the current schema marker; omission is preview-only. [default: preview]
+chirp|--dry-run|0|Preview CHIRP AppImage deployment changes without mutation. [default]
+chirp|--apply|0|Authorize staged AppImage deployment, launcher/icon repair, and safe pipx CHIRP migration.
+chirp/install|--dry-run|0|Preview official CHIRP-next AppImage installation without mutation. [default]
+chirp/install|--apply|0|Authorize staged installation after passive validation.
+chirp/repair|--dry-run|0|Preview canonical CHIRP link, icon, and launcher repair without mutation. [default]
+chirp/repair|--apply|0|Authorize canonical repair and safe pipx CHIRP migration.
+chirp/update|--dry-run|0|Compare and preview staged official CHIRP-next replacement without mutation. [default]
+chirp/update|--apply|0|Authorize staged, validated AppImage replacement.
 dev-update|--dry-run|0|Report supported update operations without mutation. [default]
 dev-update|--apply|0|Authorize only the developer ecosystem updates implemented as mutable.
 dev-update|--status-only|0|Report manager availability and policy without running update commands.
@@ -287,6 +296,10 @@ audit|commands|Show per-command audit detail.|audit/commands
 audit|fix|Preview or apply managed audit repairs.|audit/fix
 capability|list|List resolved core, program, and plugin capabilities.|capability/list
 capability|check|Resolve one named capability and its semantic state.|capability/check
+chirp|status|Inspect CHIRP AppImage, links, launcher, icon, pipx conflict, and user data.|chirp/status
+chirp|install|Preview or install the official CHIRP-next AppImage.|chirp/install
+chirp|repair|Preview or normalize the canonical CHIRP deployment.|chirp/repair
+chirp|update|Compare and safely replace with the current official CHIRP-next release.|chirp/update
 config|show|Show redacted configuration layers and their sources.|config/show
 config|status|Show configuration ownership, schema, identity, and health.|config/status
 config|validate|Validate configuration without writing.|config/validate
