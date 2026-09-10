@@ -6,7 +6,7 @@
 # Script      : chirp
 # Version     : reads VERSION
 # Category    : Maintenance
-# Requires    : bash find awk sed grep file sha256sum od stat tr
+# Requires    : bash find awk sed grep file sha256sum od stat tr date
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Deploy and safely migrate CHIRP-next to the official AppImage.
 # ==============================================================================
@@ -31,6 +31,8 @@ CHIRP_PIPX_HOME="${CC_CHIRP_PIPX_HOME:-$HOME/.local/pipx}"
 CHIRP_PIPX_BIN="${CC_CHIRP_PIPX_BIN:-$HOME/.local/bin/chirp}"
 CHIRP_SUDO="${CC_CHIRP_SUDO:-sudo}"
 CHIRP_MIN_SIZE="${CC_CHIRP_MIN_SIZE:-1048576}"
+CHIRP_DISCOVERY_DAYS="${CC_CHIRP_DISCOVERY_DAYS:-35}"
+CHIRP_ARCHIVE_BASE="${CC_CHIRP_ARCHIVE_BASE:-https://archive.chirpmyradio.com/chirp_next}"
 
 usage() {
     cat <<'EOF_HELP'
@@ -64,13 +66,13 @@ chirp_artifact_valid() {
 
 chirp_release_from_artifact() {
     local artifact="$1" release
-    release="$(LC_ALL=C grep -aom1 -E 'chirp-next-[0-9]{8}' "$artifact" 2>/dev/null || true)"
+    release="$(LC_ALL=C grep -aEiom1 'chirp-next-[0-9]{8}|next-[0-9]{8}' "$artifact" 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -oE 'next-[0-9]{8}' || true)"
     [ -n "$release" ] && printf '%s\n' "$release" || printf 'unknown\n'
 }
 
 chirp_release_matches() {
     local installed="$1" available="$2"
-    [ "${installed#chirp-}" = "$available" ]
+    [ "${installed#chirp-}" = "${available#chirp-}" ]
 }
 
 chirp_launchers() {
@@ -114,19 +116,34 @@ chirp_status() {
     fi
 }
 
+chirp_architecture() {
+    case "$(uname -m)" in
+        x86_64|amd64) printf 'x86_64\n' ;;
+        aarch64|arm64) printf 'aarch64\n' ;;
+        *) cc_error "Unsupported CHIRP architecture: $(uname -m)"; return 1 ;;
+    esac
+}
+
 chirp_release_info() {
-    local index version arch url
+    local version arch url day stamp
     if [ -n "${CC_CHIRP_DOWNLOAD_URL:-}" ]; then
         printf '%s\t%s\n' "${CC_CHIRP_RELEASE_VERSION:-override}" "$CC_CHIRP_DOWNLOAD_URL"
         return
     fi
     command -v curl >/dev/null 2>&1 || { cc_error 'Release discovery requires curl.'; return 1; }
-    index="$(curl --fail --location --proto '=https' --tlsv1.2 --silent --show-error https://archive.chirpmyradio.com/chirp_next/)" || return
-    version="$(printf '%s\n' "$index" | grep -aoE 'next-[0-9]{8}' | LC_ALL=C sort -u | tail -n 1)"
-    [ -n "$version" ] || { cc_error 'Could not discover a current official CHIRP-next release.'; return 1; }
-    case "$(uname -m)" in x86_64|amd64) arch=x86_64 ;; aarch64|arm64) arch=aarch64 ;; *) cc_error "Unsupported CHIRP architecture: $(uname -m)"; return 1 ;; esac
-    url="https://archive.chirpmyradio.com/chirp_next/$version/chirp-$version-$arch.AppImage"
-    printf '%s\t%s\n' "$version" "$url"
+    command -v date >/dev/null 2>&1 || { cc_error 'Release discovery requires date.'; return 1; }
+    arch="$(chirp_architecture)" || return
+    for ((day=0; day<=CHIRP_DISCOVERY_DAYS; day++)); do
+        stamp="$(date -u -d "$day days ago" +%Y%m%d)" || return
+        version="next-$stamp"
+        url="$CHIRP_ARCHIVE_BASE/$version/Chirp-$version-$arch.AppImage"
+        if curl --fail --location --proto '=https' --tlsv1.2 --silent --show-error --head --output /dev/null "$url" 2>/dev/null; then
+            printf '%s\t%s\n' "$version" "$url"
+            return
+        fi
+    done
+    cc_error "Could not discover a current official CHIRP-next AppImage within the last $CHIRP_DISCOVERY_DAYS days."
+    return 1
 }
 
 chirp_extract_icon() {
