@@ -11,7 +11,7 @@ mkdir -p "$TEST_DIR/bin" "$TEST_DIR/opt/chirp" "$TEST_DIR/apps" "$TEST_DIR/user-
 printf '\177ELFCHIRP chirp-next-20260904' >"$TEST_DIR/download.AppImage"
 chmod 755 "$TEST_DIR/download.AppImage"
 printf '<svg xmlns="http://www.w3.org/2000/svg"/>\n' >"$TEST_DIR/icon.svg"
-printf '#!/usr/bin/env bash\nwhile [ "$#" -gt 0 ]; do\n  if [ "$1" = --output ]; then cp "${CC_CHIRP_TEST_DOWNLOAD:?}" "$2"; exit 0; fi\n  shift\ndone\nexit 1\n' >"$TEST_DIR/bin/curl"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"${CC_CHIRP_CURL_TRACE:?}"\n[ "${CC_CHIRP_TEST_CURL_FAIL:-0}" = 0 ] || exit 22\nwhile [ "$#" -gt 0 ]; do\n  if [ "$1" = --output ]; then cp "${CC_CHIRP_TEST_DOWNLOAD:?}" "$2"; exit 0; fi\n  shift\ndone\nexit 1\n' >"$TEST_DIR/bin/curl"
 printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"${CC_CHIRP_PIPX_TRACE:?}"\nrm -rf "${CC_CHIRP_TEST_PIPX_VENV:?}"\n' >"$TEST_DIR/bin/pipx"
 chmod 755 "$TEST_DIR/bin/curl" "$TEST_DIR/bin/pipx"
 printf legacy >"$TEST_DIR/home/.local/bin/chirp"
@@ -25,7 +25,7 @@ run_chirp() {
       CC_CHIRP_APPLICATIONS_DIR="$TEST_DIR/apps" CC_CHIRP_USER_APPLICATIONS_DIR="$TEST_DIR/user-apps" \
       CC_CHIRP_ICON="$TEST_DIR/icons/chirp.svg" CC_CHIRP_SUDO=env CC_CHIRP_MIN_SIZE=1 \
       CC_CHIRP_DOWNLOAD_URL="https://fixture.invalid/Chirp-next.AppImage" CC_CHIRP_TEST_DOWNLOAD="$TEST_DIR/download.AppImage" CC_CHIRP_RELEASE_VERSION=next-20260904 \
-      CC_CHIRP_ICON_SOURCE="$TEST_DIR/icon.svg" CC_CHIRP_PIPX_TRACE="$TEST_DIR/pipx.trace" CC_CHIRP_TEST_PIPX_VENV="$TEST_DIR/home/.local/pipx/venvs/chirp" \
+      CC_CHIRP_ICON_SOURCE="$TEST_DIR/icon.svg" CC_CHIRP_PIPX_TRACE="$TEST_DIR/pipx.trace" CC_CHIRP_CURL_TRACE="$TEST_DIR/curl.trace" CC_CHIRP_TEST_PIPX_VENV="$TEST_DIR/home/.local/pipx/venvs/chirp" \
       bash "$PROJECT_ROOT/tools/cc" chirp "$@"
 }
 
@@ -58,6 +58,36 @@ run_chirp repair --apply >"$TEST_DIR/repair"
 
 run_chirp update >"$TEST_DIR/update-preview"
 contains "$TEST_DIR/update-preview" 'comparison: installed chirp-next-20260904 is current' 'update did not compare installed and official releases'
+
+: >"$TEST_DIR/curl.trace"
+run_chirp update 20260904 >"$TEST_DIR/explicit-update-preview"
+contains "$TEST_DIR/explicit-update-preview" 'official release: next-20260904' 'explicit update did not select requested release'
+contains "$TEST_DIR/explicit-update-preview" 'https://archive.chirpmyradio.com/chirp_next/next-20260904/Chirp-next-20260904-x86_64.AppImage' 'explicit update did not construct exact official URL'
+[ ! -s "$TEST_DIR/curl.trace" ] || fail 'explicit update performed automatic discovery'
+[ -f "$TEST_DIR/home/saved-radio.img" ] || fail 'explicit update removed externally saved radio image'
+[ -f "$TEST_DIR/home/saved-radio.csv" ] || fail 'explicit update removed externally saved radio CSV'
+
+run_chirp install 20240229 >"$TEST_DIR/leap-preview"
+contains "$TEST_DIR/leap-preview" 'official release: next-20240229' 'valid leap date was rejected'
+
+if run_chirp install 20260230 >"$TEST_DIR/invalid-date" 2>&1; then fail 'invalid calendar date succeeded'; fi
+contains "$TEST_DIR/invalid-date" 'Invalid CHIRP release date' 'invalid calendar date did not explain failure'
+if run_chirp update abc >"$TEST_DIR/malformed-date" 2>&1; then fail 'malformed date succeeded'; fi
+contains "$TEST_DIR/malformed-date" 'Invalid CHIRP release date' 'malformed date did not explain failure'
+if run_chirp status 20260904 >"$TEST_DIR/status-date" 2>&1; then fail 'status accepted a date'; fi
+contains "$TEST_DIR/status-date" 'valid only with install or update' 'status date rejection was unclear'
+if run_chirp repair 20260904 >"$TEST_DIR/repair-date" 2>&1; then fail 'repair accepted a date'; fi
+contains "$TEST_DIR/repair-date" 'valid only with install or update' 'repair date rejection was unclear'
+
+before_explicit_dry_run="$(sha256sum "$TEST_DIR/opt/chirp/Chirp.AppImage")"
+run_chirp install 20260904 >"$TEST_DIR/explicit-install-preview"
+[ "$(sha256sum "$TEST_DIR/opt/chirp/Chirp.AppImage")" = "$before_explicit_dry_run" ] || fail 'explicit-date dry run changed deployment'
+
+if CC_CHIRP_TEST_CURL_FAIL=1 run_chirp install 20260904 --apply >"$TEST_DIR/failed-explicit-download" 2>&1; then fail 'failed explicit-date download succeeded'; fi
+[ "$(sha256sum "$TEST_DIR/opt/chirp/Chirp.AppImage")" = "$before_explicit_dry_run" ] || fail 'failed explicit-date download changed deployment'
+[ -d "$TEST_DIR/home/.chirp" ] || fail 'explicit-date paths removed user data'
+[ -f "$TEST_DIR/home/saved-radio.img" ] || fail 'explicit-date paths removed externally saved radio image'
+[ -f "$TEST_DIR/home/saved-radio.csv" ] || fail 'explicit-date paths removed externally saved radio CSV'
 
 run_chirp status >"$TEST_DIR/status"
 contains "$TEST_DIR/status" 'AppImage:  installed' 'status did not report AppImage'

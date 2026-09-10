@@ -208,7 +208,11 @@ Discovery:
 
 ~~~text
 Usage:
-  cc chirp [status|install|repair|update] [--dry-run|--apply]
+  cc chirp [status|install|repair|update] [YYYYMMDD] [--dry-run|--apply]
+
+  YYYYMMDD is accepted only with install or update and selects that exact
+  official CHIRP-next release. Without a date, install and update discover
+  the current release from the official archive index.
 
 Deploys the official CHIRP-next AppImage as /opt/chirp/Chirp.AppImage. Install,
 repair, and update are previews by default; persistent changes require --apply.

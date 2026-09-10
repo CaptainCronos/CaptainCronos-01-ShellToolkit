@@ -18,6 +18,7 @@ source "$PROJECT_ROOT/lib/cc-common.sh"
 
 ACTION=status
 APPLY=0
+RELEASE_DATE=
 CHIRP_DIR="${CC_CHIRP_DIR:-/opt/chirp}"
 CHIRP_APPIMAGE="${CC_CHIRP_APPIMAGE:-$CHIRP_DIR/Chirp.AppImage}"
 CHIRP_BIN_DIR="${CC_CHIRP_BIN_DIR:-/usr/local/bin}"
@@ -35,7 +36,11 @@ CHIRP_MIN_SIZE="${CC_CHIRP_MIN_SIZE:-1048576}"
 usage() {
     cat <<'EOF_HELP'
 Usage:
-  cc chirp [status|install|repair|update] [--dry-run|--apply]
+  cc chirp [status|install|repair|update] [YYYYMMDD] [--dry-run|--apply]
+
+  YYYYMMDD is accepted only with install or update and selects that exact
+  official CHIRP-next release. Without a date, install and update discover
+  the current release from the official archive index.
 
 Deploys the official CHIRP-next AppImage as /opt/chirp/Chirp.AppImage. Install,
 repair, and update are previews by default; persistent changes require --apply.
@@ -71,6 +76,33 @@ chirp_release_from_artifact() {
 chirp_release_matches() {
     local installed="$1" available="$2"
     [ "${installed#chirp-}" = "$available" ]
+}
+
+chirp_release_date_valid() {
+    local date="$1" year month day max_day leap
+    [[ "$date" =~ ^[0-9]{8}$ ]] || return 1
+    year=$((10#${date:0:4}))
+    month=$((10#${date:4:2}))
+    day=$((10#${date:6:2}))
+    [ "$year" -ge 1 ] && [ "$month" -ge 1 ] && [ "$month" -le 12 ] || return 1
+    case "$month" in
+        1|3|5|7|8|10|12) max_day=31 ;;
+        4|6|9|11) max_day=30 ;;
+        2)
+            leap=0
+            if (( year % 400 == 0 || (year % 4 == 0 && year % 100 != 0) )); then leap=1; fi
+            max_day=$((28 + leap))
+            ;;
+    esac
+    [ "$day" -ge 1 ] && [ "$day" -le "$max_day" ]
+}
+
+chirp_architecture() {
+    case "$(uname -m)" in
+        x86_64|amd64) printf 'x86_64\n' ;;
+        aarch64|arm64) printf 'aarch64\n' ;;
+        *) cc_error "Unsupported CHIRP architecture: $(uname -m)"; return 1 ;;
+    esac
 }
 
 chirp_launchers() {
@@ -116,6 +148,13 @@ chirp_status() {
 
 chirp_release_info() {
     local index version arch url
+    if [ -n "$RELEASE_DATE" ]; then
+        arch="$(chirp_architecture)" || return
+        version="next-$RELEASE_DATE"
+        url="https://archive.chirpmyradio.com/chirp_next/$version/Chirp-$version-$arch.AppImage"
+        printf '%s\t%s\n' "$version" "$url"
+        return
+    fi
     if [ -n "${CC_CHIRP_DOWNLOAD_URL:-}" ]; then
         printf '%s\t%s\n' "${CC_CHIRP_RELEASE_VERSION:-override}" "$CC_CHIRP_DOWNLOAD_URL"
         return
@@ -124,8 +163,8 @@ chirp_release_info() {
     index="$(curl --fail --location --proto '=https' --tlsv1.2 --silent --show-error https://archive.chirpmyradio.com/chirp_next/)" || return
     version="$(printf '%s\n' "$index" | grep -aoE 'next-[0-9]{8}' | LC_ALL=C sort -u | tail -n 1)"
     [ -n "$version" ] || { cc_error 'Could not discover a current official CHIRP-next release.'; return 1; }
-    case "$(uname -m)" in x86_64|amd64) arch=x86_64 ;; aarch64|arm64) arch=aarch64 ;; *) cc_error "Unsupported CHIRP architecture: $(uname -m)"; return 1 ;; esac
-    url="https://archive.chirpmyradio.com/chirp_next/$version/chirp-$version-$arch.AppImage"
+    arch="$(chirp_architecture)" || return
+    url="https://archive.chirpmyradio.com/chirp_next/$version/Chirp-$version-$arch.AppImage"
     printf '%s\t%s\n' "$version" "$url"
 }
 
@@ -258,9 +297,24 @@ while [ "$#" -gt 0 ]; do
         status|install|repair|update) ACTION="$1" ;;
         --dry-run) APPLY=0 ;;
         --apply) APPLY=1 ;;
-        *) cc_error "Unknown chirp argument: $1"; usage >&2; exit 2 ;;
+        *)
+            if [ -n "$RELEASE_DATE" ]; then
+                cc_error "Unknown chirp argument: $1"; usage >&2; exit 2
+            fi
+            RELEASE_DATE="$1"
+            ;;
     esac
     shift
 done
+
+if [ -n "$RELEASE_DATE" ]; then
+    if [ "$ACTION" != install ] && [ "$ACTION" != update ]; then
+        cc_error 'A CHIRP release date is valid only with install or update.'; usage >&2; exit 2
+    fi
+    if ! chirp_release_date_valid "$RELEASE_DATE"; then
+        cc_error "Invalid CHIRP release date: $RELEASE_DATE (expected a valid YYYYMMDD Gregorian date)."
+        exit 2
+    fi
+fi
 
 if [ "$ACTION" = status ]; then chirp_status; elif [ "$APPLY" -eq 0 ]; then chirp_preview; else chirp_apply; fi
