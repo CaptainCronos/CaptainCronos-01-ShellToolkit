@@ -13,7 +13,6 @@
 
 set -euo pipefail
 
-ORIGINAL_PWD="${PWD:-$(pwd)}"
 TOOLKIT_ROOT="${TOOLKIT_ROOT:-${PROJECT_ROOT:-}}"
 if [ -z "$TOOLKIT_ROOT" ]; then
     TOOLKIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -22,13 +21,13 @@ fi
 cd "$TOOLKIT_ROOT"
 source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
-cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
+cc_context_init "$TOOLKIT_ROOT" "$TOOLKIT_ROOT"
 
 case "${1:-}" in
     --help|-h)
         echo "Usage: cc repo"
         echo
-        echo "Shows the repository path, current branch, and origin remote."
+        echo "Shows the toolkit repository path, current branch, and origin remote."
         exit 0
         ;;
     --version)
@@ -39,9 +38,9 @@ esac
 [ "$#" -eq 0 ] || { echo "Usage: cc repo" >&2; exit 2; }
 
 cc_banner
-REPO_ROOT="$(cc_current_repo)"
+REPO_ROOT="$TOOLKIT_ROOT"
 if ! cc_repo_is_git "$REPO_ROOT"; then
-    cc_error "Not a Git repository: $REPO_ROOT"
+    cc_error "Toolkit root is not a Git repository: $REPO_ROOT"
     exit 1
 fi
 printf '%-14s %s\n' "Repository:" "$REPO_ROOT"
