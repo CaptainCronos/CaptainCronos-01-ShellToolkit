@@ -297,9 +297,16 @@ Status: **Complete**
 - Cleanup candidates isolated as maintenance opportunities.
 - Fixture proof that consumers do not parse kernel CLI output or expose mutation.
 
-Recommended next kernel phase: expand read-only native artifact/package
-correlation for one non-Debian family, beginning with RPM release instances,
-before considering any additional cleanup adapter.
+### Non-Debian Kernel Correlation
+
+Status: **Deferred — no current operational requirement**
+
+Read-only native artifact/package correlation for RPM release instances was the
+recommended next kernel expansion. It is intentionally deferred because the
+currently administered systems do not normally use RPM-based package families.
+The existing platform abstraction remains in place so RPM-family correlation can
+be added later if an operational requirement appears. No additional RPM cleanup
+or mutation adapter is planned while this item is deferred.
 
 Completed in active development:
 
