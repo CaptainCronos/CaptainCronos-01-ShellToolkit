@@ -42,7 +42,7 @@ Toolkit version: 1.3.0-beta2 (Blackbeard)
 | cc prompt | interactive | 1.3.0-beta2 | Run dynamic Prompt Engine templates. |
 | cc registry | namespace | 1.3.0-beta2 | Display command metadata registry information. |
 | cc release | namespace-with-switches | 1.3.0-beta2 | Plan and run the toolkit release workflow. |
-| cc repo | flat-no-switches | 1.3.0-beta2 | Show repository path and Git remote information. |
+| cc repo | flat-no-switches | 1.3.0-beta2 | Show the toolkit repository path and Git remote information. |
 | cc reports | namespace-with-switches | 1.3.0-beta2 | Inspect and conservatively prune persistent report history. |
 | cc repos | namespace-with-switches | 1.3.0-beta2 | Inventory and manage local Git repositories. |
 | cc roadmap | flat-no-switches | 1.3.0-beta2 | Show the canonical project roadmap from ROADMAP.md. |

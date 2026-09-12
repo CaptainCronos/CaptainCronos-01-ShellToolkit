@@ -131,7 +131,7 @@ programs|namespace|cc programs [subcommand] [arguments]|Report configured semant
 prompt|interactive|cc prompt [TEMPLATE]|Run the interactive, metadata-discovered prompt engine.|any
 registry|namespace|cc registry [table|tsv|markdown]|Show the command header metadata registry.|namespace
 release|namespace-with-switches|cc release [subcommand] [switches]|Plan or check the release workflow.|namespace
-repo|flat-no-switches|cc repo|Show the current repository path, branch, and origin.|none
+repo|flat-no-switches|cc repo|Show the toolkit repository path, branch, and origin.|none
 repos|namespace-with-switches|cc repos [subcommand] [switches]|Inventory or conservatively manage local Git repositories.|namespace
 reports|namespace-with-switches|cc reports [subcommand] [switches]|Inspect and conservatively prune persistent report history.|namespace
 roadmap|flat-no-switches|cc roadmap [markdown]|Show the canonical project roadmap.|any

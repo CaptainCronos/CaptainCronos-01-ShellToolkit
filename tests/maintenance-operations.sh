@@ -34,8 +34,14 @@ run_cc_in() {
     (cd "$repo" && CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT" bash "$PROJECT_ROOT/tools/cc" "$@")
 }
 
-# Current-repository commands distinguish clean, dirty, detached, missing-origin,
-# and non-repository contexts without contacting a remote.
+# `cc status` remains caller-repository oriented. `cc repo` instead reports the
+# active toolkit checkout, regardless of the caller's repository or PWD.
+run_cc_with_toolkit_in() {
+    local toolkit_root="$1" repo="$2"
+    shift 2
+    (cd "$repo" && CAPTAIN_CRONOS_TOOLKIT_ROOT="$toolkit_root" bash "$toolkit_root/tools/cc" "$@")
+}
+
 state_root="$TEST_DIR/state"
 mkdir -p "$state_root"
 init_repo "$state_root/repo"
@@ -45,15 +51,27 @@ printf 'dirty\n' >>"$state_root/repo/README.md"
 run_cc_in "$state_root/repo" status >"$TEST_DIR/status-dirty"
 assert_contains "$TEST_DIR/status-dirty" ' M README.md' "cc status did not report a dirty repository"
 git -C "$state_root/repo" restore README.md
-git -C "$state_root/repo" switch -q --detach
-run_cc_in "$state_root/repo" repo >"$TEST_DIR/repo-detached"
+
+# Make the active toolkit root, rather than the arbitrary caller fixture,
+# detached. This preserves the detached-HEAD display contract for `cc repo`.
+toolkit_fixture="$TEST_DIR/toolkit-root"
+cp -a "$PROJECT_ROOT/." "$toolkit_fixture"
+rm -rf "$toolkit_fixture/.git"
+git init -q -b main "$toolkit_fixture"
+git -C "$toolkit_fixture" config user.name "Maintenance Fixture"
+git -C "$toolkit_fixture" config user.email "maintenance@example.invalid"
+git -C "$toolkit_fixture" add -A
+git -C "$toolkit_fixture" commit -qm "test: initialize toolkit fixture"
+git -C "$toolkit_fixture" switch -q --detach
+run_cc_with_toolkit_in "$toolkit_fixture" "$state_root/repo" repo >"$TEST_DIR/repo-detached"
+assert_contains "$TEST_DIR/repo-detached" "Repository:    $toolkit_fixture" \
+    "cc repo did not report TOOLKIT_ROOT"
 assert_contains "$TEST_DIR/repo-detached" 'detached at ' "cc repo did not identify detached HEAD"
 assert_contains "$TEST_DIR/repo-detached" 'Origin:        none' "cc repo did not report a missing origin"
 mkdir -p "$state_root/not-git"
-if run_cc_in "$state_root/not-git" repo >"$TEST_DIR/repo-invalid" 2>&1; then
-    fail "cc repo accepted a non-Git directory"
-fi
-assert_contains "$TEST_DIR/repo-invalid" 'Not a Git repository' "cc repo did not explain invalid repository context"
+run_cc_with_toolkit_in "$toolkit_fixture" "$state_root/not-git" repo >"$TEST_DIR/repo-non-git"
+assert_contains "$TEST_DIR/repo-non-git" "Repository:    $toolkit_fixture" \
+    "cc repo used a non-Git caller directory instead of TOOLKIT_ROOT"
 
 # Cached ahead/behind state is accurate and explicitly identified as not
 # refreshed. The read-only dashboard leaves refs and FETCH_HEAD unchanged.

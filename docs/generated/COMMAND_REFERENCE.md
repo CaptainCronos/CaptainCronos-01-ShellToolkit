@@ -1496,7 +1496,7 @@ Discovery:
 ~~~text
 Usage: cc repo
 
-Shows the repository path, current branch, and origin remote.
+Shows the toolkit repository path, current branch, and origin remote.
 ~~~
 
 ### Switch discovery
@@ -1507,7 +1507,7 @@ Command: cc repo
 Usage:
   cc repo
 
-Show the current repository path, branch, and origin.
+Show the toolkit repository path, branch, and origin.
 
 Switches:
   No command-specific switches.

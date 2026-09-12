@@ -8,7 +8,7 @@
 # Category    : Repository
 # Requires    : bash git
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Show repository path and Git remote information.
+# Purpose     : Show the toolkit repository path and Git remote information.
 # ==============================================================================
 
 set -euo pipefail
