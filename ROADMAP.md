@@ -330,11 +330,11 @@ Status: **Complete**
 
 ### Component 3 — Shared Table Formatter
 
-Status: **Next**
+Status: **Complete**
 
 ### Component 4 — Progress / Spinner Framework
 
-Status: **Planned**
+Status: **Next**
 
 ### Component 5 — Unicode / ASCII Abstraction
 

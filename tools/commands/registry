@@ -60,8 +60,7 @@ case "$MODE" in
     table)
         cc_banner
         echo
-        printf '%-24s %-18s %-18s %s\n' "Command" "Version" "Category" "Purpose"
-        printf '%-24s %-18s %-18s %s\n' "-------" "-------" "--------" "-------"
+        cc_table_header '%-24s %-18s %-18s %s\n' "Command" "Version" "Category" "Purpose"
         cc_registry_tsv | while IFS=$'\t' read -r cmd script version category requires repository purpose; do
             printf '%-24s %-18s %-18s %s\n' "cc $cmd" "$version" "$category" "$purpose"
         done

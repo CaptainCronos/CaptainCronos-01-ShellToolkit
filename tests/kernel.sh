@@ -185,6 +185,8 @@ assert_contains "$status_output" 'Running kernel:' 'status omitted running kerne
 assert_contains "$status_output" 'Cleanup candidates:' 'status omitted candidate count'
 : > "$DPKG_LOG"
 list_output="$(PATH="$BIN_DIR:$PATH" KEEP_COUNT=2 bash "$PROJECT_ROOT/tools/commands/kernel" list)"
+assert_contains "$list_output" "$(printf '%-32s %-28s %-10s %s' Release Protection 'APT mark' Mapping)" 'list header changed unexpectedly'
+assert_contains "$list_output" "$(printf '%-32s %-28s %-10s %s' ------- ---------- -------- -------)" 'list separator changed unexpectedly'
 assert_contains "$list_output" 'RUNNING' 'list omitted running protection'
 assert_contains "$list_output" 'PENDING' 'list omitted pending-kernel protection'
 assert_contains "$list_output" 'CANDIDATE' 'list omitted candidate classification'

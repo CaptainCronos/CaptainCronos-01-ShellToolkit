@@ -162,8 +162,7 @@ cc_banner
 echo
 echo "Drive SMART Summary"
 echo "-------------------"
-printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s\n' "Device" "Type" "Health" "Test" "Temp" "Hours" "Life"
-printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s\n' "------" "----" "------" "----" "----" "-----" "----"
+cc_table_header '%-12s %-6s %-8s %-8s %-8s %-10s %-8s\n' "Device" "Type" "Health" "Test" "Temp" "Hours" "Life"
 
 while read -r name type; do
     [ "$type" = "disk" ] || continue

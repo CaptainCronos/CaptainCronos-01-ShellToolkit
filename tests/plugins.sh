@@ -327,6 +327,9 @@ mkdir -p "$public_host/plugins"; chmod 700 "$public_home" "$public_home/.captain
 make_plugin "$public_host/plugins" public-plugin public-cap
 fingerprint() { find "$public_home" -mindepth 1 -printf '%P|%y|%m|%s|%T@|%l\n' | LC_ALL=C sort; }
 fingerprint > "$TEST_DIR/before"
+plugin_output="$(env HOME="$public_home" CC_HOME="$public_home/.captaincronos" CC_HOST_HOME="$public_host" NO_COLOR=1 TERM=dumb CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT" bash "$PROJECT_ROOT/tools/cc" plugin)" || fail 'public plugin command failed'
+assert_contains "$plugin_output" "$(printf '%-24s %-6s %-12s %-10s %s' Plugin State Version Origin Provides)" 'plugin table header changed unexpectedly'
+assert_contains "$plugin_output" "$(printf '%-24s %-6s %-12s %-10s %s' ------ ----- ------- ------ --------)" 'plugin table separator changed unexpectedly'
 for spec in 'plugin' 'plugin list' 'plugin status' 'capability' 'capability list' 'capability check public-cap' 'plugin --help' 'capability --help' 'plugin switches' 'capability switches'; do
     read -r -a args <<< "$spec"
     output="$(env HOME="$public_home" CC_HOME="$public_home/.captaincronos" CC_HOST_HOME="$public_host" NO_COLOR=1 TERM=dumb CAPTAIN_CRONOS_TOOLKIT_ROOT="$PROJECT_ROOT" bash "$PROJECT_ROOT/tools/cc" "${args[@]}")" \

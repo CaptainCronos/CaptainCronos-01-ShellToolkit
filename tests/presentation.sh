@@ -67,7 +67,8 @@ subsection="$(cc_subsection 'Dependency Check')"
 
 section_file="$(mktemp)"
 divider_file="$(mktemp)"
-trap 'rm -f "$section_file" "$divider_file"' EXIT
+table_file="$(mktemp)"
+trap 'rm -f "$section_file" "$divider_file" "$table_file"' EXIT
 cc_divider >"$divider_file"
 [ "$(<"$divider_file")" = '------------------------------------' ] ||
     fail 'default divider presentation changed unexpectedly'
@@ -145,6 +146,65 @@ section_color_never="$(TERM=dumb CC_COLOR_MODE=never cc_section 'Plain Title')"
 [ "$section_color_always" = "$section_color_never" ] || fail 'section output depended on color mode'
 case "$section_color_always" in
     *$'\033'*) fail 'section output contained ANSI color' ;;
+esac
+
+basic_table="$(cc_table_header '%-10s %-8s %s\n' 'Command' 'Version' 'Purpose')"
+[ "$basic_table" = $'Command    Version  Purpose\n-------    -------  -------' ] ||
+    fail 'basic table header presentation changed unexpectedly'
+table_bytes="$(cc_table_header '%-10s %-8s %s\n' 'Command' 'Version' 'Purpose'; printf x)"
+case "$table_bytes" in
+    *$'\n'x) ;;
+    *) fail 'table header did not terminate each row with the supplied newline' ;;
+esac
+
+one_column="$(cc_table_header '[%s]\n' 'Only column')"
+[ "$one_column" = $'[Only column]\n[-----------]' ] || fail 'one-column table header changed unexpectedly'
+empty_header="$(cc_table_header '<%s>\n' '')"
+[ "$empty_header" = $'<>\n<>' ] || fail 'empty table header changed unexpectedly'
+spaced_punctuation="$(cc_table_header '%s|%s\n' 'Build Status' 'Size (MiB):')"
+[ "$spaced_punctuation" = $'Build Status|Size (MiB):\n------------|-----------' ] ||
+    fail 'table header spaces or punctuation changed unexpectedly'
+long_header='A deliberately long table heading, with punctuation!'
+long_table="$(cc_table_header '%s\n' "$long_header")"
+long_separator="${long_table#*$'\n'}"
+[ "${#long_separator}" -eq "${#long_header}" ] || fail 'long table header separator length changed'
+[ "${long_separator//-/}" = '' ] || fail 'long table header separator character changed'
+
+fd_stdout="$(cc_table_header_fd 3 '%-8s %s\n' 'FD Name' 'State' 3>"$table_file")"
+[ -z "$fd_stdout" ] || fail 'table header FD output leaked to stdout'
+[ "$(<"$table_file")" = $'FD Name  State\n-------  -----' ] || fail 'table header FD output changed unexpectedly'
+
+table_color_always="$(unset NO_COLOR; TERM=xterm-256color CC_COLOR_MODE=always cc_table_header '%s\n' Plain)"
+table_color_never="$(TERM=dumb CC_COLOR_MODE=never cc_table_header '%s\n' Plain)"
+[ "$table_color_always" = "$table_color_never" ] || fail 'table output depended on color mode'
+case "$table_color_always" in
+    *$'\033'*) fail 'table output contained ANSI color' ;;
+esac
+
+for invalid_table_case in missing_format missing_headers missing_fd_headers invalid_fd unopened_fd; do
+    if case "$invalid_table_case" in
+        missing_format) cc_table_header >"$table_file" 2>&1 ;;
+        missing_headers) cc_table_header_fd 1 >"$table_file" 2>&1 ;;
+        missing_fd_headers) cc_table_header_fd 1 '%s\n' >"$table_file" 2>&1 ;;
+        invalid_fd) cc_table_header_fd invalid '%s\n' Header >"$table_file" 2>&1 ;;
+        unopened_fd) cc_table_header_fd 999 '%s\n' Header >"$table_file" 2>&1 ;;
+    esac; then
+        invalid_status=0
+    else
+        invalid_status=$?
+    fi
+    [ "$invalid_status" -eq 2 ] || fail "invalid table helper call returned the wrong status: $invalid_table_case"
+    [ ! -s "$table_file" ] || fail "invalid table helper call produced output: $invalid_table_case"
+done
+
+if cc_table_header '%' Header >"$table_file" 2>&1; then
+    fail 'invalid table printf format succeeded unexpectedly'
+fi
+
+registry_table="$(NO_COLOR=1 TERM=dumb bash "$PROJECT_ROOT/tools/cc" registry)"
+case "$registry_table" in
+    *$'Command                  Version            Category           Purpose\n-------                  -------            --------           -------'*) ;;
+    *) fail 'registry table header or separator changed unexpectedly' ;;
 esac
 
 cc_result_reset

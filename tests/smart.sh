@@ -66,6 +66,8 @@ EOF_SMARTCTL
 chmod 755 "$TEST_DIR/lsblk" "$TEST_DIR/smartctl"
 
 command_output="$(PATH="$TEST_DIR:$PATH" bash "$PROJECT_ROOT/tools/cc" smart)" || fail "cc smart failed with controlled SMART fixtures"
+printf '%s\n' "$command_output" | grep -Fxq "$(printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s' Device Type Health Test Temp Hours Life)" || fail "cc smart header changed unexpectedly"
+printf '%s\n' "$command_output" | grep -Fxq -- "$(printf '%-12s %-6s %-8s %-8s %-8s %-10s %-8s' ------ ---- ------ ---- ---- ----- ----)" || fail "cc smart separator changed unexpectedly"
 printf '%s\n' "$command_output" | grep -Eq '^sdb[[:space:]]+SSD[[:space:]]+PASSED[[:space:]]+UNKNOWN[[:space:]]+39C[[:space:]]+43599[[:space:]]+99%' || fail "cc smart Crucial row remained malformed"
 printf '%s\n' "$command_output" | grep -Eq '^sdc[[:space:]]+SSD[[:space:]]+PASSED[[:space:]]+UNKNOWN[[:space:]]+34C[[:space:]]+41325[[:space:]]+8%' || fail "cc smart SanDisk row remained malformed"
 if printf '%s\n' "$command_output" | grep -Eq '[0-9]+/[0-9]+\)C|0x[[:xdigit:]]+%'; then

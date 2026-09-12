@@ -51,8 +51,7 @@ esac
 
 plugin_table() {
     local id name state version provides origin path reason entrypoint found=0
-    printf '%-24s %-6s %-12s %-10s %s\n' Plugin State Version Origin Provides
-    printf '%-24s %-6s %-12s %-10s %s\n' ------ ----- ------- ------ --------
+    cc_table_header '%-24s %-6s %-12s %-10s %s\n' Plugin State Version Origin Provides
     while IFS=$'\t' read -r id name state version provides origin path reason entrypoint; do
         [ -n "$id" ] || continue
         found=1

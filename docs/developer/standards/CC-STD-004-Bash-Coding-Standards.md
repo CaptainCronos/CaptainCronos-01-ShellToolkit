@@ -51,13 +51,25 @@ cc_banner
 cc_section
 cc_subsection
 cc_divider
+cc_table_header
 ```
 
-`cc_section` and `cc_subsection` own labeled headings and their underlines.
-`cc_divider` owns unlabeled structural separation; use `cc_divider_fd` when
-that output must go to a non-stdout file descriptor. Table separators remain
-table formatting until the Shared Table Formatter component. New framework
-commands must not hand-build standalone horizontal rules.
+`cc_section` and `cc_subsection` own labeled structural headings and their
+underlines. `cc_divider` owns unlabeled structural separation; use
+`cc_divider_fd` when that output must go to a non-stdout file descriptor.
+
+`cc_table_header FORMAT HEADER...` owns fixed-width table header and generated
+separator rows; use `cc_table_header_fd FD FORMAT HEADER...` for alternate file
+descriptors. It preserves the supplied row format and derives one dash per
+header-label character, so new framework code must not maintain duplicate
+header/separator `printf` calls where this helper applies. Key/value displays
+are not tables and remain ordinary command-specific `printf` output. New
+framework commands must not hand-build standalone horizontal rules.
+
+Both helpers return `2` without output when required arguments are missing; the
+FD variant also returns `2` for a non-numeric or unopened descriptor. `FORMAT`
+is trusted toolkit code. Bash `printf` remains authoritative for format and
+conversion errors; this helper deliberately does not parse arbitrary formats.
 
 ---
 

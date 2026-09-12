@@ -195,6 +195,31 @@ cc_divider() {
     fi
 }
 
+cc_table_header_fd() {
+    [ "$#" -ge 3 ] || return 2
+    local fd="$1" format="$2" header separator
+    local -a separators=()
+    shift 2
+    [[ "$fd" =~ ^[0-9]+$ ]] || return 2
+    if ! { : >&"$fd"; } 2>/dev/null; then
+        return 2
+    fi
+    for header in "$@"; do
+        printf -v separator '%*s' "${#header}" ''
+        separators+=("${separator// /-}")
+    done
+    # FORMAT is a trusted toolkit format string; header cells remain data.
+    # shellcheck disable=SC2059
+    printf "$format" "$@" >&"$fd" || return
+    # shellcheck disable=SC2059
+    printf "$format" "${separators[@]}" >&"$fd"
+}
+
+cc_table_header() {
+    [ "$#" -ge 2 ] || return 2
+    cc_table_header_fd 1 "$@"
+}
+
 cc_banner() {
     cc_load_version
     echo "Captain Cronos Shell Toolkit"

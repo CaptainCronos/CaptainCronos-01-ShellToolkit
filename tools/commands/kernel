@@ -219,8 +219,7 @@ kernel_list() {
     cc_banner
     echo
     cc_subsection "Installed Kernels"
-    printf '%-32s %-28s %-10s %s\n' "Release" "Protection" "APT mark" "Mapping"
-    printf '%-32s %-28s %-10s %s\n' "-------" "----------" "--------" "-------"
+    cc_table_header '%-32s %-28s %-10s %s\n' "Release" "Protection" "APT mark" "Mapping"
     for kernel in "${kernels[@]}"; do
         state="$(_cc_kernel_classification "$kernel" "$keep_count")"
         [ "$state" = UNCLASSIFIED ] && state=INSTALLED
