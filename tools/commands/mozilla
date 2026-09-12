@@ -191,8 +191,7 @@ done
 
 if [ "$ACTION" = status ]; then
     cc_banner
-    echo 'Mozilla Deployment Status'
-    echo '========================='
+    cc_section 'Mozilla Deployment Status'
     while IFS= read -r product; do mozilla_status_product "$product"; done < <(mozilla_products)
     exit 0
 fi

@@ -112,8 +112,7 @@ kernel_status() {
     fi
     cleanup_detail="$(_cc_kernel_snapshot_get cleanup_candidate_count) eligible set(s)"
 
-    echo "Captain Cronos Kernel Status"
-    echo "============================"
+    cc_section "Captain Cronos Kernel Status"
     echo
     kernel_status_detail "Running kernel:" INFO "$running"
     kernel_status_detail "Running image package:" "$([ "$image_state" = present ] && printf PASS || printf FAIL)" "$image_state"
@@ -161,8 +160,7 @@ kernel_platform() {
     _cc_kernel_can_cleanup && cleanup_adapter="$(_cc_kernel_package_adapter)"
     cc_banner
     echo
-    echo "Kernel Platform"
-    echo "---------------"
+    cc_subsection "Kernel Platform"
     printf '%-28s %s\n' "Operating platform:" "$(_cc_kernel_os)"
     printf '%-28s %s\n' "Distribution family:" "$(_cc_kernel_distribution_family)"
     printf '%-28s %s\n' "Kernel package model:" "$(_cc_kernel_package_model)"
@@ -192,8 +190,7 @@ kernel_deps() {
     local provider interface score
     bash "$PROJECT_ROOT/tools/cc" deps kernel
     echo
-    echo "Detected initramfs providers"
-    echo "----------------------------"
+    cc_subsection "Detected initramfs providers"
     if _cc_kernel_supported; then
         for provider in initramfs-tools dracut mkinitcpio; do
             interface="$(_cc_kernel_provider_interface_name "$provider")"
@@ -221,8 +218,7 @@ kernel_list() {
 
     cc_banner
     echo
-    echo "Installed Kernels"
-    echo "-----------------"
+    cc_subsection "Installed Kernels"
     printf '%-32s %-28s %-10s %s\n' "Release" "Protection" "APT mark" "Mapping"
     printf '%-32s %-28s %-10s %s\n' "-------" "----------" "--------" "-------"
     for kernel in "${kernels[@]}"; do
@@ -241,8 +237,7 @@ kernel_artifacts() {
     kernel_prepare_inventory || return
     cc_banner
     echo
-    echo "Kernel Boot Artifacts"
-    echo "---------------------"
+    cc_subsection "Kernel Boot Artifacts"
     printf '%-28s %-6s %-9s %-10s %-6s %-9s %-10s %-10s %-24s %s\n' \
         "Release" "Kernel" "Initramfs" "System.map" "Config" "Package" "Ownership" "Health" "Classification" "Size"
     printf '%-28s %-6s %-9s %-10s %-6s %-9s %-10s %-10s %-24s %s\n' \
@@ -275,8 +270,7 @@ kernel_health() {
     severity="$(_cc_kernel_snapshot_get health_status)"
     cc_banner
     echo
-    echo "Kernel Boot Health"
-    echo "------------------"
+    cc_subsection "Kernel Boot Health"
     printf '%-18s ' "Overall:"
     cc_status_word "$severity"
     printf '\n'
@@ -303,8 +297,7 @@ kernel_running() {
 
     cc_banner
     echo
-    echo "Running Kernel"
-    echo "--------------"
+    cc_subsection "Running Kernel"
     printf '%-18s %s\n' "Release:" "$running"
     printf '%-18s %s\n' "OS:" "$(_cc_kernel_os)"
     if [ "${#packages[@]}" -eq 0 ]; then

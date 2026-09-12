@@ -57,6 +57,51 @@ long_plain_row="$(cc_dotted_line 'Meaningful long command name' 'Plain descripti
 summary="$(cc_summary_status 'Overall Status:' FAIL)"
 [ "$summary" = 'Overall Status: FAIL' ] || fail 'summary status structure changed unexpectedly'
 
+section="$(cc_section 'CHIRP Deployment Status')"
+[ "$section" = $'CHIRP Deployment Status\n=======================' ] ||
+    fail 'primary section presentation changed unexpectedly'
+
+subsection="$(cc_subsection 'Dependency Check')"
+[ "$subsection" = $'Dependency Check\n----------------' ] ||
+    fail 'subsection presentation changed unexpectedly'
+
+section_file="$(mktemp)"
+trap 'rm -f "$section_file"' EXIT
+fd_stdout="$(cc_section_fd 3 'FD title: ready!' 3>"$section_file")"
+[ -z "$fd_stdout" ] || fail 'primary section FD output leaked to stdout'
+[ "$(<"$section_file")" = $'FD title: ready!\n================' ] ||
+    fail 'primary section FD output changed unexpectedly'
+fd_stdout="$(cc_subsection_fd 3 'Alternate descriptor' 3>"$section_file")"
+[ -z "$fd_stdout" ] || fail 'subsection FD output leaked to stdout'
+[ "$(<"$section_file")" = $'Alternate descriptor\n--------------------' ] ||
+    fail 'subsection FD output changed unexpectedly'
+cc_section_fd 3 '' 3>"$section_file"
+[ "$(od -An -tx1 "$section_file" | tr -d '[:space:]')" = '0a0a' ] ||
+    fail 'empty primary section did not retain structural newlines'
+cc_subsection_fd 3 '' 3>"$section_file"
+[ "$(od -An -tx1 "$section_file" | tr -d '[:space:]')" = '0a0a' ] ||
+    fail 'empty subsection did not retain structural newlines'
+
+long_title='A deliberately long section heading, with spaces: punctuation!'
+long_section="$(cc_section "$long_title")"
+long_underline="${long_section#*$'\n'}"
+[ "${#long_underline}" -eq "${#long_title}" ] || fail 'primary section underline length changed'
+[ "${long_underline//=/}" = '' ] || fail 'primary section underline character changed'
+
+punctuation_title='Title: commas, periods. (Normal!)'
+punctuation_subsection="$(cc_subsection "$punctuation_title")"
+punctuation_underline="${punctuation_subsection#*$'\n'}"
+[ "${#punctuation_underline}" -eq "${#punctuation_title}" ] ||
+    fail 'subsection punctuation underline length changed'
+[ "${punctuation_underline//-/}" = '' ] || fail 'subsection underline character changed'
+
+section_color_always="$(unset NO_COLOR; TERM=xterm-256color CC_COLOR_MODE=always cc_section 'Plain Title')"
+section_color_never="$(TERM=dumb CC_COLOR_MODE=never cc_section 'Plain Title')"
+[ "$section_color_always" = "$section_color_never" ] || fail 'section output depended on color mode'
+case "$section_color_always" in
+    *$'\033'*) fail 'section output contained ANSI color' ;;
+esac
+
 cc_result_reset
 unset NO_COLOR
 CC_COLOR_MODE=always TERM=xterm-256color cc_result_record 'Semantic result' WARN >/dev/null

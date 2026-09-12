@@ -48,7 +48,14 @@ cc_log
 cc_warn
 cc_error
 cc_banner
+cc_section
+cc_subsection
 ```
+
+New framework commands must use `cc_section` or `cc_subsection` for
+user-visible title/underline pairs. Use `cc_section_fd` or
+`cc_subsection_fd` when structural output must go to a non-stdout file
+descriptor. Do not maintain hard-coded underline strings in commands.
 
 ---
 

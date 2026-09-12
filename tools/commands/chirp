@@ -132,8 +132,7 @@ chirp_command_state() {
 chirp_status() {
     local count=0 entry
     cc_banner
-    echo 'CHIRP Deployment Status'
-    echo '======================='
+    cc_section 'CHIRP Deployment Status'
     printf '  AppImage:  %s\n' "$(chirp_artifact_valid "$CHIRP_APPIMAGE" && echo installed || echo missing)"
     printf '  Command:   %s (%s)\n' "$(chirp_command_state)" "$CHIRP_LINK"
     while IFS= read -r entry; do [ -n "$entry" ] && count=$((count + 1)); done < <(chirp_launchers)

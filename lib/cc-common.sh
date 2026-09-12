@@ -150,6 +150,28 @@ cc_fail() { cc_status_word FAIL; }
 cc_warning() { cc_status_word WARN; }
 cc_info_word() { cc_status_word INFO; }
 
+cc_section_fd() {
+    local fd="$1" title="$2" underline
+    printf -v underline '%*s' "${#title}" ''
+    underline=${underline// /=}
+    printf '%s\n%s\n' "$title" "$underline" >&"$fd"
+}
+
+cc_section() {
+    cc_section_fd 1 "$1"
+}
+
+cc_subsection_fd() {
+    local fd="$1" title="$2" underline
+    printf -v underline '%*s' "${#title}" ''
+    underline=${underline// /-}
+    printf '%s\n%s\n' "$title" "$underline" >&"$fd"
+}
+
+cc_subsection() {
+    cc_subsection_fd 1 "$1"
+}
+
 cc_banner() {
     cc_load_version
     echo "Captain Cronos Shell Toolkit"
