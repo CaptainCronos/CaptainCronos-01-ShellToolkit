@@ -326,11 +326,11 @@ and regression coverage was added.
 
 ### Component 2 — Shared Divider Helpers
 
-Status: **Next**
+Status: **Complete**
 
 ### Component 3 — Shared Table Formatter
 
-Status: **Planned**
+Status: **Next**
 
 ### Component 4 — Progress / Spinner Framework
 

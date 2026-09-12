@@ -172,6 +172,29 @@ cc_subsection() {
     cc_subsection_fd 1 "$1"
 }
 
+cc_divider_fd() {
+    [ "$#" -ge 1 ] && [ "$#" -le 2 ] || return 2
+    local fd="$1" width divider
+    if [ "$#" -eq 2 ]; then
+        width="$2"
+    else
+        width=36
+    fi
+    [[ "$width" =~ ^[1-9][0-9]*$ ]] || return 2
+    printf -v divider '%*s' "$width" ''
+    divider=${divider// /-}
+    printf '%s\n' "$divider" >&"$fd"
+}
+
+cc_divider() {
+    [ "$#" -le 1 ] || return 2
+    if [ "$#" -eq 0 ]; then
+        cc_divider_fd 1
+    else
+        cc_divider_fd 1 "$1"
+    fi
+}
+
 cc_banner() {
     cc_load_version
     echo "Captain Cronos Shell Toolkit"

@@ -411,7 +411,7 @@ selftest_main() {
             --argjson failed "$FAILED"
     else
         echo
-        echo "------------------------------------"
+        cc_divider
         printf '%-18s %s\n' "Tests Registered:" "$SELFTEST_TOTAL"
         printf '%-18s %s\n' "Tests Executed:" "$CC_PROGRESS_COMPLETED"
         printf '%-18s %s\n' "Tests Passed:" "$PASSED"

@@ -50,12 +50,14 @@ cc_error
 cc_banner
 cc_section
 cc_subsection
+cc_divider
 ```
 
-New framework commands must use `cc_section` or `cc_subsection` for
-user-visible title/underline pairs. Use `cc_section_fd` or
-`cc_subsection_fd` when structural output must go to a non-stdout file
-descriptor. Do not maintain hard-coded underline strings in commands.
+`cc_section` and `cc_subsection` own labeled headings and their underlines.
+`cc_divider` owns unlabeled structural separation; use `cc_divider_fd` when
+that output must go to a non-stdout file descriptor. Table separators remain
+table formatting until the Shared Table Formatter component. New framework
+commands must not hand-build standalone horizontal rules.
 
 ---
 
