@@ -1,6 +1,6 @@
 # Captain Cronos Shell Toolkit Roadmap
 
-Current milestone: **v1.3.0-beta2 — Release Hardening Complete**
+Current lifecycle phase: **Phase 3 / Alpha — Active Development**
 
 Current version line: **v1.3.0-beta2 — Blackbeard**
 
@@ -125,9 +125,9 @@ Exit criteria:
 
 ---
 
-## Phase 2 — Installer and Command Framework
+## Phase 2 / Beta — Framework and Release Hardening
 
-Status: **Complete for v1.3.0-beta1**
+Status: **Complete**
 
 Purpose:
 
@@ -213,7 +213,7 @@ outputs without rewriting them.
 
 ---
 
-## Phase 3 — v1.3 Framework Completion
+### Completed Framework and Release-Hardening Foundations
 
 Status: **Complete**
 
@@ -247,9 +247,9 @@ cc verify executable
 
 ---
 
-## Phase 3.x — Framework Polish
+## Phase 3 / Alpha — Framework Polish and Presentation Foundation
 
-Status: **Maintenance / Future**
+Status: **Active Development**
 
 ### Kernel Management Foundation
 
@@ -308,23 +308,49 @@ The existing platform abstraction remains in place so RPM-family correlation can
 be added later if an operational requirement appears. No additional RPM cleanup
 or mutation adapter is planned while this item is deferred.
 
-Completed in active development:
+### Prompt Engine Foundation
+
+Status: **Complete**
 
 - Internal Prompt Engine foundation for future `cc prompt` workflows.
 - Dynamic `cc prompt` menu backed by metadata-discovered prompt templates.
 - Prompt template metadata validation for menu title, description, category, and tags.
 
-Remaining polish candidates:
+### Component 1 — Shared Section Helpers
 
-- Shared section helpers.
-- Shared divider helpers.
-- Shared table formatter.
-- Progress/spinner framework.
-- Unicode/ASCII abstraction.
-- Expanded standardized logging helpers.
-- Generated user command reference.
+Status: **Complete**
 
-These items improve presentation and developer experience but are not blockers for `v1.3.0-beta1`.
+Introduced the canonical presentation API: `cc_section`, `cc_section_fd`,
+`cc_subsection`, and `cc_subsection_fd`. Representative consumers were migrated
+and regression coverage was added.
+
+### Component 2 — Shared Divider Helpers
+
+Status: **Next**
+
+### Component 3 — Shared Table Formatter
+
+Status: **Planned**
+
+### Component 4 — Progress / Spinner Framework
+
+Status: **Planned**
+
+### Component 5 — Unicode / ASCII Abstraction
+
+Status: **Planned**
+
+### Component 6 — Expanded Standardized Logging Helpers
+
+Status: **Planned**
+
+### Component 7 — Generated User Command Reference
+
+Status: **Planned**
+
+These components improve presentation and developer experience. Completed kernel
+management and prompt-engine foundations above support this work but are not
+unfinished Phase 3 / Alpha components.
 
 ---
 
