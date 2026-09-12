@@ -90,15 +90,21 @@ CC_PROGRESS_SEQUENTIAL=0
 CC_PROGRESS_ACTIVE=0
 CC_PROGRESS_LABEL=""
 CC_PROGRESS_TAG="STATUS"
+CC_PROGRESS_INITIALIZED=0
 
 cc_progress_terminal_available() {
     [ -t 2 ] && [ "${TERM:-}" != dumb ]
 }
 
 cc_progress_init() {
-    local title="$1" total="$2" machine="${3:-0}" tag="${4:-STATUS}"
-    [[ "$total" =~ ^[0-9]+$ ]] || return 2
+    local title="${1-}" total="${2-}" machine="${3-0}" tag="${4-STATUS}"
+
+    [ "$#" -ge 2 ] && [ "$#" -le 4 ] || return 2
+    [ -n "$title" ] || return 2
+    [[ "$total" =~ ^[0-9]+$ ]] && (( 10#$total > 0 )) || return 2
+    [[ "$machine" =~ ^[01]$ ]] || return 2
     [[ "$tag" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]] || return 2
+
     CC_PROGRESS_TOTAL="$total"
     CC_PROGRESS_CURRENT=0
     CC_PROGRESS_COMPLETED=0
@@ -107,6 +113,7 @@ cc_progress_init() {
     CC_PROGRESS_ACTIVE=0
     CC_PROGRESS_LABEL=""
     CC_PROGRESS_TAG="${tag^^}"
+    CC_PROGRESS_INITIALIZED=1
     cc_debug_kv "progress workflow" "$title"
     if cc_debug_enabled; then
         CC_PROGRESS_SEQUENTIAL=1
@@ -116,8 +123,15 @@ cc_progress_init() {
 }
 
 cc_progress_start() {
-    local label="$1"
-    CC_PROGRESS_CURRENT=$((CC_PROGRESS_CURRENT + 1))
+    local label="${1-}"
+
+    [ "$#" -eq 1 ] || return 2
+    [ -n "$label" ] || return 2
+    [ "$CC_PROGRESS_INITIALIZED" -eq 1 ] || return 2
+    [ "$CC_PROGRESS_ACTIVE" -eq 0 ] || return 2
+    (( 10#$CC_PROGRESS_CURRENT < 10#$CC_PROGRESS_TOTAL )) || return 2
+
+    CC_PROGRESS_CURRENT=$((10#$CC_PROGRESS_CURRENT + 1))
     CC_PROGRESS_ACTIVE=1
     CC_PROGRESS_LABEL="$label"
     if [ "$CC_PROGRESS_LIVE" -eq 1 ]; then
@@ -139,8 +153,14 @@ _cc_progress_status_line() {
 }
 
 cc_progress_finish() {
-    local status="$1"
-    CC_PROGRESS_COMPLETED=$((CC_PROGRESS_COMPLETED + 1))
+    local status="${1-}"
+
+    [ "$#" -eq 1 ] || return 2
+    [ -n "$status" ] || return 2
+    [ "$CC_PROGRESS_INITIALIZED" -eq 1 ] || return 2
+    [ "$CC_PROGRESS_ACTIVE" -eq 1 ] || return 2
+
+    CC_PROGRESS_COMPLETED=$((10#$CC_PROGRESS_COMPLETED + 1))
     if [ "$CC_PROGRESS_LIVE" -eq 1 ]; then
         printf '\r\033[2K' >&2
         _cc_progress_status_line \
@@ -163,6 +183,7 @@ cc_progress_sequential() {
 }
 
 cc_progress_cleanup() {
+    [ "$#" -eq 0 ] || return 2
     if [ "$CC_PROGRESS_LIVE" -eq 1 ] && [ "$CC_PROGRESS_ACTIVE" -eq 1 ]; then
         printf '\n' >&2
     fi

@@ -71,6 +71,14 @@ FD variant also returns `2` for a non-numeric or unopened descriptor. `FORMAT`
 is trusted toolkit code. Bash `printf` remains authoritative for format and
 conversion errors; this helper deliberately does not parse arbitrary formats.
 
+For count-based workflows, use the canonical `cc_progress_*` API in
+`lib/cc-diagnostics.sh`. Progress presentation belongs on stderr and must never
+contaminate machine-readable stdout. Do not hand-build carriage-return
+`RUNNING` lines: live redraw is terminal-dependent, debug mode uses sequential
+lines, and callers must invoke `cc_progress_cleanup` when abandoning an active
+workflow. No spinner API exists; add one only when a real indeterminate-progress
+consumer establishes the requirement.
+
 ---
 
 ## Dependencies

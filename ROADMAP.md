@@ -334,11 +334,15 @@ Status: **Complete**
 
 ### Component 4 — Progress / Spinner Framework
 
-Status: **Next**
+Status: **Complete**
+
+The existing count-based progress framework was formalized, hardened, and
+documented as the canonical progress API. Spinner support is deferred until an
+indeterminate-progress consumer exists.
 
 ### Component 5 — Unicode / ASCII Abstraction
 
-Status: **Planned**
+Status: **Next**
 
 ### Component 6 — Expanded Standardized Logging Helpers
 

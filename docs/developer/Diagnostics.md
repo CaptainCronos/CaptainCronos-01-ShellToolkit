@@ -33,12 +33,36 @@ arbitrary credentials or secret-bearing command lines to diagnostics.
 
 ## Progress API
 
-Multi-stage commands initialize an authoritative operation count with
-`cc_progress_init`, then bracket each operation with `cc_progress_start` and
-`cc_progress_finish`. `cc_progress_cleanup` makes an interrupted live line safe.
-The optional progress tag identifies the workflow (`TEST` for selftest and
-`STATUS` by default), so the helper remains suitable for other staged commands.
+`cc_progress_*` is the canonical count-based progress API. It is stateful
+diagnostic infrastructure in `lib/cc-diagnostics.sh`; callers must not
+hand-build carriage-return `RUNNING` lines or create competing progress helpers.
 Counts describe completed stages, not estimated execution time.
+
+The public contract is:
+
+- `cc_progress_init TITLE TOTAL [MACHINE] [TAG]` initializes a non-empty
+  workflow. `TITLE` must be non-empty; `TOTAL` must be a positive decimal
+  integer; `MACHINE` is `0` (default) or `1`; and `TAG` defaults to `STATUS`
+  and must match `[A-Za-z][A-Za-z0-9_-]*`. It accepts two through four
+  arguments. Zero-total workflows are not supported.
+- `cc_progress_start LABEL` accepts exactly one non-empty label after a
+  successful init. It cannot start another operation while one is active or
+  exceed the declared total.
+- `cc_progress_finish STATUS` accepts exactly one non-empty status only for an
+  active operation. It renders through `cc_status_line_fd` when that helper is
+  available.
+- `cc_progress_live` and `cc_progress_sequential` report the selected
+  presentation mode.
+- `cc_progress_cleanup` accepts no arguments and is safe to call repeatedly.
+  Call it when abandoning an active workflow so a live terminal is left on a
+  clean line.
+
+Invalid calls return `2` without changing progress counters or active state.
+After init, `current=completed=active=0`; after start, `current` increases once
+and `active=1`; after finish, `completed` increases once and `active=0`. At all
+valid points, `completed <= current <= total`. `CC_PROGRESS_INITIALIZED`
+distinguishes use before initialization from an initialized workflow with no
+completed operations.
 
 When stderr is a terminal, normal selftest uses a live `RUNNING` line followed
 by the completed status. Redirected and piped execution retains stable existing
@@ -47,6 +71,12 @@ captured until the harness has completed its canonical result line, so embedded
 commands cannot attach to or duplicate that presentation. Machine mode suppresses
 normal progress. Debug mode automatically selects sequential `[CC TEST]` lines
 instead of live redrawing, including when JSON is requested.
+
+Progress presentation is stderr-owned. Machine-readable stdout must remain
+uncontaminated: non-debug machine mode is silent, while debug diagnostics remain
+on stderr. Live redraw is terminal-dependent; debug mode always uses sequential
+lines. No spinner abstraction is provided because the toolkit has no demonstrated
+indeterminate-progress consumer; spinner support is deferred until one exists.
 
 ## Selftest
 
