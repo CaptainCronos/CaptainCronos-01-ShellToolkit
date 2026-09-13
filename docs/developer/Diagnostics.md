@@ -1,4 +1,4 @@
-# Debug and Progress Infrastructure
+# Runtime Messages, Debug, and Progress Infrastructure
 
 Captain Cronos commands use `lib/cc-diagnostics.sh` for intentional diagnostics
 and count-based workflow progress. Commands must not create competing debug
@@ -6,13 +6,27 @@ flags, global tracing systems, or private progress implementations.
 
 ## Output contract
 
-- Normal human and machine-readable results use stdout.
+- Runtime presentation uses `cc_log`, `cc_info`, `cc_warn`, and `cc_error` from
+  `lib/cc-common.sh`. `cc_log` preserves its compatibility format, `[CC]
+  message`, on stdout. `cc_info` emits `[CC INFO] message` on stdout;
+  `cc_warn` and `cc_error` emit `[CC WARN] message` and `[CC ERROR] message` on
+  stderr. The FD variants accept exactly `FD MESSAGE`, validate that the
+  descriptor is numeric and open, and return `2` without output on invalid
+  calls. Prefix-only color follows the shared presentation policy.
 - Debug diagnostics use stderr and begin with `[CC DEBUG]`.
 - Interactive workflow activity uses stderr and begins with `[CC TEST]` or the
   equivalent shared progress prefix.
 - Errors use stderr.
 - Debug and progress output must never be written to JSON or other structured
   stdout.
+
+Runtime presentation is intentionally distinct from debug diagnostics,
+progress rendering, and persistent operational records. Persistent logs and
+reports (for example system-update, kernel-cleanup, monthly-health, and asset
+history) remain command-specific host records and are not a generic logging
+API. Bootstrap or standalone programs may render directly when loading the
+common library would be unsafe; prompt menus, questions, and selection UI are
+also intentionally outside this API.
 
 ## Debug API
 

@@ -237,24 +237,74 @@ cc_version() {
     echo "Release : ${RELEASE_DATE:-unknown}"
 }
 
+# Runtime presentation messages are deliberately separate from debug diagnostics,
+# progress, and persistent operational records.  Keep the historical cc_log
+# prefix intact: it is a public stdout surface used by existing commands.
+_cc_runtime_message_fd() {
+    [ "$#" -eq 3 ] || return 2
+    local fd="$1" level="$2" message="$3"
+
+    [[ "$fd" =~ ^[0-9]+$ ]] || return 2
+    if ! { : >&"$fd"; } 2>/dev/null; then
+        return 2
+    fi
+
+    case "$level" in
+        INFO)
+            if cc_color_enabled "$fd"; then
+                cc_color_info "$fd"; printf '[CC INFO]' >&"$fd"; cc_color_reset "$fd"
+            else
+                printf '[CC INFO]' >&"$fd"
+            fi
+            ;;
+        WARN)
+            if cc_color_enabled "$fd"; then
+                cc_color_warn "$fd"; printf '[CC WARN]' >&"$fd"; cc_color_reset "$fd"
+            else
+                printf '[CC WARN]' >&"$fd"
+            fi
+            ;;
+        ERROR)
+            if cc_color_enabled "$fd"; then
+                cc_color_fail "$fd"; printf '[CC ERROR]' >&"$fd"; cc_color_reset "$fd"
+            else
+                printf '[CC ERROR]' >&"$fd"
+            fi
+            ;;
+        *) return 2 ;;
+    esac
+    printf ' %s\n' "$message" >&"$fd"
+}
+
 cc_log() {
-    echo "[CC] $*"
+    printf '[CC] %s\n' "$*"
+}
+
+cc_info_fd() {
+    [ "$#" -eq 2 ] || return 2
+    _cc_runtime_message_fd "$1" INFO "$2"
+}
+
+cc_warn_fd() {
+    [ "$#" -eq 2 ] || return 2
+    _cc_runtime_message_fd "$1" WARN "$2"
+}
+
+cc_error_fd() {
+    [ "$#" -eq 2 ] || return 2
+    _cc_runtime_message_fd "$1" ERROR "$2"
+}
+
+cc_info() {
+    _cc_runtime_message_fd 1 INFO "$*"
 }
 
 cc_warn() {
-    if cc_color_enabled 2; then
-        cc_color_warn 2; printf '[CC WARN]' >&2; cc_color_reset 2; printf ' %s\n' "$*" >&2
-    else
-        echo "[CC WARN] $*" >&2
-    fi
+    _cc_runtime_message_fd 2 WARN "$*"
 }
 
 cc_error() {
-    if cc_color_enabled 2; then
-        cc_color_fail 2; printf '[CC ERROR]' >&2; cc_color_reset 2; printf ' %s\n' "$*" >&2
-    else
-        echo "[CC ERROR] $*" >&2
-    fi
+    _cc_runtime_message_fd 2 ERROR "$*"
 }
 
 cc_require_file() {

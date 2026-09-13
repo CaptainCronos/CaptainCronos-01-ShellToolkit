@@ -45,6 +45,7 @@ Use shared logging helpers from `lib/cc-common.sh` where practical:
 
 ```bash
 cc_log
+cc_info
 cc_warn
 cc_error
 cc_banner
@@ -53,6 +54,23 @@ cc_subsection
 cc_divider
 cc_table_header
 ```
+
+Runtime presentation messages have explicit stream ownership: `cc_log` retains
+its established `[CC] message` stdout contract; `cc_info` writes `[CC INFO]
+message` to stdout; and `cc_warn` / `cc_error` write `[CC WARN] message` /
+`[CC ERROR] message` to stderr. Use `cc_info_fd`, `cc_warn_fd`, or
+`cc_error_fd` only when an already-open alternate descriptor is genuinely
+required. Their exact two-argument contract is `FD MESSAGE`; non-numeric,
+unopened, or otherwise invalid calls return `2` without output. The prefix is
+the only colored portion and follows the shared `NO_COLOR`, `TERM=dumb`, and
+`CC_COLOR_MODE` policy.
+
+These helpers are runtime presentation, not debug diagnostics, progress UI, or
+persistent records. Use `cc_debug*` for redacted debug diagnostics and
+`cc_progress_*` for workflow activity; command-specific operational files and
+reports retain their own formats. Bootstrap or deliberately standalone code may
+render directly when loading `cc-common.sh` would make dependency direction
+unsafe. Interactive prompt UI remains command-owned presentation.
 
 `cc_section` and `cc_subsection` own labeled structural headings and their
 underlines. `cc_divider` owns unlabeled structural separation; use

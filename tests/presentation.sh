@@ -51,6 +51,73 @@ case "$diagnostic" in
     *) fail 'error diagnostic did not use shared red presentation' ;;
 esac
 
+# Ordinary runtime messages retain their established streams and prefixes.
+logging_stdout="$(mktemp)"
+logging_stderr="$(mktemp)"
+logging_fd="$(mktemp)"
+literal_message='%-quoted-\\path "double" '\''single'\'' * ? [glob] -leading'
+cc_log "$literal_message" >"$logging_stdout" 2>"$logging_stderr"
+[ "$(<"$logging_stdout")" = "[CC] $literal_message" ] || fail 'cc_log compatibility output changed'
+[ ! -s "$logging_stderr" ] || fail 'cc_log wrote to stderr'
+cc_info "$literal_message" >"$logging_stdout" 2>"$logging_stderr"
+[ "$(<"$logging_stdout")" = "[CC INFO] $literal_message" ] || fail 'cc_info prefix or literal rendering changed'
+[ ! -s "$logging_stderr" ] || fail 'cc_info wrote to stderr'
+cc_warn "$literal_message" >"$logging_stdout" 2>"$logging_stderr"
+[ ! -s "$logging_stdout" ] || fail 'cc_warn contaminated stdout'
+[ "$(<"$logging_stderr")" = "[CC WARN] $literal_message" ] || fail 'cc_warn prefix or literal rendering changed'
+cc_error "$literal_message" >"$logging_stdout" 2>"$logging_stderr"
+[ ! -s "$logging_stdout" ] || fail 'cc_error contaminated stdout'
+[ "$(<"$logging_stderr")" = "[CC ERROR] $literal_message" ] || fail 'cc_error prefix or literal rendering changed'
+(
+    NO_COLOR=1
+    cc_debug_enable
+    printf '%s\n' '{"result":"machine"}'
+    cc_warn 'machine warning'
+    cc_error 'machine error'
+    cc_debug 'machine diagnostic'
+) >"$logging_stdout" 2>"$logging_stderr"
+[ "$(<"$logging_stdout")" = '{"result":"machine"}' ] || fail 'runtime diagnostics contaminated structured stdout'
+[ "$(<"$logging_stderr")" = $'[CC WARN] machine warning\n[CC ERROR] machine error\n[CC DEBUG] machine diagnostic' ] ||
+    fail 'runtime diagnostics did not remain stderr-only'
+cc_debug_disable
+
+info_colored="$(unset NO_COLOR; TERM=xterm-256color CC_COLOR_MODE=always cc_info 'color check')"
+[ "$info_colored" = $'\033[1;36m[CC INFO]\033[0m color check' ] || fail 'cc_info did not use informational color'
+warn_colored="$(unset NO_COLOR; TERM=xterm-256color CC_COLOR_MODE=always cc_warn 'color check' 2>&1)"
+[ "$warn_colored" = $'\033[1;33m[CC WARN]\033[0m color check' ] || fail 'cc_warn did not use warning color'
+no_color_info="$(NO_COLOR=1 TERM=xterm-256color CC_COLOR_MODE=always cc_info 'plain check')"
+[ "$no_color_info" = '[CC INFO] plain check' ] || fail 'cc_info ignored NO_COLOR'
+dumb_info="$(unset NO_COLOR; TERM=dumb CC_COLOR_MODE=always cc_info 'plain check')"
+[ "$dumb_info" = '[CC INFO] plain check' ] || fail 'cc_info ignored TERM=dumb'
+never_info="$(unset NO_COLOR; TERM=xterm-256color CC_COLOR_MODE=never cc_info 'plain check')"
+[ "$never_info" = '[CC INFO] plain check' ] || fail 'cc_info ignored CC_COLOR_MODE=never'
+
+cc_info_fd 3 'FD info' 3>"$logging_fd" >"$logging_stdout" 2>"$logging_stderr"
+[ "$(<"$logging_fd")" = '[CC INFO] FD info' ] || fail 'cc_info_fd output changed unexpectedly'
+[ ! -s "$logging_stdout" ] && [ ! -s "$logging_stderr" ] || fail 'cc_info_fd leaked to a default stream'
+cc_warn_fd 3 'FD warn' 3>"$logging_fd" >"$logging_stdout" 2>"$logging_stderr"
+[ "$(<"$logging_fd")" = '[CC WARN] FD warn' ] || fail 'cc_warn_fd output changed unexpectedly'
+[ ! -s "$logging_stdout" ] && [ ! -s "$logging_stderr" ] || fail 'cc_warn_fd leaked to a default stream'
+cc_error_fd 3 'FD error' 3>"$logging_fd" >"$logging_stdout" 2>"$logging_stderr"
+[ "$(<"$logging_fd")" = '[CC ERROR] FD error' ] || fail 'cc_error_fd output changed unexpectedly'
+[ ! -s "$logging_stdout" ] && [ ! -s "$logging_stderr" ] || fail 'cc_error_fd leaked to a default stream'
+for invalid_logging_case in missing_arity missing_message invalid_fd unopened_fd; do
+    : >"$logging_stdout"
+    : >"$logging_stderr"
+    if case "$invalid_logging_case" in
+        missing_arity) cc_info_fd >"$logging_stdout" 2>"$logging_stderr" ;;
+        missing_message) cc_info_fd 3 >"$logging_stdout" 2>"$logging_stderr" ;;
+        invalid_fd) cc_warn_fd unopened message >"$logging_stdout" 2>"$logging_stderr" ;;
+        unopened_fd) cc_error_fd 999 message >"$logging_stdout" 2>"$logging_stderr" ;;
+    esac; then
+        invalid_status=0
+    else
+        invalid_status=$?
+    fi
+    [ "$invalid_status" -eq 2 ] || fail "invalid logging call returned the wrong status: $invalid_logging_case"
+    [ ! -s "$logging_stdout" ] && [ ! -s "$logging_stderr" ] || fail "invalid logging call produced output: $invalid_logging_case"
+done
+
 long_row="$(CC_STATUS_WIDTH=4 cc_status_line 'Meaningful long label' PASS)"
 [ "$long_row" = 'Meaningful long label PASS' ] || fail 'long status label degraded unsafely'
 
@@ -87,7 +154,7 @@ assert_ascii 'table header' "$(cc_table_header '%s %s\n' 'Column' 'State')"
 section_file="$(mktemp)"
 divider_file="$(mktemp)"
 table_file="$(mktemp)"
-trap 'rm -f "$section_file" "$divider_file" "$table_file"' EXIT
+trap 'rm -f "$section_file" "$divider_file" "$table_file" "$logging_stdout" "$logging_stderr" "$logging_fd"' EXIT
 cc_divider >"$divider_file"
 [ "$(<"$divider_file")" = '------------------------------------' ] ||
     fail 'default divider presentation changed unexpectedly'

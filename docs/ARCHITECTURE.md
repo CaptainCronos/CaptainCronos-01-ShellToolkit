@@ -55,14 +55,15 @@ Important libraries:
 Commands retain semantic state as plain PASS, WARN, FAIL, SKIP, or INFO values.
 `cc-results.sh` aggregates those values without inspecting display text, and
 `cc-common.sh` renders them through shared status-word, dotted-leader row,
-summary, and diagnostic helpers. The general dotted-leader renderer also keeps
+summary, and runtime-message helpers. The general dotted-leader renderer also keeps
 plain label/value inventories such as `cc help` readable without coupling their
 meaning to color. `cc-diagnostics.sh` uses the status renderer for completed
 progress rows. Exit status remains authoritative; neither commands nor tests
 derive results from ANSI sequences.
 
 Color is semantic rather than decorative: PASS is green, WARN yellow, FAIL and
-ERROR red, SKIP cyan, and INFO or ordinary data use the terminal default.
+ERROR red, SKIP cyan, INFO runtime-message prefixes cyan, and ordinary data use
+the terminal default.
 Automatic color requires the destination stream to be a TTY. `NO_COLOR`,
 `TERM=dumb`, or `CC_COLOR_MODE=never` suppress it; `CC_COLOR_MODE=always` is a
 focused rendering/test override. Generated documents, reports, pipes, and files
@@ -75,6 +76,19 @@ commands. Any future Unicode extension must have a concrete consumer, retain an
 ASCII fallback, preserve machine-readable output, remain safe for `TERM=dumb`
 and redirected output, and extend the shared presentation layer with coverage
 for both representations.
+
+Runtime messages, debug diagnostics, and persistent operational records are
+separate layers. `cc_log` retains `[CC] message` on stdout for compatibility;
+`cc_info` emits `[CC INFO] message` on stdout; and `cc_warn` / `cc_error` emit
+their canonical WARN/ERROR forms on stderr. Validated `*_fd` variants are
+available for an already-open alternate descriptor. `cc_debug*` remains a
+redacted stderr-only diagnostics API, while `cc_progress_*` remains stderr-owned
+workflow presentation. Command-specific records such as system-update and
+kernel-cleanup logs, monthly-health reports, and asset history use the host
+logging/report infrastructure rather than these presentation helpers. Direct
+rendering is still appropriate for bootstrap or standalone code where loading
+the common library would introduce unsafe dependency direction; interactive
+prompt UI is intentionally not a runtime log event.
 
 ### Configuration
 User configuration is stored under:

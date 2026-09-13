@@ -351,11 +351,11 @@ implementation.
 
 ### Component 6 — Expanded Standardized Logging Helpers
 
-Status: **Next**
+Status: **Complete**
 
 ### Component 7 — Generated User Command Reference
 
-Status: **Planned**
+Status: **Next**
 
 These components improve presentation and developer experience. Completed kernel
 management and prompt-engine foundations above support this work but are not

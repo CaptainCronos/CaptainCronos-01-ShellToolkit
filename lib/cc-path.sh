@@ -21,6 +21,15 @@ fi
 CC_PATH_BLOCK_BEGIN="# Captain Cronos managed PATH: begin"
 CC_PATH_BLOCK_END="# Captain Cronos managed PATH: end"
 
+_cc_path_error() {
+    if declare -F cc_error >/dev/null 2>&1; then
+        cc_error "$@"
+    else
+        # cc-path is intentionally sourceable with only cc-temp available.
+        printf '[CC ERROR] %s\n' "$*" >&2
+    fi
+}
+
 cc_path_count_entry() {
     [ "$#" -eq 2 ] || return 2
     local path_value="$1" needle="$2" remaining entry more count=0
@@ -247,12 +256,12 @@ cc_path_repair_bashrc() {
 
     parent="$(dirname "$file")"
     [ -d "$parent" ] && [ ! -L "$file" ] || {
-        printf '[CC ERROR] Refusing unsafe shell startup target: %s\n' "$file" >&2
+        _cc_path_error "Refusing unsafe shell startup target: $file"
         return 1
     }
     if [ -e "$file" ]; then
         [ -f "$file" ] || {
-            printf '[CC ERROR] Shell startup target is not a regular file: %s\n' "$file" >&2
+            _cc_path_error "Shell startup target is not a regular file: $file"
             return 1
         }
         identity="$(stat -c '%d:%i' -- "$file")" || return 1
@@ -261,7 +270,7 @@ cc_path_repair_bashrc() {
     cc_path_startup_audit "$file" || return
     if [ "$CC_PATH_CANONICAL_BLOCKS" -ne "$CC_PATH_CANONICAL_ENDS" ] ||
         [ "$CC_PATH_CANONICAL_MALFORMED" -ne 0 ]; then
-        printf '[CC ERROR] Refusing malformed Captain Cronos PATH block in %s\n' "$file" >&2
+        _cc_path_error "Refusing malformed Captain Cronos PATH block in $file"
         return 1
     fi
 
@@ -325,7 +334,7 @@ cc_path_repair_bashrc() {
         fi
     fi
     cc_temp_remove "$temporary" || :
-    printf '[CC ERROR] PATH startup repair failed without replacing %s\n' "$file" >&2
+    _cc_path_error "PATH startup repair failed without replacing $file"
     [ "$status" -ne 0 ] || status=1
     return "$status"
 }
