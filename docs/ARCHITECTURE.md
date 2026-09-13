@@ -654,6 +654,12 @@ for command discovery; `cc docs build --apply` derives the command inventory and
 reference under `docs/generated/`. Generated documents are build artifacts and
 must not be hand-maintained as competing sources.
 
+In particular, do not edit `docs/generated/COMMAND_REFERENCE.md`. Command
+`--help` output owns user-facing usage text and `lib/cc-metadata.sh` owns switch
+discovery. Change those sources, run `cc docs reference --apply` or `cc docs
+build --apply`, then use `cc docs check`; `cc release check` enforces the same
+freshness requirement.
+
 `docs/ARCHITECTURE.md` owns architecture, `docs/ADMINISTRATOR_GUIDE.md` owns
 administrator procedures, and `docs/RELEASE_1.3_CHECKLIST.md` owns the 1.3
 release checklist.

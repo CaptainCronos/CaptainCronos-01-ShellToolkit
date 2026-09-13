@@ -86,6 +86,18 @@ CC_PROGRAMS_CONFIG="$TEST_DIR/does-not-exist" \
     || fail "reference generation depended on caller program configuration"
 cmp -s "$docs_fixture/COMMAND_REFERENCE.md" "$polluted_docs/COMMAND_REFERENCE.md" \
     || fail "caller program configuration changed generated command help"
+# The command may also be called directly from outside the checkout. Its own
+# location, rather than the caller's directory, must establish the repository
+# root used by generated help and switch discovery.
+outside_dir="$TEST_DIR/outside-checkout"
+outside_docs="$TEST_DIR/generated-outside-checkout"
+mkdir -p "$outside_dir"
+(
+    cd "$outside_dir"
+    bash "$PROJECT_ROOT/tools/commands/docs" reference --apply --out "$outside_docs" >/dev/null
+) || fail "reference generation failed outside the repository"
+cmp -s "$docs_fixture/COMMAND_REFERENCE.md" "$outside_docs/COMMAND_REFERENCE.md" \
+    || fail "outside-repository invocation changed generated command help"
 normal_switches="$TEST_DIR/drive-inventory-switches-normal"
 polluted_switches="$TEST_DIR/drive-inventory-switches-polluted"
 bash "$PROJECT_ROOT/tools/cc" drive-inventory switches >"$normal_switches" \

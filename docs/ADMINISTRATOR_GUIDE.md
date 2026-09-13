@@ -305,8 +305,14 @@ that the running kernel exposes EFI runtime services.
 
 ## Documentation
 - `cc docs inventory`
+- `cc docs reference --apply`
 - `cc docs build --apply`
 - `cc docs lint`
+- `cc docs check`
+
+`docs/generated/COMMAND_REFERENCE.md` is generated user-facing documentation;
+do not edit it directly. Update command help or CLI switch contracts, regenerate
+it, and use `cc docs check` before release validation.
 
 ## Releases
 Run `cc release check` before every tagged release.

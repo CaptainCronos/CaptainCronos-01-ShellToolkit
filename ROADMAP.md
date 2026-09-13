@@ -1,6 +1,6 @@
 # Captain Cronos Shell Toolkit Roadmap
 
-Current lifecycle phase: **Phase 3 / Alpha — Active Development**
+Current lifecycle phase: **Phase 3 / Alpha — Complete**
 
 Current version line: **v1.3.0-beta2 — Blackbeard**
 
@@ -249,7 +249,7 @@ cc verify executable
 
 ## Phase 3 / Alpha — Framework Polish and Presentation Foundation
 
-Status: **Active Development**
+Status: **Complete**
 
 ### Kernel Management Foundation
 
@@ -355,7 +355,7 @@ Status: **Complete**
 
 ### Component 7 — Generated User Command Reference
 
-Status: **Next**
+Status: **Complete**
 
 These components improve presentation and developer experience. Completed kernel
 management and prompt-engine foundations above support this work but are not

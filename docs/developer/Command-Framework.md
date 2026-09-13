@@ -98,6 +98,13 @@ usage, positional policy, subcommands and aliases, switch arity, defaults, and
 bounded safety descriptions. Command scripts still implement parsing and
 behavior; do not duplicate discovery text in a second registry.
 
+`docs/generated/COMMAND_REFERENCE.md` is generated output, never a manual
+editing surface. Command `--help` output is authoritative for its usage and
+description, while `lib/cc-metadata.sh` is authoritative for switch discovery.
+Make changes at those sources, regenerate with `cc docs reference --apply` or
+`cc docs build --apply`, and verify with `cc docs check`. `cc release check`
+also rejects stale generated documentation.
+
 `tests/command-switches.sh` protects this boundary. It requires one contract per
 registered command, switch discovery for every command and namespace entry,
 unique switch rows, source presence for advertised switches, and focused

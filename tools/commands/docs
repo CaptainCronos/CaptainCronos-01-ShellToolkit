@@ -29,7 +29,12 @@ if [ "${CC_DOCS_SANITIZED:-0}" != 1 ]; then
     exit $?
 fi
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# Resolve from this command's location, not the caller's current directory.
+# Documentation generation is also supported when this script is invoked by
+# absolute path outside the repository.
+DOCS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+DOCS_FALLBACK_ROOT="$(cd "$DOCS_SCRIPT_DIR/../.." && pwd -P)"
+PROJECT_ROOT="$(git -C "$DOCS_FALLBACK_ROOT" rev-parse --show-toplevel 2>/dev/null || printf '%s\n' "$DOCS_FALLBACK_ROOT")"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
 source "$PROJECT_ROOT/lib/cc-metadata.sh"
@@ -285,7 +290,7 @@ generate_index() {
     echo "Source: cc docs build --apply"
     echo
     echo "- COMMAND_INVENTORY.md"
-    echo "- COMMAND_REFERENCE.md"
+    echo "- COMMAND_REFERENCE.md — generated user-facing command reference."
     echo "- CHANGE_SUMMARY.md"
     echo "- DOCS_LINT.md"
 }
