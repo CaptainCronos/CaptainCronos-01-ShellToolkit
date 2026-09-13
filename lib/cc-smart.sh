@@ -58,6 +58,68 @@ cc_smart_collect() {
     sudo smartctl -a "$device" 2>/dev/null || smartctl -a "$device" 2>/dev/null || true
 }
 
+# Component 3 verification deliberately does not inherit the legacy sudo
+# fallback above.  A restricted ordinary-user read is evidence, not a reason
+# to elevate privileges.
+cc_smart_collect_passive() {
+    [ "$#" -eq 1 ] || return 2
+    command -v smartctl >/dev/null 2>&1 || return 127
+    smartctl -a "$1" 2>&1
+}
+
+cc_smart_protocol_from_text() {
+    case "$1" in
+        *"NVMe Version"*|*"NVMe"*) printf '%s\n' nvme ;;
+        *"ATA Version"*|*"SATA"*) printf '%s\n' ata ;;
+        *"SCSI"*) printf '%s\n' scsi ;;
+        *) printf '%s\n' unknown ;;
+    esac
+}
+
+cc_smart_error_count() {
+    awk '
+        /ATA Error Count:/ {for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+$/) {print $i; found=1; exit}}
+        /Media and Data Integrity Errors:/ {gsub(/,/, "", $NF); if ($NF ~ /^[0-9]+$/) {print $NF; found=1; exit}}
+        END {if (!found) print "unknown"}
+    '
+}
+
+cc_smart_self_test_state() {
+    awk '
+        /Self-test routine in progress/ {print "running"; found=1; exit}
+        /Self-test execution status/ {if ($0 ~ /Completed without error/) print "passed"; else if ($0 ~ /Completed/) print "failed"; else print "unknown"; found=1; exit}
+        /No self-tests have been logged/ {print "none"; found=1; exit}
+        END {if (!found) print "unknown"}
+    '
+}
+
+# smart: device_id, access, protocol, capability, overall_health,
+# temperature_c, power_on_hours, life_remaining_percent, self_test_state,
+# error_count, state
+cc_smart_record_tsv() {
+    [ "$#" -eq 2 ] || return 2
+    local device_id="$1" device="$2" text rc=0 health temp hours life protocol selftest errors state
+    text="$(cc_smart_collect_passive "$device")" || rc=$?
+    if [ "$rc" -eq 127 ]; then
+        printf '%s\tunsupported\tunknown\tunsupported\tunknown\tunknown\tunknown\tunknown\tunknown\tunknown\tunknown\n' "$device_id"
+        return 0
+    fi
+    if [ "$rc" -ne 0 ] || printf '%s\n' "$text" | grep -Eqi 'Permission denied|Operation not permitted|requires.*root|insufficient permission'; then
+        printf '%s\trestricted\tunknown\tunknown\tunknown\tunknown\tunknown\tunknown\tunknown\tunknown\trestricted\n' "$device_id"
+        return 0
+    fi
+    protocol="$(cc_smart_protocol_from_text "$text")"
+    health="$(cc_smart_field_first "$text" 'SMART overall-health self-assessment test result|SMART Health Status')"; [ -n "$health" ] || health=unknown
+    temp="$(printf '%s\n' "$text" | cc_smart_temperature)"; temp="${temp%C}"; [ "$temp" = -- ] && temp=unknown
+    hours="$(printf '%s\n' "$text" | cc_smart_power_on_hours)"; [ "$hours" = -- ] && hours=unknown
+    life="$(printf '%s\n' "$text" | cc_smart_life_remaining)"; life="${life%%%}"; [ "$life" = -- ] && life=unknown
+    selftest="$(printf '%s\n' "$text" | cc_smart_self_test_state)"
+    errors="$(printf '%s\n' "$text" | cc_smart_error_count)"
+    state=PASS
+    case "$health" in *FAIL*|*BAD*) state=FAIL;; unknown) state=unknown;; esac
+    printf '%s\tavailable\t%s\tsupported\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$device_id" "$protocol" "$health" "$temp" "$hours" "$life" "$selftest" "$errors" "$state"
+}
+
 cc_smart_field_first() {
     local smart_text="$1" key="$2"
     printf '%s\n' "$smart_text" | awk -F: -v key="$key" '$0 ~ key {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}'

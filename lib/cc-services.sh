@@ -74,6 +74,17 @@ _cc_log_available() {
     command -v "$log_program" >/dev/null 2>&1
 }
 
+# Read-only, bounded system-log query for diagnostic consumers.  Callers pass
+# an explicit time window and record limit; this helper never escalates.
+_cc_log_since() {
+    [ "$#" -eq 2 ] || return 2
+    local since="$1" limit="$2" log_program
+    [[ "$limit" =~ ^[1-9][0-9]*$ ]] || return 2
+    log_program="$(_cc_system_log_program)" || return 1
+    command -v "$log_program" >/dev/null 2>&1 || return 1
+    "$log_program" --no-pager -o short-iso --since "$since" -n "$limit"
+}
+
 _cc_service_exists() {
     [ "$#" -eq 2 ] || return 2
     local scope="$1" unit="$2" manager state

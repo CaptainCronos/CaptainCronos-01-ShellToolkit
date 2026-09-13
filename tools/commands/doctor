@@ -6,7 +6,7 @@
 # Script      : doctor
 # Version     : reads VERSION
 # Category    : Diagnostics
-# Requires    : bash git awk df smartctl uname find sort
+# Requires    : bash git awk smartctl uname find sort
 # Repository  : CaptainCronos-01-ShellToolkit
 # Purpose     : Run repository, installation, and host health checks.
 # ==============================================================================
@@ -26,6 +26,7 @@ source "$TOOLKIT_ROOT/lib/cc-kernel.sh"
 source "$TOOLKIT_ROOT/lib/cc-config.sh"
 source "$TOOLKIT_ROOT/lib/cc-requirements.sh"
 source "$TOOLKIT_ROOT/lib/cc-network.sh"
+source "$TOOLKIT_ROOT/lib/cc-storage.sh"
 cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 FULL=0
@@ -112,6 +113,36 @@ doctor_network_check() {
     done < <(cc_network_local_findings_tsv)
     if [ "$local_fail" -eq 0 ]; then cc_status_line "Local network foundation" "PASS"
     else WARNINGS=$((WARNINGS + 1)); cc_status_line "Local network foundation" "WARN"; fi
+}
+
+# Deliberately bounded: this snapshot does not enumerate SMART data or inspect
+# journal history.  Deep storage analysis remains `cc storage diagnose`.
+doctor_storage_check() {
+    local state code subject message serious=0 warnings=0
+    cc_log "Checking bounded storage verification summary..."
+    while IFS=$'\t' read -r state code _ subject message _; do
+        case "$state:$code" in
+            FAIL:ZFS_POOL_FAULTED)
+                serious=1; cc_warn "Storage [$code] $subject: $message"
+                ;;
+            WARN:CAPACITY_PRESSURE|WARN:MDRAID_DEGRADED|WARN:MDRAID_RECOVERING|WARN:ZFS_POOL_DEGRADED|WARN:ZFS_READONLY)
+                warnings=1; cc_warn "Storage [$code] $subject: $message"
+                ;;
+            FAIL:FILESYSTEM_READONLY)
+                # Read-only is an observed mount fact.  Without an expected
+                # mount policy, normal doctor cannot classify it as unexpected;
+                # `cc storage status` and diagnose retain the finding.
+                cc_log "Storage [$code] $subject: observed read-only mount"
+                ;;
+        esac
+    done < <(cc_storage_local_findings_tsv)
+    if [ "$serious" -eq 1 ]; then
+        FAILURES=$((FAILURES + 1)); cc_status_line "Storage verification" FAIL
+    elif [ "$warnings" -eq 1 ]; then
+        WARNINGS=$((WARNINGS + 1)); cc_status_line "Storage verification" WARN
+    else
+        cc_status_line "Storage verification" PASS
+    fi
 }
 
 doctor_main() {
@@ -218,15 +249,7 @@ if [ "${CC_DOCTOR_SKIP_KERNEL:-0}" != 1 ]; then
 fi
 
 doctor_network_check
-
-cc_log "Checking disk pressure..."
-if df -hT | awk 'NR==1 || /^\/dev\//' | awk 'NR==1 {print; next} {gsub(/%/,"",$6); print; if ($6+0 >= 90) high=1} END {if (high) exit 2}'; then
-    cc_status_line "Disk pressure" "PASS"
-else
-    WARNINGS=$((WARNINGS + 1))
-    cc_status_line "Disk pressure" "WARN"
-    cc_warn "One or more filesystems are at or above 90%."
-fi
+doctor_storage_check
 
 cc_log "Checking SMART tooling..."
 if command -v smartctl >/dev/null 2>&1; then

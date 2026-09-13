@@ -1851,9 +1851,19 @@ Switches:
 
 ~~~text
 Usage:
+  cc storage [status]
   cc storage <action> [options]
 
-Actions:
+Verification actions (local, read-only, no sudo):
+  status           Show concise storage verification summary.
+  devices          Show normalized local block-device inventory.
+  mounts           Show normalized filesystem/mount inventory.
+  smart [DEVICE]   Passively inspect SMART records; never starts a test.
+  zfs              Show read-only ZFS pool and dataset verification.
+  diagnose [--since DURATION]
+                    Correlate passive SMART and bounded storage log evidence.
+
+Legacy compatibility actions:
   inventory        Show physical drive inventory.
   drives           Show mounted and installed storage devices.
   smart DEVICE     Show concise SMART summary for one device.
@@ -1863,7 +1873,7 @@ Actions:
   burnin DEVICE    Run or inspect drive burn-in workflow framework.
   workbench        Prepare or inspect live USB workbench environment.
   deps             Show storage dependency status.
-  status           Show storage workbench-oriented status summary.
+  status no longer routes to workbench status; use `cc storage workbench status`.
 
 Compatibility:
   Existing commands remain available:
@@ -1877,8 +1887,10 @@ Compatibility:
     cc workbench
 
 Examples:
-  cc storage inventory
+  cc storage
+  cc storage devices
   cc storage smart /dev/sda
+  cc storage diagnose --since '24 hours ago'
   cc storage test /dev/sda status
   cc storage test /dev/sda short
   cc storage test /dev/sda long
@@ -1903,10 +1915,15 @@ Switches:
   --version......... Show toolkit version information.
 
 Subcommands:
+  status.............. Show concise local storage verification summary.
+  devices............. Show normalized local block-device inventory.
+  mounts.............. Show normalized filesystem and mount inventory.
+  smart............... Passively inspect SMART records without privilege escalation.
+  zfs................. Show read-only ZFS pool and dataset verification.
+  diagnose............ Correlate passive SMART and bounded storage log evidence.
   inventory........... Delegate to read-only drive inventory.
   help................ Show storage namespace help.
   drives.............. Delegate to mounted and installed device reporting.
-  smart............... Delegate to concise SMART reporting.
   test................ Delegate to SMART self-test operations.
   report.............. Delegate to archived drive reporting.
   qualify............. Delegate to non-destructive qualification.
@@ -1915,7 +1932,6 @@ Subcommands:
   workbench........... Delegate to workbench inspection or preparation.
   deps................ Show storage dependency status.
   dependencies........ Alias for deps.
-  status.............. Show workbench-oriented storage status.
 
 Discovery:
   cc storage <subcommand> switches

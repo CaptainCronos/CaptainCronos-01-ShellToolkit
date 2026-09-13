@@ -116,6 +116,7 @@ Storage and asset commands include:
 
 ```bash
 cc storage
+cc storage diagnose
 cc drives
 cc smart
 cc drive-report

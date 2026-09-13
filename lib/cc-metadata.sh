@@ -259,6 +259,7 @@ selftest|--json|0|Emit the selftest summary as JSON.
 selftest|--debug|0|Emit intentional diagnostic events to standard error.
 smart|--full|0|Show full SMART device information for the selected device.
 smart|--logs|0|Show SMART log information for the selected device.
+storage/diagnose|--since|1|Use a bounded local journal evidence window.
 system-update|--dry-run|0|Preview package, Snap, and Flatpak operations without persistent mutation. [default]
 system-update|--apply|0|Explicitly authorize implemented package, Snap, and Flatpak mutations.
 toolkit-update|--dry-run|0|Inspect local state and preview update/install without Git or file mutation. [default]
@@ -412,10 +413,15 @@ repos|doctor|Run cc doctor in toolkit repositories.|repos/doctor
 reports|status|Show current-host report lifecycle health and retained totals.|reports/status
 reports|list|List recognized retained reports and policy state.|reports/list
 reports|prune|Preview or explicitly apply a bounded current-host report plan.|reports/prune
+storage|status|Show concise local storage verification summary.|storage/status
+storage|devices|Show normalized local block-device inventory.|storage/devices
+storage|mounts|Show normalized filesystem and mount inventory.|storage/mounts
+storage|smart|Passively inspect SMART records without privilege escalation.|storage/smart
+storage|zfs|Show read-only ZFS pool and dataset verification.|storage/zfs
+storage|diagnose|Correlate passive SMART and bounded storage log evidence.|storage/diagnose
 storage|inventory|Delegate to read-only drive inventory.|storage/inventory
 storage|help|Show storage namespace help.|storage/help
 storage|drives|Delegate to mounted and installed device reporting.|storage/drives
-storage|smart|Delegate to concise SMART reporting.|storage/smart
 storage|test|Delegate to SMART self-test operations.|storage/test
 storage|report|Delegate to archived drive reporting.|storage/report
 storage|qualify|Delegate to non-destructive qualification.|storage/qualify
@@ -424,7 +430,6 @@ storage|burn-in|Alias for burnin.|storage/burnin
 storage|workbench|Delegate to workbench inspection or preparation.|storage/workbench
 storage|deps|Show storage dependency status.|storage/deps
 storage|dependencies|Alias for deps.|storage/deps
-storage|status|Show workbench-oriented storage status.|storage/status
 update|dev|Target supported developer package managers.|update/dev
 update|developer|Alias for dev.|update/dev
 update|developers|Alias for dev.|update/dev

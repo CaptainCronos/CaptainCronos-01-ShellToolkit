@@ -83,4 +83,17 @@ if PATH="$TEST_DIR:$PATH" bash "$PROJECT_ROOT/tools/cc" smart sdb --invalid-opti
     fail "cc smart accepted an invalid detail mode"
 fi
 
+# The Component 3 record helper is deliberately passive: a sudo executable
+# that would fail must never be reached during collection.
+cat > "$TEST_DIR/sudo" <<'EOF_SUDO'
+#!/usr/bin/env bash
+printf 'sudo invoked\n' > "${CC_SMART_SUDO_TRACE:?}"
+exit 99
+EOF_SUDO
+chmod 755 "$TEST_DIR/sudo"
+rm -f "$TEST_DIR/sudo.trace"
+record="$(PATH="$TEST_DIR:$PATH" CC_SMART_SUDO_TRACE="$TEST_DIR/sudo.trace" cc_smart_record_tsv fixture /dev/sdb)"
+printf '%s\n' "$record" | grep -Fq $'fixture\tavailable\tunknown\tsupported\tPASSED' || fail 'passive SMART record changed passive summary semantics'
+[ ! -e "$TEST_DIR/sudo.trace" ] || fail 'passive SMART record invoked sudo'
+
 printf 'SMART parsing tests: PASS\n'

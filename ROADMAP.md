@@ -385,11 +385,11 @@ read-only requirement summary.
 
 ### Component 2 — Network Diagnostics Foundation
 
-Status: **In Progress**
+Status: **Complete**
 
 ### Component 3 — Storage, ZFS, and NAS Verification Foundation
 
-Status: **Planned**
+Status: **In Progress**
 
 ### Component 4 — System and Service Health Monitoring
 

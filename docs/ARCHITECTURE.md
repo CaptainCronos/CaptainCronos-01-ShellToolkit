@@ -369,6 +369,34 @@ System mutations add `sudo` in the execution library, user mutations do not, and
 dry-run mode reports commands without executing them. OpenRC and FreeBSD rc
 behavior remains behind explicit platform branches.
 
+### Storage Verification Architecture
+
+`cc storage` is the local, read-only storage verification surface. Linux
+adapters in `lib/cc-storage.sh` confine `lsblk`, `findmnt`, `/proc/mdstat`, and
+optional `zpool`/`zfs` calls behind normalized TSV records. The stable schemas
+are device, mount, SMART, redundancy, ZFS pool, ZFS dataset, and finding.
+Device identity prefers `/dev/disk/by-id`, then WWN and the kernel path; an
+optional by-path link records local transport topology. Missing identifiers are
+normal and are represented as `unknown`, not invented.
+
+The verification namespace never invokes `sudo`, starts SMART tests, mounts or
+repairs filesystems, changes RAID, or changes ZFS. Passive SMART collection is
+owned by `lib/cc-smart.sh`; legacy drive lifecycle commands retain their prior
+behavior separately. SMART media findings, SATA/NVMe transport observations,
+USB reset/UAS/disconnect evidence, kernel I/O errors, filesystem errors, and
+read-only mount events remain separate finding layers. This permits healthy
+media with an unhealthy USB path to be reported accurately.
+
+`cc storage diagnose` requests a finite, local 24-hour journal window by
+default (or `--since DURATION`). `lib/cc-storage-logs.sh` uses the existing
+configured system-log provider through `lib/cc-services.sh`; it neither
+escalates privilege nor persists a log cache. Normal `cc doctor` consumes only
+the lightweight device/mount/mdraid/ZFS summary, never broad SMART or journal
+enumeration. Linux mdraid is read from `/proc/mdstat`; non-Linux systems return
+explicit reduced states. ZFS inspection is read-only and reports unavailable or
+restricted access without elevation. The isolated TrueNAS read-only plugin
+remains the bounded middleware provider; administration is deferred.
+
 ### HTTP and Download Architecture
 
 HTTP retrieval is split by semantics. File acquisition resolves the configured

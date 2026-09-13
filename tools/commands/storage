@@ -8,7 +8,7 @@
 # Category    : Storage
 # Requires    : bash
 # Repository  : CaptainCronos-01-ShellToolkit
-# Purpose     : Namespace wrapper for storage inventory, SMART, testing, reports, and qualification.
+# Purpose     : Inspect local storage verification state and route legacy lifecycle workflows.
 # ==============================================================================
 
 set -euo pipefail
@@ -16,13 +16,26 @@ set -euo pipefail
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$PROJECT_ROOT"
 source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-smart.sh"
+source "$PROJECT_ROOT/lib/cc-storage.sh"
+source "$PROJECT_ROOT/lib/cc-storage-logs.sh"
 
 usage() {
     cat <<'EOF_HELP'
 Usage:
+  cc storage [status]
   cc storage <action> [options]
 
-Actions:
+Verification actions (local, read-only, no sudo):
+  status           Show concise storage verification summary.
+  devices          Show normalized local block-device inventory.
+  mounts           Show normalized filesystem/mount inventory.
+  smart [DEVICE]   Passively inspect SMART records; never starts a test.
+  zfs              Show read-only ZFS pool and dataset verification.
+  diagnose [--since DURATION]
+                    Correlate passive SMART and bounded storage log evidence.
+
+Legacy compatibility actions:
   inventory        Show physical drive inventory.
   drives           Show mounted and installed storage devices.
   smart DEVICE     Show concise SMART summary for one device.
@@ -32,7 +45,7 @@ Actions:
   burnin DEVICE    Run or inspect drive burn-in workflow framework.
   workbench        Prepare or inspect live USB workbench environment.
   deps             Show storage dependency status.
-  status           Show storage workbench-oriented status summary.
+  status no longer routes to workbench status; use `cc storage workbench status`.
 
 Compatibility:
   Existing commands remain available:
@@ -46,8 +59,10 @@ Compatibility:
     cc workbench
 
 Examples:
-  cc storage inventory
+  cc storage
+  cc storage devices
   cc storage smart /dev/sda
+  cc storage diagnose --since '24 hours ago'
   cc storage test /dev/sda status
   cc storage test /dev/sda short
   cc storage test /dev/sda long
@@ -61,14 +76,102 @@ run_cc() {
     bash "$PROJECT_ROOT/tools/cc" "$@"
 }
 
-case "${1:-}" in
-    --help|-h|help|"")
+show_status() {
+    local devices mounts readonly_count pressure arrays pools findings
+    cc_storage_snapshot
+    devices="$(awk -F '\t' '$6=="disk" && $15=="observed" {n++} END{print n+0}' <<<"$CC_STORAGE_DEVICES")"
+    mounts="$(awk -F '\t' '$11!="pseudo" && NF {n++} END{print n+0}' <<<"$CC_STORAGE_MOUNTS")"
+    readonly_count="$(awk -F '\t' '$11!="pseudo" && $6=="1" {n++} END{print n+0}' <<<"$CC_STORAGE_MOUNTS")"
+    pressure="$(awk -F '\t' -v t="${CC_STORAGE_CAPACITY_WARN_PERCENT:-90}" '$11!="pseudo" && $10 ~ /^[0-9]+$/ && $10>=t {n++} END{print n+0}' <<<"$CC_STORAGE_MOUNTS")"
+    arrays="$(awk -F '\t' '$1=="mdraid" && $7!="unsupported" {n++} END{print n+0}' <<<"$CC_STORAGE_REDUNDANCY")"
+    pools="$(awk -F '\t' '$6!="unsupported" && $1!="unknown" {n++} END{print n+0}' <<<"$CC_STORAGE_ZFS_POOLS")"
+    findings="$(cc_storage_local_findings_tsv)"
+    echo 'Storage Status'; echo '--------------'
+    printf '%-22s %s\n' 'Physical devices:' "$devices"
+    printf '%-22s %s\n' 'Mounted filesystems:' "$mounts"
+    printf '%-22s %s\n' 'Read-only mounts:' "$readonly_count"
+    printf '%-22s %s\n' 'Capacity pressure:' "$pressure"
+    printf '%-22s %s\n' 'mdraid arrays:' "$arrays"
+    printf '%-22s %s\n' 'ZFS pools:' "$pools"
+    if [ -n "$findings" ]; then
+        echo; echo 'Current Findings'; echo '----------------'
+        printf '%-6s %-26s %-12s %-22s %s\n' State Code Layer Subject Message
+        while IFS=$'\t' read -r state code layer subject message _; do printf '%-6s %-26s %-12s %-22s %s\n' "$state" "$code" "$layer" "$subject" "$message"; done <<<"$findings"
+    fi
+}
+
+show_devices() {
+    printf '%-14s %-28s %-12s %-10s %-12s %-12s %-8s %-5s %s\n' Path Stable-ID Type Parent Transport Model Serial RO State
+    cc_storage_devices_tsv | while IFS=$'\t' read -r path stable _ _ parent type model serial _ size _ transport _ ro state; do
+        printf '%-14s %-28s %-12s %-10s %-12s %-12s %-8s %-5s %s\n' "$path" "${stable:-unknown}" "$type" "${parent:-none}" "$transport" "${model:-unknown}" "${serial:-unknown}" "$ro" "$state"
+    done
+}
+
+show_mounts() {
+    printf '%-24s %-20s %-10s %-4s %-8s %-12s %s\n' Target Source Filesystem RO Usage Available State
+    cc_storage_mounts_tsv | while IFS=$'\t' read -r target source filesystem _ _ ro _ _ available percent state; do
+        printf '%-24s %-20s %-10s %-4s %-8s %-12s %s\n' "$target" "$source" "$filesystem" "$ro" "${percent}%" "$available" "$state"
+    done
+}
+
+show_smart() {
+    local requested="${1:-}" path stable _ type observed
+    printf '%-28s %-11s %-8s %-10s %-8s %-8s %-8s %-10s %s\n' Device Access Protocol Health Temp Hours Life Self-test State
+    cc_storage_snapshot
+    while IFS=$'\t' read -r path stable _ _ _ type _ _ _ _ _ _ _ _ observed; do
+        [ "$type" = disk ] || continue
+        [ "$observed" = observed ] || continue
+        [ -z "$requested" ] || [ "$requested" = "$path" ] || [ "$requested" = "$stable" ] || continue
+        IFS=$'\t' read -r id access protocol _ health temp hours life selftest errors state < <(cc_smart_record_tsv "$stable" "$path")
+        printf '%-28s %-11s %-8s %-10s %-8s %-8s %-8s %-10s %s\n' "$id" "$access" "$protocol" "$health" "$temp" "$hours" "$life" "$selftest" "$state"
+    done <<<"$CC_STORAGE_DEVICES"
+}
+
+show_zfs() {
+    echo 'ZFS Pools'; echo '---------'
+    printf '%-20s %-10s %-30s %-8s %-8s %s\n' Name Health Scan Capacity RO State
+    cc_storage_zfs_pools_tsv | while IFS=$'\t' read -r name health scan capacity readonly state; do printf '%-20s %-10s %-30s %-8s %-8s %s\n' "$name" "$health" "$scan" "${capacity}%" "$readonly" "$state"; done
+    echo; echo 'ZFS Datasets'; echo '------------'
+    printf '%-28s %-14s %-8s %-24s %-12s %-12s %-4s %s\n' Name Pool Mounted Mountpoint Used Available RO State
+    cc_storage_zfs_datasets_tsv | while IFS=$'\t' read -r name pool mounted mountpoint used available readonly state; do printf '%-28s %-14s %-8s %-24s %-12s %-12s %-4s %s\n' "$name" "$pool" "$mounted" "$mountpoint" "$used" "$available" "$readonly" "$state"; done
+}
+
+show_diagnose() {
+    local since="$1" findings
+    cc_storage_snapshot
+    findings="$( { cc_storage_local_findings_tsv; cc_storage_smart_findings_tsv; cc_storage_log_findings_tsv "$since" || printf 'SKIP\tSTORAGE_LOG_UNAVAILABLE\tcollection\thost\tbounded system log inspection unavailable\tjournal\tunknown\n'; } | awk '!seen[$0]++')"
+    printf '%-6s %-26s %-12s %-22s %s\n' State Code Layer Subject Message
+    while IFS=$'\t' read -r state code layer subject message _; do printf '%-6s %-26s %-12s %-22s %s\n' "$state" "$code" "$layer" "$subject" "$message"; done <<<"$findings"
+}
+
+action="${1:-status}"
+case "$action" in
+    --help|-h|help)
         usage
         exit 0
         ;;
     --version)
         cc_version
         exit 0
+        ;;
+    status) shift || true; [ "$#" -eq 0 ] || { usage >&2; exit 2; }; show_status ;;
+    devices) shift; [ "$#" -eq 0 ] || { usage >&2; exit 2; }; show_devices ;;
+    mounts) shift; [ "$#" -eq 0 ] || { usage >&2; exit 2; }; show_mounts ;;
+    smart)
+        shift
+        [ "$#" -le 1 ] || { usage >&2; exit 2; }
+        show_smart "${1:-}"
+        ;;
+    zfs) shift; [ "$#" -eq 0 ] || { usage >&2; exit 2; }; show_zfs ;;
+    diagnose)
+        shift
+        since='24 hours ago'
+        if [ "$#" -gt 0 ]; then
+            [ "$#" -eq 2 ] && [ "$1" = --since ] || { usage >&2; exit 2; }
+            since="$2"
+        fi
+        [ -n "$since" ] || { cc_error 'since must not be empty'; exit 2; }
+        show_diagnose "$since"
         ;;
     inventory)
         shift
@@ -77,10 +180,6 @@ case "${1:-}" in
     drives)
         shift
         run_cc drives "$@"
-        ;;
-    smart)
-        shift
-        run_cc drive-smart "$@"
         ;;
     test)
         shift
@@ -105,10 +204,6 @@ case "${1:-}" in
     deps|dependencies)
         shift
         run_cc deps storage "$@"
-        ;;
-    status)
-        shift
-        run_cc workbench status "$@"
         ;;
     *)
         cc_error "Unknown storage action: $1"

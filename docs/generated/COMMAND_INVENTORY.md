@@ -51,7 +51,7 @@ Toolkit version: 1.3.0 (Blackbeard)
 | cc selftest | flat-with-switches | 1.3.0 | Run the full toolkit engineering self-test suite. |
 | cc smart | flat-with-switches | 1.3.0 | Summarize SMART health for installed storage devices. |
 | cc status | flat-no-switches | 1.3.0 | Show repository status summary. |
-| cc storage | namespace | 1.3.0 | Namespace wrapper for storage inventory, SMART, testing, reports, and qualification. |
+| cc storage | namespace | 1.3.0 | Inspect local storage verification state and route legacy lifecycle workflows. |
 | cc system-update | flat-with-switches | 1.3.0 | Safely preview or apply operating-system and packaged-app updates. |
 | cc toolkit-update | flat-with-switches | 1.3.0 | Pull latest toolkit changes and reinstall local command files. |
 | cc update | namespace-with-switches | 1.3.0 | Run managed toolkit, system, and optional developer maintenance. |
