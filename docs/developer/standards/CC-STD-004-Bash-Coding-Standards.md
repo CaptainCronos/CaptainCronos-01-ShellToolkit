@@ -79,6 +79,16 @@ lines, and callers must invoke `cc_progress_cleanup` when abandoning an active
 workflow. No spinner API exists; add one only when a real indeterminate-progress
 consumer establishes the requirement.
 
+Core human-readable command presentation is ASCII-safe by default. Commands
+must not hard-code decorative Unicode glyphs; prefer the shared presentation
+helpers for statuses, headings, dividers, tables, and progress. Color capability
+is independent of this policy. Machine-readable output must remain
+representation-neutral, and normal or redirected `TERM=dumb` output must remain
+safe. A future Unicode presentation feature requires a concrete consumer, an
+ASCII fallback, and tests for both representations; it must extend the shared
+presentation layer rather than individual commands. Locale detection is not
+currently required because ASCII is the canonical representation.
+
 ---
 
 ## Dependencies

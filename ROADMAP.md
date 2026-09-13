@@ -342,11 +342,16 @@ indeterminate-progress consumer exists.
 
 ### Component 5 — Unicode / ASCII Abstraction
 
-Status: **Next**
+Status: **Complete**
+
+ASCII-safe presentation is now the formal baseline and is protected by focused
+shared-helper and progress regression coverage. Unicode extensions are deferred
+until a concrete presentation consumer requires an ASCII-backed shared-layer
+implementation.
 
 ### Component 6 — Expanded Standardized Logging Helpers
 
-Status: **Planned**
+Status: **Next**
 
 ### Component 7 — Generated User Command Reference
 

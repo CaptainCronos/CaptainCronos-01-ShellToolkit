@@ -69,6 +69,13 @@ focused rendering/test override. Generated documents, reports, pipes, and files
 therefore remain uncolored in normal operation. Tables remain tables, while
 primary semantic cells may use the shared status-word renderer.
 
+The canonical human-readable presentation baseline is ASCII-safe and does not
+depend on locale detection. Decorative Unicode glyphs are not hard-coded by
+commands. Any future Unicode extension must have a concrete consumer, retain an
+ASCII fallback, preserve machine-readable output, remain safe for `TERM=dumb`
+and redirected output, and extend the shared presentation layer with coverage
+for both representations.
+
 ### Configuration
 User configuration is stored under:
 

@@ -50,8 +50,7 @@ script_field() {
 show_group() {
     local title="$1"
     shift
-    echo "$title"
-    printf '%*s\n' "${#title}" '' | tr ' ' '-'
+    cc_subsection "$title"
     cc_dep_check_list "$@" || true
 }
 

@@ -10,6 +10,16 @@ fail() {
     exit 1
 }
 
+assert_ascii_file() {
+    local file="$1"
+    if ! LC_ALL=C od -An -tu1 "$file" | LC_ALL=C awk '
+        { for (i = 1; i <= NF; i++) if ($i > 127) { bad = 1; exit } }
+        END { exit bad }
+    '; then
+        fail "progress output contained a non-ASCII byte: $file"
+    fi
+}
+
 reject() {
     local rc
     set +e
@@ -104,6 +114,7 @@ cc_progress_init 'Interactive test' 2 0 TEST
 grep -Fq '[ 1/2] Current operation ... RUNNING' "$TEST_DIR/interactive.err" || fail 'interactive current activity was absent'
 grep -Fq '[ 1/2] Current operation ... PASS' "$TEST_DIR/interactive.err" || fail 'interactive completion status was absent'
 grep -q $'\r' "$TEST_DIR/interactive.err" || fail 'interactive progress did not use a live line'
+assert_ascii_file "$TEST_DIR/interactive.err"
 
 cc_progress_init 'Live cleanup test' 1 0 TEST
 cc_progress_start 'Interrupted operation' 2>"$TEST_DIR/live-cleanup.err"

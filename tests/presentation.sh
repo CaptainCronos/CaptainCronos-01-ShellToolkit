@@ -11,6 +11,16 @@ fail() {
     exit 1
 }
 
+assert_ascii() {
+    local description="$1" output="$2"
+    if ! LC_ALL=C printf '%s' "$output" | LC_ALL=C od -An -tu1 | LC_ALL=C awk '
+        { for (i = 1; i <= NF; i++) if ($i > 127) { bad = 1; exit } }
+        END { exit bad }
+    '; then
+        fail "$description contained a non-ASCII byte"
+    fi
+}
+
 assert_rendered() {
     local state="$1" color="$2" actual
     actual="$(unset NO_COLOR; TERM=xterm-256color CC_COLOR_MODE=always cc_status_word "$state")"
@@ -64,6 +74,15 @@ section="$(cc_section 'CHIRP Deployment Status')"
 subsection="$(cc_subsection 'Dependency Check')"
 [ "$subsection" = $'Dependency Check\n----------------' ] ||
     fail 'subsection presentation changed unexpectedly'
+
+# Shared human-readable presentation remains byte-safe in every locale. ANSI
+# escapes may be present when color is enabled, but they are ASCII bytes too.
+assert_ascii 'status word' "$(cc_status_word PASS)"
+assert_ascii 'status line' "$(cc_status_line 'ASCII status' PASS)"
+assert_ascii 'section' "$(cc_section 'ASCII Section')"
+assert_ascii 'subsection' "$(cc_subsection 'ASCII Subsection')"
+assert_ascii 'divider' "$(cc_divider)"
+assert_ascii 'table header' "$(cc_table_header '%s %s\n' 'Column' 'State')"
 
 section_file="$(mktemp)"
 divider_file="$(mktemp)"
