@@ -1,6 +1,6 @@
 # Captain Cronos Command Reference
 
-Toolkit version: 1.3.0-beta2 (Blackbeard)
+Toolkit version: 1.3.0 (Blackbeard)
 
 ## cc about
 
@@ -2011,11 +2011,11 @@ Discovery:
 ## cc version
 
 ~~~text
-Toolkit : 1.3.0-beta2
+Toolkit : 1.3.0
 Codename: Blackbeard
 Standard: 0.1.0
 Baseline: ubuntu-26.04
-Release : 2026-08-29
+Release : 2026-09-13
 ~~~
 
 ### Switch discovery

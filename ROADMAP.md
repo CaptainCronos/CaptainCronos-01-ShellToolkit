@@ -2,13 +2,13 @@
 
 Current lifecycle phase: **Phase 3 / Alpha — Complete**
 
-Current version line: **v1.3.0-beta2 — Blackbeard**
+Current version line: **v1.3.0 — Blackbeard**
 
 The Shell Toolkit has moved from a personal Bash collection into an engineered, installable toolkit with versioning, verification, baseline capture, defaults, storage workflows, asset history, shared libraries, and a GitHub-backed development workflow.
 
-## v1.3 RC Stabilization — Diagnostic Integrity and Release State
+## v1.3 Release Stabilization — Diagnostic Integrity and Release State
 
-Status: **Complete for v1.3.0-beta2**
+Status: **Complete for v1.3.0**
 
 Mutation-capable install and maintenance commands now default to zero-write
 preview and require explicit `--apply`. Toolkit preview does not fetch or modify

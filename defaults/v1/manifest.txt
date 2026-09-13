@@ -1,6 +1,6 @@
 Captain Cronos Shell Toolkit Defaults
-Version: 1.3.0-beta2
-Promoted: 2026-08-29T19:20:19-04:00
+Version: 1.3.0
+Promoted: 2026-09-13T00:00:00-04:00
 
 Files:
   bashrc

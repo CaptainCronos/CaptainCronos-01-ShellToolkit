@@ -152,7 +152,7 @@ Status targets:
 
 ## Quality Gates
 
-Before tagging 1.3.0-rc1:
+Before tagging v1.3.0:
 
 ```text
 cc selftest
@@ -180,4 +180,5 @@ working tree clean
 
 Those belong to later milestones.
 
-1.3.x is complete when the framework can reliably initialize, inspect, update, validate, and support storage/workbench operations through stable namespaces.
+v1.3.0 completes the framework: it can reliably initialize, inspect, update,
+validate, and support storage/workbench operations through stable namespaces.

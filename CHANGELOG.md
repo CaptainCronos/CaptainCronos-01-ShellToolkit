@@ -6,7 +6,15 @@ The format follows a simple milestone-based structure until the project reaches 
 
 ---
 
-## Unreleased — v1.3.0-beta3
+## v1.3.0 — Blackbeard (2026-09-13)
+
+### Purpose
+
+Final release of the completed 1.3 framework. It delivers stable namespaces,
+release and documentation tooling, presentation helpers, kernel management,
+capability-backed platform interfaces, and the validated local plugin and
+capability foundation. Phase 3 / Alpha and all seven of its presentation
+components are complete; Phase 4 remains planned for v1.4.
 
 ### Added
 

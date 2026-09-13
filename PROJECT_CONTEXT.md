@@ -9,9 +9,9 @@
 
 **Project Context Version:** 1.0.0
 
-**Toolkit Version:** v1.3.0-beta2 ("Blackbeard")
+**Toolkit Version:** v1.3.0 ("Blackbeard")
 
-**Last Reviewed:** 2026-08-29
+**Last Reviewed:** 2026-09-13
 
 ---
 
