@@ -6,6 +6,7 @@ workflow additions, and validation requirements. The Engineering Manual takes
 precedence on general engineering policy.
 
 - [Architecture](Architecture.md)
+- [Host awareness](Host-Awareness.md)
 - [Command framework](Command-Framework.md)
 - [Engineering overview](Engineering.md)
 - [Repository layout](Repository-Layout.md)

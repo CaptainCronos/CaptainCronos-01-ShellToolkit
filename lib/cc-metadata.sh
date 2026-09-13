@@ -115,6 +115,7 @@ drive-test|namespace|cc drive-test <subcommand> DEVICE|Start or inspect SMART se
 drives|flat-no-switches|cc drives|Show physical devices, filesystems, labels, usage, and mounts.|none
 env|namespace-with-switches|cc env [subcommand] [switches]|Inspect or repair host identity, shell files, and PATH health.|namespace
 framework|namespace|cc framework [subcommand]|Inspect or verify framework milestone status.|namespace
+host|namespace-with-switches|cc host [status|facts|capabilities|requirements] [switches]|Show composed host awareness and role requirements.|namespace
 gitflow|interactive|cc gitflow [REPOSITORY]|Launch the interactive Captain Cronos Git assistant.|any
 helpme-refresh|flat-with-switches|cc helpme-refresh [switches]|Preview or replace the installed helpme function.|none
 init|interactive|cc init [switches]|Initialize a portable host identity, optionally interactively.|none
@@ -188,6 +189,8 @@ env/doctor|--fix, --apply|0|Repair managed PATH configuration after environment 
 helpme-refresh|--dry-run|0|Preview replacement of the installed helpme function. [default]
 helpme-refresh|--apply|0|Authorize replacement of the managed helpme function block.
 init|--apply|0|Authorize host identity and managed environment writes; omission is dry-run. [default: dry-run]
+host/requirements|--role ROLE|1|Inspect requirements for ROLE without changing configured host state.
+host/requirements|--apply|0|Install only revalidated missing required provider-mapped prerequisites; never refresh package metadata.
 init|--interactive|0|Collect host identity choices interactively.
 init|--selftest|0|Run the engineering selftest after initialization.
 init|--host-id ID|1|Set the normalized Captain Cronos host identifier.
@@ -341,6 +344,10 @@ env|doctor|Run environment diagnostics and optionally repair PATH.|env/doctor
 framework|status|Show framework milestone progress.|framework/status
 framework|checklist|Print the 1.3 completion checklist.|framework/checklist
 framework|verify|Run framework quality gates.|framework/verify
+host|status|Show concise composed host status.|host/status
+host|facts|Show normalized observed and configured host facts.|host/facts
+host|capabilities|Show unified capability resolution.|host/capabilities
+host|requirements|Show configured-role semantic requirement resolution.|host/requirements
 kernel|status|Show kernel state and boot filesystem usage.|kernel/status
 kernel|help|Show kernel namespace help.|kernel/help
 kernel|list|List installed kernels and protection state.|kernel/list

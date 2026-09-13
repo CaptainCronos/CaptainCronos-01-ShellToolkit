@@ -117,6 +117,24 @@ download client, or HTTP API client instead of selecting applications directly.
 `cc programs`, `cc programs check`, and `cc programs show CAPABILITY` provide
 read-only reporting. They do not install programs or modify host configuration.
 
+## Host Awareness and Requirements
+
+`lib/cc-host.sh` is a read-only composition layer over configuration,
+environment, platform, and capability libraries. It reports observed facts and
+configured context without persisting snapshots. The configured Captain Cronos
+host ID remains distinct from the human hostname and is never derived from
+`/etc/machine-id`.
+
+`lib/cc-requirements.sh` supplies conservative semantic requirements for the
+single configured `HOST_ROLE`. `config/requirements.conf` is repository-owned
+data mapping semantic capabilities to package names by the existing package
+manager family. `cc host requirements` has no mutation, privilege escalation,
+network fetch, or package-index refresh; its explicit `--apply` route uses only
+`cc-packages.sh`, revalidates each eligible required prerequisite, and never
+changes host configuration. Optional, unsupported, unknown, and incompatible
+requirements do not trigger installation. Desktop and session data are
+informational evidence, never role inference.
+
 System package execution is layered separately in `lib/cc-packages.sh`:
 
 ```text

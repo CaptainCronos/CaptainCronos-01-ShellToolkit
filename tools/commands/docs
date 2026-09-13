@@ -42,6 +42,7 @@ DOCS_BASH="$(type -P bash)" || {
     printf 'docs: could not resolve the Bash executable.\n' >&2
     exit 127
 }
+DOCS_REFERENCE_HOME=""
 
 ACTION="build"
 OUT_DIR="$PROJECT_ROOT/docs/generated"
@@ -180,7 +181,10 @@ generate_reference() {
 docs_reference_cc() {
     local reference_path reference_home
     reference_path="$PATH"
-    reference_home="${HOME:-}"
+    if [ -z "$DOCS_REFERENCE_HOME" ]; then
+        cc_temp_dir DOCS_REFERENCE_HOME "${TMPDIR:-/tmp}/cc-docs-home.XXXXXX" || return 1
+    fi
+    reference_home="$DOCS_REFERENCE_HOME"
     (
         # Generated command documentation is a repository artifact. Do not let
         # caller shell hooks, exported functions, user program mappings,

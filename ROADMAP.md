@@ -365,23 +365,55 @@ unfinished Phase 3 / Alpha components.
 
 ## Phase 4 — Infrastructure and Toolkit Expansion
 
-Status: **Planned for v1.4**
+Status: **Planned / In Progress for v1.4**
 
 Purpose:
 
 Begin adding larger user-facing infrastructure modules on top of the completed 1.3 framework.
 
-Candidate areas:
+### Component 1 — Host Awareness, Capabilities, and Requirements Foundation
 
-- Additional prompt templates backed by the dynamic Prompt Engine.
-- TrueNAS administration.
-- ZFS pool management.
-- NAS backup verification.
-- System and service health monitoring.
-- Docker and local service management.
-- Bitcoin node operations.
-- Network diagnostics.
-- Rescue USB utilities.
+Status: **In Progress**
+
+Establish a read-only composed host model, explicit singular `HOST_ROLE`,
+semantic capability requirements, repository-owned package providers, and an
+explicit revalidated prerequisite-installation path. `cc host` composes the
+existing focused commands and never replaces them. Package metadata refresh is
+not part of requirement planning or apply. Desktop/session evidence is
+informational only and never assigns a role. `cc doctor` consumes the
+read-only requirement summary.
+
+### Component 2 — Network Diagnostics Foundation
+
+Status: **Planned**
+
+### Component 3 — Storage, ZFS, and NAS Verification Foundation
+
+Status: **Planned**
+
+### Component 4 — System and Service Health Monitoring
+
+Status: **Planned**
+
+### Component 5 — Container and Local-Service Management
+
+Status: **Planned**
+
+### Component 6 — TrueNAS Administration
+
+Status: **Planned**
+
+### Component 7 — Bitcoin Node Operations
+
+Status: **Planned**
+
+### Component 8 — Rescue USB Utilities
+
+Status: **Planned**
+
+### Component 9 — Prompt Template Expansion
+
+Status: **Planned**
 
 ---
 

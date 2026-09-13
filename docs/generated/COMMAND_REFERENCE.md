@@ -901,6 +901,45 @@ Switches:
   --version......... Show toolkit version information.
 ~~~
 
+## cc host
+
+~~~text
+Usage:
+  cc host [status]
+  cc host facts
+  cc host capabilities
+  cc host requirements [--role ROLE] [--apply]
+
+Host facts and requirement planning are read-only.  Requirement apply installs
+only eligible missing required packages through the semantic package layer; it
+never refreshes package metadata or changes host configuration.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc host
+
+Usage:
+  cc host [status
+
+facts
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status.............. Show concise composed host status.
+  facts............... Show normalized observed and configured host facts.
+  capabilities........ Show unified capability resolution.
+  requirements........ Show configured-role semantic requirement resolution.
+
+Discovery:
+  cc host <subcommand> switches
+~~~
+
 ## cc init
 
 ~~~text

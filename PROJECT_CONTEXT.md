@@ -261,6 +261,7 @@ Expand ShellToolkit's implementation capabilities to support:
 - Live USB qualification
 - Metadata-driven command generation
 - AI-assisted engineering workflows
+- Read-only host awareness, semantic capabilities, and explicit prerequisite planning
 
 ---
 

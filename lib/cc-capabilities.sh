@@ -31,16 +31,36 @@ cc_capability_result() {
         status="$(cc_program_status "$capability")"
         case "$status" in
             OK) printf 'available\tPASS\tcore/program\tconfigured provider is available\n' ;;
-            MISSING) printf 'missing-dependency\tFAIL\tcore/program\tconfigured provider is missing\n' ;;
-            *) printf 'unavailable\tFAIL\tcore/program\tconfigured provider is incompatible\n' ;;
+            MISSING) printf 'missing\tFAIL\tcore/program\tconfigured provider is missing\n' ;;
+            *) printf 'incompatible\tFAIL\tcore/program\tconfigured provider is incompatible\n' ;;
         esac
         return
     fi
+    # Composite semantic aliases deliberately compose existing probes; they do
+    # not create a second scanner or claim health semantics.
+    case "$capability" in
+        container-runtime)
+            if cc_platform_capability_exists docker || cc_platform_capability_exists podman; then
+                printf 'available\tPASS\tcore/platform\tdocker or podman detected\n'
+            else
+                printf 'missing\tFAIL\tcore/platform\tno supported container runtime detected\n'
+            fi
+            return
+            ;;
+        network-sockets)
+            if cc_platform_capability_exists sockets; then
+                printf 'available\tPASS\tcore/platform\tsocket inspection detected\n'
+            else
+                printf 'missing\tFAIL\tcore/platform\tsocket inspection unavailable\n'
+            fi
+            return
+            ;;
+    esac
     if cc_platform_capability_known "$capability"; then
         if cc_platform_capability_exists "$capability"; then
             printf 'available\tPASS\tcore/platform\tdetected on this host\n'
         else
-            printf 'unavailable\tFAIL\tcore/platform\tnot detected on this host\n'
+            printf 'missing\tFAIL\tcore/platform\tnot detected on this host\n'
         fi
         return
     fi
@@ -58,6 +78,9 @@ cc_capability_result() {
         fi
     done < <(cc_plugin_capability_tsv "$capability")
     if [ -z "$selected_id" ]; then
+        # Preserve the public legacy unknown-capability result.  The host
+        # requirement layer separately reports unknown/unresolved only for a
+        # declared requirement whose probe cannot establish a state.
         printf 'unavailable\tFAIL\tnone\tunknown capability\n'
         return
     fi
@@ -101,6 +124,7 @@ cc_capability_status() {
 cc_capability_list() {
     {
         cc_platform_capability_list
+        printf '%s\n' container-runtime network-sockets
         cc_program_capabilities
         cc_plugin_capability_tsv | cut -f1
     } | LC_ALL=C sort -u

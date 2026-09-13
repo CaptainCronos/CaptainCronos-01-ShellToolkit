@@ -28,6 +28,7 @@ Toolkit version: 1.3.0 (Blackbeard)
 | cc framework | namespace | 1.3.0 | Show framework milestone status and 1.3 completion progress. |
 | cc gitflow | interactive | 1.3.0 | Launch the interactive Git assistant. |
 | cc helpme-refresh | flat-with-switches | 1.3.0 | Replace installed helpme with canonical framework help. |
+| cc host | namespace-with-switches | 1.3.0 | Show composed host facts, capabilities, and role requirements. |
 | cc init | interactive | 1.3.0 | Initialize a Captain Cronos host identity and local environment. |
 | cc install | flat-with-switches | 1.3.0 | Install the active toolkit launcher into ~/bin. |
 | cc kernel | namespace | 1.3.0 | Inspect and safely manage installed kernels. |

@@ -24,6 +24,7 @@ source "$TOOLKIT_ROOT/lib/cc-context.sh"
 source "$TOOLKIT_ROOT/lib/cc-common.sh"
 source "$TOOLKIT_ROOT/lib/cc-kernel.sh"
 source "$TOOLKIT_ROOT/lib/cc-config.sh"
+source "$TOOLKIT_ROOT/lib/cc-requirements.sh"
 cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 FULL=0
@@ -175,6 +176,19 @@ while IFS=$'\t' read -r config_status config_label config_detail; do
     cc_status_line "$config_label" "$config_status"
     [ "$config_status" = PASS ] || cc_warn "$config_label: $config_detail"
 done < <(cc_config_validation_rows || true)
+
+cc_log "Checking configured-role requirements..."
+requirement_role="$(cc_config_get HOST_ROLE workstation 2>/dev/null || printf workstation)"
+if IFS=$'\t' read -r requirement_state requirement_detail < <(cc_requirements_summary "$requirement_role" || true); then
+    case "$requirement_state" in
+        FAIL) FAILURES=$((FAILURES + 1)) ;;
+        WARN) WARNINGS=$((WARNINGS + 1)) ;;
+        PASS) ;;
+        *) requirement_state=WARN; WARNINGS=$((WARNINGS + 1)) ;;
+    esac
+    cc_status_line "Configured-role requirements" "$requirement_state"
+    [ "$requirement_state" = PASS ] || cc_warn "Configured-role requirements: ${requirement_detail:-unresolved}"
+fi
 
 echo
 cc_log "Checking host basics..."

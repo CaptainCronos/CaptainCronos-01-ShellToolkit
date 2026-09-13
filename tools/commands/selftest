@@ -269,10 +269,14 @@ selftest_suite() {
     "$runner" "PATH environment behavior" shell bash "$PROJECT_ROOT/tests/path-environment.sh"
     "$runner" "Context library" core check_library cc-context.sh
     "$runner" "Config library" configuration check_library cc-config.sh
+    "$runner" "Host composition library" host check_library cc-host.sh
+    "$runner" "Requirements library" host check_library cc-requirements.sh
     "$runner" "Temporary-resource lifecycle" core bash "$PROJECT_ROOT/tests/temp-lifecycle.sh"
     "$runner" "Persistent-resource retention" maintenance bash "$PROJECT_ROOT/tests/retention.sh"
     "$runner" "Report lifecycle" maintenance bash "$PROJECT_ROOT/tests/reports.sh"
     "$runner" "Semantic dependencies" dependencies bash "$PROJECT_ROOT/tests/dependencies.sh"
+    "$runner" "Host composition" host bash "$PROJECT_ROOT/tests/host.sh"
+    "$runner" "Host requirements" host bash "$PROJECT_ROOT/tests/requirements.sh"
     "$runner" "Plugin library" plugins check_library cc-plugins.sh
     "$runner" "Capability library" plugins check_library cc-capabilities.sh
     "$runner" "Plugin and capability foundation" plugins bash "$PROJECT_ROOT/tests/plugins.sh"

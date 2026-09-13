@@ -44,6 +44,8 @@ Important libraries:
 - `cc-deps.sh` — semantic capability and literal executable dependency checks
 - `cc-plugins.sh` — data-only local plugin discovery, validation, and inventory
 - `cc-capabilities.sh` — authoritative core, program, and plugin capability resolution
+- `cc-host.sh` — normalized, read-only observed and configured host facts
+- `cc-requirements.sh` — semantic role requirements, provider resolution, and explicit package plans
 - `cc-yaml.sh` — compatibility API for existing asset YAML operations
 - `cc-metadata.sh` — command metadata and registry helpers
 - `cc-assets.sh` — local asset database helpers

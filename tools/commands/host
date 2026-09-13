@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+#
+# Captain Cronos Shell Toolkit
+# Script      : host
+# Version     : reads VERSION
+# Category    : Diagnostics
+# Requires    : bash hostname awk command
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Show composed host facts, capabilities, and role requirements.
+
+set -euo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-host.sh"
+source "$PROJECT_ROOT/lib/cc-requirements.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc host [status]
+  cc host facts
+  cc host capabilities
+  cc host requirements [--role ROLE] [--apply]
+
+Host facts and requirement planning are read-only.  Requirement apply installs
+only eligible missing required packages through the semantic package layer; it
+never refreshes package metadata or changes host configuration.
+EOF_HELP
+}
+
+action=status role="" apply=0
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h) usage; exit 0 ;; --version) cc_version; exit 0 ;;
+        status|facts|capabilities|requirements) action="$1"; shift ;;
+        --role) shift; role="${1:-}"; [ -n "$role" ] || { usage >&2; exit 2; }; shift ;;
+        --apply) apply=1; shift ;;
+        *) usage >&2; exit 2 ;;
+    esac
+done
+[ "$apply" -eq 0 ] || [ "$action" = requirements ] || { cc_error '--apply is valid only with requirements.'; exit 2; }
+
+show_status() {
+    local state detail
+    echo 'Host Status'; echo '-----------'
+    printf '%-22s %s\n' 'Toolkit host ID:' "$(cc_env_host_id)"
+    printf '%-22s %s\n' 'Hostname:' "$(cc_host_hostname)"
+    printf '%-22s %s\n' 'Role/profile:' "$(cc_env_role) / $(cc_env_profile)"
+    printf '%-22s %s\n' 'Platform:' "$(cc_platform_name) ($(cc_platform_arch))"
+    IFS=$'\t' read -r state detail < <(cc_requirements_summary "$(cc_env_role)" || true)
+    printf '%-22s %s %s\n' 'Requirements:' "$state" "$detail"
+}
+show_facts() { printf '%-24s %s\n' Fact Value; printf '%-24s %s\n' ---- -----; while IFS=$'\t' read -r key value; do printf '%-24s %s\n' "$key" "$value"; done < <(cc_host_facts_tsv); }
+show_capabilities() { printf '%-24s %-19s %-20s %s\n' Capability State Provider Detail; while read -r cap; do IFS=$'\t' read -r state _ provider detail < <(cc_capability_result "$cap"); printf '%-24s %-19s %-20s %s\n' "$cap" "$state" "$provider" "$detail"; done < <(cc_capability_list); }
+show_requirements() {
+    [ -n "$role" ] || role="$(cc_env_role)"
+    cc_requirement_role_valid "$role" || { cc_error "Unsupported host role: $role"; return 2; }
+    [ "$apply" -eq 0 ] || { cc_requirements_apply "$role"; return; }
+    printf '%-12s %-20s %-10s %-24s %-20s %s\n' Role Capability Criticality Outcome Provider Detail
+    cc_requirements_resolve "$role" | while IFS=$'\t' read -r r cap critical outcome provider detail; do printf '%-12s %-20s %-10s %-24s %-20s %s\n' "$r" "$cap" "$critical" "$outcome" "$provider" "$detail"; done
+}
+case "$action" in status) show_status;; facts) show_facts;; capabilities) show_capabilities;; requirements) show_requirements;; esac
