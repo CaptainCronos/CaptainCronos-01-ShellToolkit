@@ -1303,6 +1303,48 @@ Discovery:
   cc mozilla <subcommand> switches
 ~~~
 
+## cc network
+
+~~~text
+Usage:
+  cc network [status]
+  cc network interfaces
+  cc network routes
+  cc network dns
+  cc network sockets
+  cc network diagnose [--target-ip ADDRESS] [--target-host HOSTNAME] [--target-url URL] [--timeout SECONDS]
+
+All views except diagnose are local and read-only. Diagnose uses bounded,
+non-identifying external probes; it does not persist probe responses.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc network
+
+Usage:
+  cc network [subcommand] [switches]
+
+Inspect local network state and run bounded layered diagnostics.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status............ Show concise local network configuration.
+  interfaces........ Show normalized interfaces and addresses.
+  routes............ Show normalized routes and default gateway.
+  dns............... Show resolver summary and one hostname/NSS resolution test.
+  sockets........... Show local listening sockets without remote connection inventory.
+  diagnose.......... Run bounded local-to-external network diagnostics.
+
+Discovery:
+  cc network <subcommand> switches
+~~~
+
 ## cc platform
 
 ~~~text

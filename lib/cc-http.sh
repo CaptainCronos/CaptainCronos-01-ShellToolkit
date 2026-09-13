@@ -115,3 +115,17 @@ _cc_http_head() {
     fi
     "$program" --fail --silent --show-error --location --head "$url"
 }
+
+# Bounded, bodyless connectivity probe.  This intentionally remains in the
+# HTTP abstraction so callers do not select curl or weaken TLS policy.
+_cc_http_probe_head() {
+    [ "$#" -eq 2 ] || return 2
+    local url="$1" timeout="$2" program
+    [[ "$timeout" =~ ^[1-9][0-9]*$ ]] || return 2
+    case "$url" in https://*) ;; *) return 2;; esac
+    program="$(_cc_http_program)" || return 1
+    "$program" --fail --silent --show-error --location --head \
+        --connect-timeout "$timeout" --max-time "$timeout" "$url" >/dev/null 2>&1 ||
+        "$program" --fail --silent --show-error --location --range 0-0 \
+            --connect-timeout "$timeout" --max-time "$timeout" "$url" >/dev/null 2>&1
+}

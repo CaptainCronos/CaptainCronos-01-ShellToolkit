@@ -332,6 +332,30 @@ behind explicit platform branches. NetworkManager configuration, resolver/DNS
 inspection, reachability probes, and network scanning are separate capabilities;
 they are not treated as substitutes for kernel network or socket state.
 
+### Network Diagnostics Foundation
+
+`cc network` composes those adapters into local normalized TSV records without
+exposing raw `ip`, `ss`, `ifconfig`, or `sockstat` output to consumers. Records
+are `interface(name,state,kind,flags)`, `address(interface,family,address,scope,state)`,
+`route(destination,gateway,interface,source,flags)`, and
+`socket(transport,local_address,port,state,owner,owner_state)`. Findings use
+`state, code, layer, message` and distinguish PASS, WARN, FAIL, and SKIP.
+
+`status`, `interfaces`, `routes`, and `sockets` are local/read-only. `dns` may
+perform one bounded hostname/NSS lookup through `getent`; it never claims that
+NSS success proves public DNS. Resolver state uses `resolvectl` when available,
+otherwise a conservative `/etc/resolv.conf` presence summary; search domains are
+not displayed. Only `diagnose` runs bounded external evidence: optional ICMP,
+route lookup, hostname/NSS resolution, and TLS-verifying HTTPS HEAD with a
+bounded GET-range fallback through `cc-http`. It stores neither responses nor
+network snapshots. ICMP failure is advisory and cannot override a later HTTP
+success. Socket ownership is shown only when the ordinary unprivileged provider
+already exposes it; no diagnostic escalates privileges.
+
+`cc doctor` consumes only the local interface, address, and default-route
+findings. Monthly health consumes the same bounded diagnostic engine instead of
+its former direct single-target ping probe.
+
 ### Service and System Log Architecture
 
 On systemd Linux hosts, service lifecycle and unit/timer inspection resolves the

@@ -37,6 +37,7 @@ Toolkit version: 1.3.0 (Blackbeard)
 | cc monthly-health | flat-with-switches | 1.3.0 | Generate a monthly host health and maintenance report. |
 | cc monthly-health-timer | namespace | 1.3.0 | Retire or inspect the standalone monthly health user timer. |
 | cc mozilla | namespace-with-switches | 1.3.0 | Manage official Mozilla Firefox and Thunderbird archive deployments. |
+| cc network | namespace-with-switches | 1.3.0 | Inspect local network state and run bounded layered diagnostics. |
 | cc platform | namespace | 1.3.0 | Show detected operating platform and host capabilities. |
 | cc plugin | namespace | 1.3.0 | Inspect plugins and explicitly run one validated entrypoint. |
 | cc programs | namespace | 1.3.0 | Show and validate preferred command-line program interfaces. |

@@ -373,7 +373,7 @@ Begin adding larger user-facing infrastructure modules on top of the completed 1
 
 ### Component 1 — Host Awareness, Capabilities, and Requirements Foundation
 
-Status: **In Progress**
+Status: **Complete**
 
 Establish a read-only composed host model, explicit singular `HOST_ROLE`,
 semantic capability requirements, repository-owned package providers, and an
@@ -385,7 +385,7 @@ read-only requirement summary.
 
 ### Component 2 — Network Diagnostics Foundation
 
-Status: **Planned**
+Status: **In Progress**
 
 ### Component 3 — Storage, ZFS, and NAS Verification Foundation
 

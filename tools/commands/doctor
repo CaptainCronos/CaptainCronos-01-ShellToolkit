@@ -25,6 +25,7 @@ source "$TOOLKIT_ROOT/lib/cc-common.sh"
 source "$TOOLKIT_ROOT/lib/cc-kernel.sh"
 source "$TOOLKIT_ROOT/lib/cc-config.sh"
 source "$TOOLKIT_ROOT/lib/cc-requirements.sh"
+source "$TOOLKIT_ROOT/lib/cc-network.sh"
 cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 FULL=0
@@ -96,6 +97,21 @@ doctor_kernel_check() {
         esac
     done < <(_cc_kernel_snapshot_findings)
     return 0
+}
+
+doctor_network_check() {
+    local state code message local_fail=0
+    cc_log "Checking local network foundation..."
+    while IFS=$'\t' read -r state code _ message; do
+        case "$code:$state" in
+            NO_USABLE_INTERFACE:FAIL|NO_USABLE_ADDRESS:FAIL|NO_DEFAULT_ROUTE:FAIL)
+                local_fail=1
+                cc_warn "Network [$code]: $message"
+                ;;
+        esac
+    done < <(cc_network_local_findings_tsv)
+    if [ "$local_fail" -eq 0 ]; then cc_status_line "Local network foundation" "PASS"
+    else WARNINGS=$((WARNINGS + 1)); cc_status_line "Local network foundation" "WARN"; fi
 }
 
 doctor_main() {
@@ -200,6 +216,8 @@ printf '%-18s %s\n' "Load:" "$(awk '{print $1" "$2" "$3}' /proc/loadavg 2>/dev/n
 if [ "${CC_DOCTOR_SKIP_KERNEL:-0}" != 1 ]; then
     doctor_kernel_check
 fi
+
+doctor_network_check
 
 cc_log "Checking disk pressure..."
 if df -hT | awk 'NR==1 || /^\/dev\//' | awk 'NR==1 {print; next} {gsub(/%/,"",$6); print; if ($6+0 >= 90) high=1} END {if (high) exit 2}'; then

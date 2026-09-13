@@ -125,6 +125,7 @@ kernel-cleanup|compatibility-wrapper|cc kernel-cleanup [switches]|Compatibility 
 maintenance|namespace-with-switches|cc maintenance [subcommand] [switches]|Inspect persistent toolkit resource ownership and retention.|namespace
 monthly-health|flat-with-switches|cc monthly-health [switches]|Generate a host health and maintenance report without kernel cleanup.|none
 monthly-health-timer|namespace|cc monthly-health-timer <subcommand>|Manage the optional user-scoped monthly-health timer.|namespace
+network|namespace-with-switches|cc network [subcommand] [switches]|Inspect local network state and run bounded layered diagnostics.|namespace
 mozilla|namespace-with-switches|cc mozilla [ACTION] [TARGET] [switches]|Manage official Mozilla archive deployments.|namespace
 platform|namespace|cc platform [summary|capabilities]|Show platform identity and capabilities.|namespace
 plugin|namespace|cc plugin [list|status|info ID|run ID OPERATION]|Inspect plugins or explicitly run one validated entrypoint.|namespace
@@ -215,6 +216,10 @@ maintenance/inventory|--format FORMAT|1|Render inventory as a readable table or 
 maintenance/cleanup|--dry-run|0|Explicitly request the read-only cleanup preview; cleanup remains disabled.
 monthly-health|--stdout|0|Write the report to standard output instead of a report file.
 monthly-health|--file|0|Write the report file under the configured report directory. [default]
+network/diagnose|--target-ip ADDRESS|1|Use ADDRESS for bounded external route evidence.
+network/diagnose|--target-host HOSTNAME|1|Use HOSTNAME for hostname/NSS resolution evidence.
+network/diagnose|--target-url URL|1|Use HTTPS URL for the bounded HTTP/TLS probe.
+network/diagnose|--timeout SECONDS|1|Set bounded connect and total probe timeout seconds.
 reports|--format FORMAT|1|Render list or prune as a readable table or stable TSV. [default: table]
 reports/list|--format FORMAT|1|Render retained reports as a readable table or stable TSV. [default: table]
 reports/list|--permissions|0|Show recognized report permission-policy violations in a readable, read-only table.
@@ -369,6 +374,12 @@ monthly-health-timer|run-once|Run monthly health once.|monthly-health-timer/run-
 monthly-health-timer|install-standalone|Install the optional standalone user timer.|monthly-health-timer/install-standalone
 monthly-health-timer|enable|Enable the optional user timer.|monthly-health-timer/enable
 monthly-health-timer|disable|Disable the optional user timer.|monthly-health-timer/disable
+network|status|Show concise local network configuration.|network/status
+network|interfaces|Show normalized interfaces and addresses.|network/interfaces
+network|routes|Show normalized routes and default gateway.|network/routes
+network|dns|Show resolver summary and one hostname/NSS resolution test.|network/dns
+network|sockets|Show local listening sockets without remote connection inventory.|network/sockets
+network|diagnose|Run bounded local-to-external network diagnostics.|network/diagnose
 mozilla|status|Inspect Mozilla archive installs, Snap conflicts, and launchers.|mozilla/status
 mozilla|install|Preview or install official Mozilla archives.|mozilla/install
 mozilla|repair|Preview or restore Mozilla links and canonical launchers.|mozilla/repair

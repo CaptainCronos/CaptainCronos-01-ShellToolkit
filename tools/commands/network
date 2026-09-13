@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : network
+# Version     : reads VERSION
+# Category    : Diagnostics
+# Requires    : bash awk command
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect local network state and run bounded layered diagnostics.
+# ==============================================================================
+
+set -euo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-network.sh"
+source "$PROJECT_ROOT/lib/cc-http.sh"
+
+usage() { cat <<'EOF_HELP'
+Usage:
+  cc network [status]
+  cc network interfaces
+  cc network routes
+  cc network dns
+  cc network sockets
+  cc network diagnose [--target-ip ADDRESS] [--target-host HOSTNAME] [--target-url URL] [--timeout SECONDS]
+
+All views except diagnose are local and read-only. Diagnose uses bounded,
+non-identifying external probes; it does not persist probe responses.
+EOF_HELP
+}
+
+action=status target_ip=1.1.1.1 target_host=example.com target_url=https://example.com timeout=3
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --help|-h) usage; exit 0;; --version) cc_version; exit 0;;
+        status|interfaces|routes|dns|sockets|diagnose) action="$1"; shift;;
+        --target-ip) target_ip="${2:-}"; shift 2;;
+        --target-host) target_host="${2:-}"; shift 2;;
+        --target-url) target_url="${2:-}"; shift 2;;
+        --timeout) timeout="${2:-}"; shift 2;;
+        *) usage >&2; exit 2;;
+    esac
+done
+[[ "$timeout" =~ ^[1-9][0-9]*$ ]] || { cc_error 'timeout must be a positive whole number'; exit 2; }
+[ -n "$target_ip" ] && [ -n "$target_host" ] || { cc_error 'diagnostic targets must not be empty'; exit 2; }
+case "$target_url" in https://*|http://*) ;; *) cc_error 'target URL must use HTTP or HTTPS'; exit 2;; esac
+case "$target_url" in *://*@*) cc_error 'target URL must not contain credentials'; exit 2;; esac
+
+show_status() {
+    local route source state
+    cc_network_snapshot
+    echo 'Network Status'; echo '--------------'
+    printf '%-20s %s\n' 'Platform:' "$(_cc_net_platform)"
+    printf '%-20s %s\n' 'Usable interfaces:' "$(awk -F '\t' '$2=="up" && $3!="loopback" {n++} END{print n+0}' <<<"$CC_NET_INTERFACES")"
+    printf '%-20s %s\n' 'IPv4 addresses:' "$(awk -F '\t' '$2=="ipv4" && $1!="lo" {n++} END{print n+0}' <<<"$CC_NET_ADDRESSES")"
+    printf '%-20s %s\n' 'IPv6 addresses:' "$(awk -F '\t' '$2=="ipv6" && $1!="lo" {n++} END{print n+0}' <<<"$CC_NET_ADDRESSES")"
+    route="$(cc_network_default_route_tsv || true)"
+    if [ -n "$route" ]; then IFS=$'\t' read -r _ gateway iface source _ <<<"$route"; printf '%-20s %s via %s%s\n' 'Default route:' "${gateway:-direct}" "${iface:-unknown}" "${source:+ ($source)}"; else printf '%-20s %s\n' 'Default route:' 'not observed'; fi
+    IFS=$'\t' read -r source state < <(cc_network_dns_summary_tsv); printf '%-20s %s (%s)\n' 'Resolver source:' "$source" "$state"
+    printf '%-20s %s\n' 'Listening sockets:' "$(awk 'NF {n++} END{print n+0}' <<<"$CC_NET_SOCKETS")"
+}
+show_interfaces() { cc_network_snapshot; printf '%-18s %-10s %-20s %s\n' Interface State Kind Flags; printf '%s\n' "$CC_NET_INTERFACES" | while IFS=$'\t' read -r n s k f; do printf '%-18s %-10s %-20s %s\n' "$n" "$s" "$k" "$f"; done; echo; printf '%-18s %-8s %-40s %s\n' Interface Family Address Scope; printf '%s\n' "$CC_NET_ADDRESSES" | while IFS=$'\t' read -r i f a sc _; do printf '%-18s %-8s %-40s %s\n' "$i" "$f" "$a" "$sc"; done; }
+show_routes() { cc_network_snapshot; printf '%-18s %-30s %-18s %-20s %s\n' Destination Gateway Interface Source Flags; printf '%s\n' "$CC_NET_ROUTES" | while IFS=$'\t' read -r d g i s f; do printf '%-18s %-30s %-18s %-20s %s\n' "$d" "${g:-direct}" "$i" "$s" "$f"; done; }
+show_dns() { local source state; IFS=$'\t' read -r source state < <(cc_network_dns_summary_tsv); echo 'Resolver Configuration'; echo '----------------------'; printf '%-20s %s\n' 'Source:' "$source"; printf '%-20s %s\n' 'State:' "$state"; echo 'Search domains: hidden'; if cc_network_resolve_host "$target_host"; then printf '%-20s %s\n' 'Hostname/NSS test:' "PASS ($target_host)"; else printf '%-20s %s\n' 'Hostname/NSS test:' "FAIL ($target_host)"; fi; }
+show_sockets() { cc_network_snapshot; printf '%-8s %-35s %-8s %-10s %-24s %s\n' Transport Local-address Port State Owner Owner-state; printf '%s\n' "$CC_NET_SOCKETS" | while IFS=$'\t' read -r p a po st o os; do printf '%-8s %-35s %-8s %-10s %-24s %s\n' "$p" "$a" "$po" "$st" "$o" "$os"; done; }
+show_diagnose() { printf '%-6s %-32s %-12s %s\n' State Code Layer Message; cc_network_diagnose_tsv "$target_ip" "$target_host" "$target_url" "$timeout" | while IFS=$'\t' read -r state code layer message; do printf '%-6s %-32s %-12s %s\n' "$state" "$code" "$layer" "$message"; done; }
+case "$action" in status) show_status;; interfaces) show_interfaces;; routes) show_routes;; dns) show_dns;; sockets) show_sockets;; diagnose) show_diagnose;; esac

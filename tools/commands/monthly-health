@@ -22,6 +22,7 @@ source "$PROJECT_ROOT/lib/cc-config.sh"
 source "$PROJECT_ROOT/lib/cc-report.sh"
 source "$PROJECT_ROOT/lib/cc-kernel.sh"
 source "$PROJECT_ROOT/lib/cc-network.sh"
+source "$PROJECT_ROOT/lib/cc-http.sh"
 source "$PROJECT_ROOT/lib/cc-services.sh"
 source "$PROJECT_ROOT/lib/cc-results.sh"
 
@@ -311,8 +312,12 @@ print_security_network() {
         echo "fail2ban-client not available"
         incomplete=1
     fi
-    subsection "Network connectivity"
-    ping -c 2 -W 2 8.8.8.8 >/dev/null 2>&1 && echo "internet reachable" || echo "internet check failed"
+    subsection "Network diagnostics"
+    echo "Bounded layered diagnostics; external targets are defaults and do not collect response bodies."
+    cc_network_diagnose_tsv "${CC_NETWORK_TARGET_IP:-1.1.1.1}" "${CC_NETWORK_TARGET_HOST:-example.com}" "${CC_NETWORK_TARGET_URL:-https://example.com}" "${CC_NETWORK_TIMEOUT:-3}" |
+        while IFS=$'\t' read -r state code layer message; do
+            printf '%-6s %-32s %-12s %s\n' "$state" "$code" "$layer" "$message"
+        done || incomplete=1
     [ "$incomplete" -eq 0 ] || return "$CC_RESULT_WARN_RC"
 }
 
