@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#
+# Captain Cronos Shell Toolkit
+# Script      : container
+# Version     : reads VERSION
+# Category    : Infrastructure
+# Requires    : bash awk command
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect bounded local Docker and Podman containers safely.
+
+set -euo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"; cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-containers.sh"
+
+usage() { cat <<'EOF'
+Usage:
+  cc container [status]
+  cc container list [--runtime docker|podman] [--limit N]
+  cc container show NAME_OR_ID [--runtime docker|podman]
+  cc container logs NAME_OR_ID [--runtime docker|podman] [--since WINDOW] [--limit N]
+  cc container start|stop|restart NAME_OR_ID [--runtime docker|podman] [--apply]
+
+Local host only. Metadata is normalized and excludes inspect JSON, environment,
+and labels. Logs are bounded raw application output and can contain secrets.
+EOF
+}
+action="${1:-status}"; [ "$#" -gt 0 ] && shift || true
+runtime="" limit="$CC_CONTAINER_LIST_DEFAULT" since="24 hours ago" apply=0 target=""
+case "$action" in --help|-h|help) usage; exit 0;; --version) cc_version; exit 0;; status|list|show|logs|start|stop|restart) ;; *) usage >&2; exit 2;; esac
+case "$action" in show|logs|start|stop|restart) target="${1:-}"; [ -n "$target" ] || { usage >&2; exit 2; }; shift;; esac
+while [ "$#" -gt 0 ]; do case "$1" in --runtime) runtime="${2:-}"; shift 2;; --limit) limit="${2:-}"; shift 2;; --since) since="${2:-}"; shift 2;; --apply) apply=1; shift;; *) usage >&2; exit 2;; esac; done
+case "$action" in list) _cc_container_positive_limit "$limit" "$CC_CONTAINER_LIST_MAX" || { cc_error "--limit must be 1-$CC_CONTAINER_LIST_MAX"; exit 2; };; logs) _cc_container_positive_limit "$limit" "$CC_CONTAINER_LOG_MAX" && _cc_container_since_valid "$since" || { cc_error "invalid bounded log window or limit"; exit 2; };; *) [ "$limit" = "$CC_CONTAINER_LIST_DEFAULT" ] || { cc_error '--limit is valid only with list or logs'; exit 2; };; esac
+[ -z "$runtime" ] || _cc_container_runtime_valid "$runtime" || { cc_error 'runtime must be docker or podman'; exit 2; }
+select_runtime() { local selected; selected="$(cc_container_provider_select "$runtime" 2>/dev/null)" || { cc_error "select --runtime when both local runtimes are usable, or select an accessible runtime"; return 1; }; printf '%s\n' "$selected"; }
+case "$action" in
+ status) printf '%-10s %-10s %-12s %s\n' Runtime Client Access Detail; cc_container_provider_records_tsv | while IFS=$'\t' read -r r c a d; do printf '%-10s %-10s %-12s %s\n' "$r" "$c" "$a" "$d"; done;;
+ list) selected="$(select_runtime)" || exit 20; printf '%-8s %-12s %-22s %-28s %-12s %-10s %s\n' Runtime ID Name Image State Health Ports; cc_container_records_tsv "$selected" | head -n "$limit" | while IFS=$'\t' read -r r id n image state health _ ports; do printf '%-8s %-12s %-22s %-28s %-12s %-10s %s\n' "$r" "$id" "$n" "$image" "$state" "$health" "$ports"; done;;
+ show) selected="$(select_runtime)" || exit 20; record="$(cc_container_record_tsv "$selected" "$target")" || { cc_error 'container not found or runtime inaccessible'; exit 1; }; printf '%-18s %s\n' Runtime "$(cut -f1 <<<"$record")" ID "$(cut -f2 <<<"$record")" Name "$(cut -f3 <<<"$record")" Image "$(cut -f4 <<<"$record")" State "$(cut -f5 <<<"$record")" Health "$(cut -f6 <<<"$record")" Created "$(cut -f7 <<<"$record")" 'Published ports' "$(cut -f8 <<<"$record")";;
+ logs) selected="$(select_runtime)" || exit 20; cc_warn 'Container logs are bounded raw application output and may contain secrets.'; cc_container_logs "$selected" "$target" "$since" "$limit";;
+ start|stop|restart) selected="$(select_runtime)" || exit 20; if [ "$apply" -eq 0 ]; then printf 'DRY RUN: %s %s %s\n' "$selected" "$action" "$target"; else cc_container_action "$selected" "$action" "$target" || { cc_error 'container lifecycle action failed or runtime is inaccessible'; exit 1; }; fi;;
+esac

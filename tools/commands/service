@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# Captain Cronos Shell Toolkit
+# Script      : service
+# Version     : reads VERSION
+# Category    : Infrastructure
+# Requires    : bash awk command
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect and control bounded local services without escalation.
+
+set -euo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"; cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-services.sh"
+
+CC_SERVICE_LIST_DEFAULT=50
+CC_SERVICE_LIST_MAX=200
+CC_SERVICE_LOG_DEFAULT=100
+CC_SERVICE_LOG_MAX=1000
+usage() { cat <<'EOF'
+Usage:
+  cc service [status]
+  cc service list [--scope system|user] [--limit N]
+  cc service show UNIT [--scope system|user]
+  cc service logs UNIT [--scope system|user] [--since WINDOW] [--limit N]
+  cc service start|stop|restart UNIT [--scope system|user] [--apply]
+
+All reads are local and bounded. System-scope lifecycle actions never invoke
+sudo; run with sufficient existing privilege when --apply is requested.
+EOF
+}
+valid_limit() { [[ "$1" =~ ^[1-9][0-9]*$ ]] && [ "$1" -le "$2" ]; }
+valid_since() { [ -n "$1" ] && [ "${#1}" -le 64 ] && [[ "$1" != *$'\n'* ]] && [[ "$1" != *$'\r'* ]]; }
+action="${1:-status}"; [ "$#" -gt 0 ] && shift || true
+scope=system limit="" since='24 hours ago' apply=0 unit=""
+
+case "$action" in
+    logs) limit="$CC_SERVICE_LOG_DEFAULT" ;;
+    *)    limit="$CC_SERVICE_LIST_DEFAULT" ;;
+esac
+case "$action" in --help|-h|help) usage; exit 0;; --version) cc_version; exit 0;; status|list|show|logs|start|stop|restart) ;; *) usage >&2; exit 2;; esac
+case "$action" in show|logs|start|stop|restart) unit="${1:-}"; [ -n "$unit" ] || { usage >&2; exit 2; }; shift;; esac
+while [ "$#" -gt 0 ]; do case "$1" in --scope) scope="${2:-}"; shift 2;; --limit) limit="${2:-}"; shift 2;; --since) since="${2:-}"; shift 2;; --apply) apply=1; shift;; *) usage >&2; exit 2;; esac; done
+_cc_service_validate_scope "$scope" >/dev/null || { cc_error 'scope must be system or user'; exit 2; }
+case "$action" in list) valid_limit "$limit" "$CC_SERVICE_LIST_MAX" || { cc_error "--limit must be 1-$CC_SERVICE_LIST_MAX"; exit 2; };; logs) valid_limit "$limit" "$CC_SERVICE_LOG_MAX" && valid_since "$since" || { cc_error 'invalid bounded log window or limit'; exit 2; };; *) [ "$limit" = "$CC_SERVICE_LIST_DEFAULT" ] || { cc_error '--limit is valid only with list or logs'; exit 2; };; esac
+case "$action" in
+ status) printf '%-8s %-32s %-12s %-12s %-14s %s\n' Scope Unit Load Active Enabled Collection; _cc_service_failed_records_tsv "$scope" 2>/dev/null | head -n "$CC_SERVICE_LIST_DEFAULT" | while IFS=$'\t' read -r s u _ load active _ enabled _ _ _ collection _; do printf '%-8s %-32s %-12s %-12s %-14s %s\n' "$s" "$u" "$load" "$active" "$enabled" "$collection"; done;;
+ list) printf '%-8s %-30s %-12s %-12s %-14s %-10s %s\n' Scope Unit Load Active Enabled Restarts Collection; _cc_service_records_tsv "$scope" "$limit" | while IFS=$'\t' read -r s u _ load active _ enabled _ _ restarts collection _; do printf '%-8s %-30s %-12s %-12s %-14s %-10s %s\n' "$s" "$u" "$load" "$active" "$enabled" "$restarts" "$collection"; done;;
+ show) record="$(_cc_service_record_tsv "$scope" "$unit")" || { cc_error 'service inspection unavailable'; exit 1; }; IFS=$'\t' read -r s u description load active sub enabled type pid restarts collection _ _ <<<"$record"; printf '%-18s %s\n' Scope "$s" Unit "$u" Description "$description" Load "$load" Active "$active" Sub-state "$sub" Enabled "$enabled" Type "$type" PID "$pid" Restarts "$restarts" Collection "$collection";;
+ logs) _cc_log_query "$scope" "$since" "$limit" "$unit" || { cc_error 'bounded service log query unavailable or restricted'; exit 1; };;
+ start|stop|restart) if [ "$apply" -eq 0 ]; then printf 'DRY RUN: %s service action %s %s\n' "$scope" "$action" "$unit"; else _cc_service_action_unprivileged "$action" "$scope" "$unit" || { cc_error 'service lifecycle action failed or requires existing privilege'; exit 1; }; fi;;
+esac

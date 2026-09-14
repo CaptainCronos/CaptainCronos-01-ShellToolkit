@@ -210,6 +210,48 @@ _cc_service_action() {
     esac
 }
 
+# Public Component 5 callers use this variant so system-scope lifecycle work
+# never silently invokes sudo.  Permission must be supplied by the invoking
+# process; legacy helpers above retain their established behavior.
+_cc_service_action_unprivileged() {
+    [ "$#" -eq 3 ] || return 2
+    local action="$1" scope="$2" unit="$3" manager init_system
+    _cc_service_validate_scope "$scope" || return $?
+    case "$action" in start|stop|restart) ;; *) return 2;; esac
+    manager="$(_cc_service_manager)" || return 1
+    init_system="$(cc_platform_init_system)"
+    case "$init_system" in
+        systemd)
+            local -a scope_args=()
+            _cc_service_scope_args "$scope" scope_args || return $?
+            "$manager" "${scope_args[@]}" "$action" "$unit"
+            ;;
+        openrc|freebsd-rc)
+            [ "$scope" = system ] || return 1
+            "$manager" "$unit" "$action"
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+# Bounded systemd service enumeration for the public service namespace.
+# Individual normalized records remain owned by the existing record helper.
+_cc_service_records_tsv() {
+    [ "$#" -eq 2 ] || return 2
+    local scope="$1" limit="$2" manager line unit count=0
+    local -a scope_args=()
+    _cc_service_validate_scope "$scope" || return $?
+    [[ "$limit" =~ ^[1-9][0-9]*$ ]] || return 2
+    [ "$(cc_platform_init_system)" = systemd ] || { printf '%s\tunknown\tunknown\tunknown\tunknown\tunknown\tunknown\tservice\tunknown\tunknown\tunsupported\n' "$scope"; return 0; }
+    manager="$(_cc_service_manager)" || { printf '%s\tunknown\tunknown\tunknown\tunknown\tunknown\tunknown\tservice\tunknown\tunknown\trestricted\n' "$scope"; return 0; }
+    _cc_service_scope_args "$scope" scope_args || return $?
+    while IFS= read -r line; do
+        unit="${line%%[[:space:]]*}"; [ -n "$unit" ] || continue
+        _cc_service_record_tsv "$scope" "$unit"
+        count=$((count + 1)); [ "$count" -lt "$limit" ] || break
+    done < <("$manager" "${scope_args[@]}" list-units --all --type=service --no-legend --plain 2>/dev/null)
+}
+
 _cc_service_start() { [ "$#" -eq 2 ] || return 2; _cc_service_action start "$1" "$2"; }
 _cc_service_stop() { [ "$#" -eq 2 ] || return 2; _cc_service_action stop "$1" "$2"; }
 _cc_service_restart() { [ "$#" -eq 2 ] || return 2; _cc_service_action restart "$1" "$2"; }

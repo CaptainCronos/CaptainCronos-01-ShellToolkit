@@ -98,6 +98,7 @@ asset|namespace|cc asset <subcommand> [arguments]|Manage local lifecycle asset i
 audit|namespace-with-switches|cc audit [summary|commands] [switches]; cc audit fix [switches]|Audit command consistency and optionally repair managed command metadata.|namespace
 baseline|flat-no-switches|cc baseline|Capture operating-system baseline shell files.|none
 capability|namespace|cc capability [list|check NAME]|Resolve core, program, and plugin-provided capabilities.|namespace
+container|namespace-with-switches|cc container [status, list, show, logs, start, stop, restart] [switches]|Inspect bounded local Docker and Podman containers safely.|namespace
 chirp|namespace-with-switches|cc chirp [status|install|repair|update] [switches]|Deploy and maintain the official CHIRP-next AppImage.|namespace
 config|namespace|cc config <subcommand> [arguments]|Read or update toolkit configuration.|namespace
 defaults|flat-no-switches|cc defaults|Promote active shell files into defaults/v1.|none
@@ -137,6 +138,7 @@ release|namespace-with-switches|cc release [subcommand] [switches]|Plan or check
 repo|flat-no-switches|cc repo|Show the toolkit repository path, branch, and origin.|none
 repos|namespace-with-switches|cc repos [subcommand] [switches]|Inventory or conservatively manage local Git repositories.|namespace
 reports|namespace-with-switches|cc reports [subcommand] [switches]|Inspect and conservatively prune persistent report history.|namespace
+service|namespace-with-switches|cc service [status, list, show, logs, start, stop, restart] [switches]|Inspect and control bounded local services without escalation.|namespace
 roadmap|flat-no-switches|cc roadmap [markdown]|Show the canonical project roadmap.|any
 selftest|flat-with-switches|cc selftest [switches]|Run the toolkit engineering self-test suite.|none
 smart|flat-with-switches|cc smart [DEVICE] [switches]|Show storage and SMART detail, optionally for one device.|any
@@ -158,6 +160,18 @@ audit/summary|--strict|0|Require executable bits plus Category and Requires head
 audit/commands|--strict|0|Require executable bits plus Category and Requires headers.
 audit/fix|--apply|0|Repair managed command metadata and executable bits; omission is preview-only. [default: preview]
 config/migrate|--apply|0|Back up and atomically add the current schema marker; omission is preview-only. [default: preview]
+container/list|--runtime RUNTIME|1|Select docker or podman when needed.
+container/list|--limit N|1|Show 1-200 normalized records. [default: 50]
+container/show|--runtime RUNTIME|1|Select docker or podman when needed.
+container/logs|--runtime RUNTIME|1|Select docker or podman when needed.
+container/logs|--since WINDOW|1|Use a bounded local runtime log window. [default: 24 hours ago]
+container/logs|--limit N|1|Show 1-1000 raw application log lines. [default: 100]
+container/start|--runtime RUNTIME|1|Select docker or podman when needed.
+container/start|--apply|0|Authorize one local container start; omission is dry-run. [default: dry-run]
+container/stop|--runtime RUNTIME|1|Select docker or podman when needed.
+container/stop|--apply|0|Authorize one local container stop; omission is dry-run. [default: dry-run]
+container/restart|--runtime RUNTIME|1|Select docker or podman when needed.
+container/restart|--apply|0|Authorize one local container restart; omission is dry-run. [default: dry-run]
 chirp|--dry-run|0|Preview CHIRP AppImage deployment changes without mutation. [default]
 chirp|--apply|0|Authorize staged AppImage deployment, launcher/icon repair, and safe pipx CHIRP migration.
 chirp/install|--dry-run|0|Preview official CHIRP-next AppImage installation without mutation. [default]
@@ -226,6 +240,18 @@ reports/list|--format FORMAT|1|Render retained reports as a readable table or st
 reports/list|--permissions|0|Show recognized report permission-policy violations in a readable, read-only table.
 reports/prune|--format FORMAT|1|Render the bounded prune plan as a readable table or stable TSV. [default: table]
 reports/prune|--apply|0|Explicitly authorize deletion of the displayed, verified current-host plan; omission is preview-only. [default: preview]
+service/list|--scope SCOPE|1|Select system or current-user service scope. [default: system]
+service/list|--limit N|1|Show 1-200 normalized service records. [default: 50]
+service/show|--scope SCOPE|1|Select system or current-user service scope. [default: system]
+service/logs|--scope SCOPE|1|Select system or current-user service scope. [default: system]
+service/logs|--since WINDOW|1|Use a bounded journal window. [default: 24 hours ago]
+service/logs|--limit N|1|Show 1-1000 journal records. [default: 100]
+service/start|--scope SCOPE|1|Select system or current-user service scope. [default: system]
+service/start|--apply|0|Authorize one service start without automatic sudo; omission is dry-run. [default: dry-run]
+service/stop|--scope SCOPE|1|Select system or current-user service scope. [default: system]
+service/stop|--apply|0|Authorize one service stop without automatic sudo; omission is dry-run. [default: dry-run]
+service/restart|--scope SCOPE|1|Select system or current-user service scope. [default: system]
+service/restart|--apply|0|Authorize one service restart without automatic sudo; omission is dry-run. [default: dry-run]
 release|--apply|0|Accepted for workflow compatibility; release automation still does not bump, tag, or push.
 repos|--root PATH|1|Inspect repositories below PATH. [default: ~/GitHub]
 repos|--out FILE|1|Write inventory output to a .md or .csv file.
@@ -306,6 +332,13 @@ audit|commands|Show per-command audit detail.|audit/commands
 audit|fix|Preview or apply managed audit repairs.|audit/fix
 capability|list|List resolved core, program, and plugin capabilities.|capability/list
 capability|check|Resolve one named capability and its semantic state.|capability/check
+container|status|Show Docker and Podman client and local-runtime accessibility.|container/status
+container|list|Show a bounded normalized container inventory.|container/list
+container|show|Show safe normalized metadata for one container.|container/show
+container|logs|Show bounded raw application output for one container.|container/logs
+container|start|Preview or explicitly start one container.|container/start
+container|stop|Preview or explicitly stop one container.|container/stop
+container|restart|Preview or explicitly restart one container.|container/restart
 chirp|status|Inspect CHIRP AppImage, links, launcher, icon, pipx conflict, and user data.|chirp/status
 chirp|install|Preview or install the official CHIRP-next AppImage.|chirp/install
 chirp|repair|Preview or normalize the canonical CHIRP deployment.|chirp/repair
@@ -418,6 +451,13 @@ repos|publish|Push eligible clean main branches; dry-run by default.|repos/publi
 repos|verify|Run cc verify in toolkit repositories.|repos/verify
 repos|doctor|Run cc doctor in toolkit repositories.|repos/doctor
 reports|status|Show current-host report lifecycle health and retained totals.|reports/status
+service|status|Show bounded failed-service observations.|service/status
+service|list|Show a bounded normalized service inventory.|service/list
+service|show|Show normalized state for one service unit.|service/show
+service|logs|Show bounded journal output for one service unit.|service/logs
+service|start|Preview or explicitly start one service unit without sudo.|service/start
+service|stop|Preview or explicitly stop one service unit without sudo.|service/stop
+service|restart|Preview or explicitly restart one service unit without sudo.|service/restart
 reports|list|List recognized retained reports and policy state.|reports/list
 reports|prune|Preview or explicitly apply a bounded current-host report plan.|reports/prune
 storage|status|Show concise local storage verification summary.|storage/status

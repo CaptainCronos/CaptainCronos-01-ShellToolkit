@@ -393,11 +393,11 @@ Status: **Complete**
 
 ### Component 4 — System and Service Health Monitoring
 
-Status: **In Progress**
+Status: **Complete**
 
 ### Component 5 — Container and Local-Service Management
 
-Status: **Planned**
+Status: **In Progress**
 
 ### Component 6 — TrueNAS Administration
 

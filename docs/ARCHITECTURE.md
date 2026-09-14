@@ -370,6 +370,20 @@ System mutations add `sudo` in the execution library, user mutations do not, and
 dry-run mode reports commands without executing them. OpenRC and FreeBSD rc
 behavior remains behind explicit platform branches.
 
+### Container and Local-Service Foundation
+
+`cc container` is local-host-only and supports only detected Docker and Podman
+providers. Client detection is distinct from runtime accessibility; neither
+absence nor restricted access makes a host unhealthy. Its records intentionally
+exclude inspect JSON, environment, labels, and credentials. Inventories and raw
+application logs are bounded; logs may contain application secrets.
+
+`cc service` reuses the service and journal semantics above. Both namespaces
+default to read-only behavior; start, stop, and restart require `--apply`.
+Neither container actions nor the public service command automatically invokes
+sudo. Compose, remote administration, destructive operations, and normal
+health/doctor container enumeration are deliberately out of scope.
+
 ### Storage Verification Architecture
 
 `cc storage` is the local, read-only storage verification surface. Linux

@@ -304,6 +304,48 @@ Discovery:
   cc config <subcommand> switches
 ~~~
 
+## cc container
+
+~~~text
+Usage:
+  cc container [status]
+  cc container list [--runtime docker|podman] [--limit N]
+  cc container show NAME_OR_ID [--runtime docker|podman]
+  cc container logs NAME_OR_ID [--runtime docker|podman] [--since WINDOW] [--limit N]
+  cc container start|stop|restart NAME_OR_ID [--runtime docker|podman] [--apply]
+
+Local host only. Metadata is normalized and excludes inspect JSON, environment,
+and labels. Logs are bounded raw application output and can contain secrets.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc container
+
+Usage:
+  cc container [status, list, show, logs, start, stop, restart] [switches]
+
+Inspect bounded local Docker and Podman containers safely.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status......... Show Docker and Podman client and local-runtime accessibility.
+  list........... Show a bounded normalized container inventory.
+  show........... Show safe normalized metadata for one container.
+  logs........... Show bounded raw application output for one container.
+  start.......... Preview or explicitly start one container.
+  stop........... Preview or explicitly stop one container.
+  restart........ Preview or explicitly restart one container.
+
+Discovery:
+  cc container <subcommand> switches
+~~~
+
 ## cc defaults
 
 ~~~text
@@ -1835,6 +1877,48 @@ Switches:
   --debug........... Emit intentional diagnostic events to standard error.
   --help, -h........ Show contextual command help.
   --version......... Show toolkit version information.
+~~~
+
+## cc service
+
+~~~text
+Usage:
+  cc service [status]
+  cc service list [--scope system|user] [--limit N]
+  cc service show UNIT [--scope system|user]
+  cc service logs UNIT [--scope system|user] [--since WINDOW] [--limit N]
+  cc service start|stop|restart UNIT [--scope system|user] [--apply]
+
+All reads are local and bounded. System-scope lifecycle actions never invoke
+sudo; run with sufficient existing privilege when --apply is requested.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc service
+
+Usage:
+  cc service [status, list, show, logs, start, stop, restart] [switches]
+
+Inspect and control bounded local services without escalation.
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status......... Show bounded failed-service observations.
+  list........... Show a bounded normalized service inventory.
+  show........... Show normalized state for one service unit.
+  logs........... Show bounded journal output for one service unit.
+  start.......... Preview or explicitly start one service unit without sudo.
+  stop........... Preview or explicitly stop one service unit without sudo.
+  restart........ Preview or explicitly restart one service unit without sudo.
+
+Discovery:
+  cc service <subcommand> switches
 ~~~
 
 ## cc smart

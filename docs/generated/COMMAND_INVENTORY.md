@@ -11,6 +11,7 @@ Toolkit version: 1.3.0 (Blackbeard)
 | cc capability | namespace | 1.3.0 | Resolve core, program, and plugin-provided host capabilities. |
 | cc chirp | namespace-with-switches | 1.3.0 | Deploy and safely migrate CHIRP-next to the official AppImage. |
 | cc config | namespace | 1.3.0 | View and update toolkit configuration. |
+| cc container | namespace-with-switches | 1.3.0 | Inspect bounded local Docker and Podman containers safely. |
 | cc defaults | flat-no-switches | 1.3.0 | Promote active shell files into deployable defaults. |
 | cc deps | namespace | 1.3.0 | Show dependency status for toolkit commands and profiles. |
 | cc desktop-reload | flat-no-switches | 1.3.0 | Reload the Cinnamon desktop shell without ending the X11 session. |
@@ -50,6 +51,7 @@ Toolkit version: 1.3.0 (Blackbeard)
 | cc repos | namespace-with-switches | 1.3.0 | Inventory and manage local Git repositories. |
 | cc roadmap | flat-no-switches | 1.3.0 | Show the canonical project roadmap from ROADMAP.md. |
 | cc selftest | flat-with-switches | 1.3.0 | Run the full toolkit engineering self-test suite. |
+| cc service | namespace-with-switches | 1.3.0 | Inspect and control bounded local services without escalation. |
 | cc smart | flat-with-switches | 1.3.0 | Summarize SMART health for installed storage devices. |
 | cc status | flat-no-switches | 1.3.0 | Show repository status summary. |
 | cc storage | namespace | 1.3.0 | Inspect local storage verification state and route legacy lifecycle workflows. |
