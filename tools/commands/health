@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#
+# ==============================================================================
+# Captain Cronos Shell Toolkit
+# ------------------------------------------------------------------------------
+# Script      : health
+# Version     : reads VERSION
+# Category    : Diagnostics
+# Requires    : bash awk ps date
+# Repository  : CaptainCronos-01-ShellToolkit
+# Purpose     : Inspect bounded local system and service health read-only.
+# ==============================================================================
+
+set -euo pipefail
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/lib/cc-common.sh"
+source "$PROJECT_ROOT/lib/cc-health.sh"
+
+usage() {
+    cat <<'EOF_HELP'
+Usage:
+  cc health [status]
+  cc health system
+  cc health resources
+  cc health services
+  cc health timers
+  cc health diagnose
+
+All health inspection is local, read-only, bounded, and unprivileged. Status
+does not perform external probes, broad SMART inspection, journal scans, or
+service mutation. Diagnose reads bounded journal context for failed units.
+EOF_HELP
+}
+
+show_findings() {
+    local findings="${1:-$CC_HEALTH_FINDINGS}"
+    printf '%-6s %-28s %-12s %-26s %s\n' State Code Layer Subject Message
+    while IFS=$'\t' read -r state code layer subject message _; do
+        [ -n "$state" ] && printf '%-6s %-28s %-12s %-26s %s\n' "$state" "$code" "$layer" "$subject" "$message"
+    done <<<"$findings"
+}
+
+show_status() {
+    local failures warnings overall
+    cc_health_snapshot
+    failures="$(awk -F '\t' '$1=="FAIL" {n++} END {print n+0}' <<<"$CC_HEALTH_FINDINGS")"
+    warnings="$(awk -F '\t' '$1=="WARN" {n++} END {print n+0}' <<<"$CC_HEALTH_FINDINGS")"
+    [ "$failures" -gt 0 ] && overall=FAIL || { [ "$warnings" -gt 0 ] && overall=WARN || overall=PASS; }
+    cc_section 'Captain Cronos Health'
+    printf '%-22s %s\n' 'Host role/profile:' "$(cc_env_role) / $(cc_env_profile)"
+    printf '%-22s %s\n' 'Resource records:' "$(awk 'NF {n++} END {print n+0}' <<<"$CC_HEALTH_RESOURCES")"
+    printf '%-22s %s\n' 'Failed-unit findings:' "$(awk -F '\t' '$2=="SERVICE_FAILED" || $2=="TIMER_FAILED" {n++} END {print n+0}' <<<"$CC_HEALTH_FINDINGS")"
+    printf '%-22s %s\n' 'Policy findings:' "$(awk -F '\t' '$2 ~ /^SERVICE_EXPECTED|^TIMER_EXPECTED/ {n++} END {print n+0}' <<<"$CC_HEALTH_FINDINGS")"
+    echo
+    show_findings
+    echo
+    cc_summary_status 'Overall Status:' "$overall"
+    [ "$overall" != FAIL ]
+}
+
+show_system() { cc_health_snapshot; cc_host_facts_tsv | while IFS=$'\t' read -r key value; do printf '%-24s %s\n' "$key:" "$value"; done; echo; show_findings "$CC_HEALTH_FINDINGS"; }
+show_resources() { printf '%-22s %-14s %-16s %-20s %s\n' Name Value Unit State Source; cc_health_resources_tsv | while IFS=$'\t' read -r name value unit state source _; do printf '%-22s %-14s %-16s %-20s %s\n' "$name" "$value" "$unit" "$state" "$source"; done; }
+show_services() { local rows; rows="$(_cc_service_failed_records_tsv system 2>/dev/null || true)"; printf '%-8s %-32s %-12s %-12s %-14s %-12s %s\n' Scope Unit Load Active Enabled Restarts Collection; while IFS=$'\t' read -r scope unit _ load active _ enabled _ _ restarts collection; do [ -n "$unit" ] && printf '%-8s %-32s %-12s %-12s %-14s %-12s %s\n' "$scope" "$unit" "$load" "$active" "$enabled" "$restarts" "$collection"; done <<<"$rows"; cc_health_snapshot; echo; show_findings "$(awk -F '\t' '$3=="service" || $3=="collection" {print}' <<<"$CC_HEALTH_FINDINGS")"; }
+show_timers() { local _ selector scope unit expectation severity; printf '%-8s %-36s %-28s %-28s %-14s %s\n' Scope Unit Next Last Enabled Collection; while IFS=$'\t' read -r _ _ scope unit expectation severity; do [[ "$unit" == *.timer ]] || continue; IFS=$'\t' read -r scope unit next last _ active enabled collection < <(_cc_timer_record_tsv "$scope" "$unit"); printf '%-8s %-36s %-28s %-28s %-14s %s\n' "$scope" "$unit" "$next" "$last" "$enabled" "$collection"; done < <(cc_health_policy_records_tsv 2>/dev/null || true); }
+show_diagnose() { echo 'Bounded failed-unit journal evidence'; echo '-----------------------------------'; cc_health_diagnose_tsv '24 hours ago' 200 || true; }
+
+action="${1:-status}"
+case "$action" in
+    --help|-h|help) usage;; --version) cc_version;; status) [ "$#" -eq 1 ] || [ "$#" -eq 0 ] || { usage >&2; exit 2; }; show_status;; system) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; show_system;; resources) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; show_resources;; services) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; show_services;; timers) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; show_timers;; diagnose) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; show_diagnose;; *) usage >&2; exit 2;;
+esac

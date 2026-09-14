@@ -27,6 +27,7 @@ Toolkit version: 1.3.0 (Blackbeard)
 | cc env | namespace-with-switches | 1.3.0 | Inspect and repair Captain Cronos environment and PATH health. |
 | cc framework | namespace | 1.3.0 | Show framework milestone status and 1.3 completion progress. |
 | cc gitflow | interactive | 1.3.0 | Launch the interactive Git assistant. |
+| cc health | namespace | 1.3.0 | Inspect bounded local system and service health read-only. |
 | cc helpme-refresh | flat-with-switches | 1.3.0 | Replace installed helpme with canonical framework help. |
 | cc host | namespace-with-switches | 1.3.0 | Show composed host facts, capabilities, and role requirements. |
 | cc init | interactive | 1.3.0 | Initialize a Captain Cronos host identity and local environment. |

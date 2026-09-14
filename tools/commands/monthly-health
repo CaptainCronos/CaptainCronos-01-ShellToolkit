@@ -354,7 +354,7 @@ print_logs() {
     fi
     subsection "SSH/auth noise"
     if _cc_log_available; then
-        _cc_log_since system "$JOURNAL_SINCE" all 2>/dev/null | \
+        _cc_log_since system "$JOURNAL_SINCE" 800 2>/dev/null | \
             grep -Ei 'sshd.*invalid user|Failed password|maximum authentication attempts' | tail -n 25 || true
     fi
 }

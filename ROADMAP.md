@@ -389,11 +389,11 @@ Status: **Complete**
 
 ### Component 3 — Storage, ZFS, and NAS Verification Foundation
 
-Status: **In Progress**
+Status: **Complete**
 
 ### Component 4 — System and Service Health Monitoring
 
-Status: **Planned**
+Status: **In Progress**
 
 ### Component 5 — Container and Local-Service Management
 

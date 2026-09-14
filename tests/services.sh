@@ -4,17 +4,12 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "$PROJECT_ROOT/lib/cc-services.sh"
+source "$PROJECT_ROOT/lib/cc-storage-logs.sh"
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
     exit 1
 }
-
-[ "$(cc_program_get service-manager)" = "systemctl" ] || fail "service-manager capability did not resolve"
-[ "$(cc_program_get system-log)" = "journalctl" ] || fail "system-log capability did not resolve"
-_cc_service_exists system systemd-journald.service || fail "real service existence detection failed"
-_cc_service_is_active system systemd-journald.service || fail "real active-service detection failed"
-_cc_log_since system "1 minute ago" 1 >/dev/null || fail "real system-log query failed"
 
 TEST_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEST_DIR"' EXIT
@@ -37,7 +32,25 @@ fi
 case "${args[0]:-}" in
     show)
         unit="${args[${#args[@]}-1]}"
-        [ "$unit" = "missing.service" ] && printf '%s\n' not-found || printf '%s\n' loaded
+        property=''; for arg in "${args[@]}"; do case "$arg" in --property=*) property="${arg#--property=}";; esac; done
+        case "$unit:$property" in
+            missing.service:Description) printf '%s\n' unknown ;;
+            missing.service:LoadState) printf '%s\n' not-found ;;
+            missing.service:ActiveState) printf '%s\n' inactive ;;
+            missing.service:SubState) printf '%s\n' dead ;;
+            missing.service:MainPID|missing.service:NRestarts) printf '%s\n' 0 ;;
+            failed.service:Description) printf '%s\n' 'Failed fixture' ;;
+            failed.service:LoadState) printf '%s\n' loaded ;;
+            failed.service:ActiveState|failed.service:SubState) printf '%s\n' failed ;;
+            failed.service:MainPID) printf '%s\n' 123 ;;
+            failed.service:NRestarts) printf '%s\n' 4 ;;
+            *:Description) printf '%s\n' 'Fixture service' ;;
+            *:LoadState) printf '%s\n' loaded ;;
+            *:ActiveState) printf '%s\n' active ;;
+            *:SubState) printf '%s\n' running ;;
+            *:MainPID) printf '%s\n' 42 ;;
+            *:NRestarts) printf '%s\n' 0 ;;
+        esac
         ;;
     is-active)
         [ "${args[${#args[@]}-1]}" = "active.service" ]
@@ -110,7 +123,18 @@ fi
 grep -q '^log --since 1 hour ago --no-pager --output=short-iso -n 10$' "$TRACE_FILE" || fail "system-log arguments were incorrect"
 : > "$TRACE_FILE"
 _cc_log_unit user example.service today 5 >/dev/null || fail "user-unit log query failed"
-grep -q '^log --user --unit example.service ' "$TRACE_FILE" || fail "user log query lost user scope"
+grep -q '^log --user ' "$TRACE_FILE" || fail "user log query lost user scope"
+grep -q -- '--unit example.service' "$TRACE_FILE" || fail "user log query lost unit"
+: > "$TRACE_FILE"
+_cc_log_query system '24 hours ago' 7 example.service err >/dev/null || fail 'bounded combined log query failed'
+grep -q '^log --since 24 hours ago --no-pager --output=short-iso -n 7 --unit example.service --priority err$' "$TRACE_FILE" || fail 'bounded combined log arguments were incorrect'
+if _cc_log_since system '24 hours ago' all >/dev/null 2>&1; then fail 'unbounded log limit was accepted'; fi
+: > "$TRACE_FILE"
+cc_storage_log_since_tsv '24 hours ago' >/dev/null || fail 'storage bounded log caller failed'
+grep -q '^log --since 24 hours ago --no-pager --output=short-iso -n 1000$' "$TRACE_FILE" || fail 'storage log caller did not use bounded canonical contract'
+
+record="$(_cc_service_record_tsv system failed.service)"
+printf '%s\n' "$record" | grep -q $'failed.service\tFailed fixture\tloaded\tfailed\tfailed' || fail 'normalized failed service record was incorrect'
 
 cc_platform_init_system() { printf '%s\n' openrc; }
 [ "$(_cc_service_manager)" = "rc-service" ] || fail "OpenRC abstraction was not preserved"

@@ -294,6 +294,8 @@ selftest_suite() {
     "$runner" "Network interfaces" network bash "$PROJECT_ROOT/tests/network.sh"
     "$runner" "Services library" services check_library cc-services.sh
     "$runner" "Service operations" services bash "$PROJECT_ROOT/tests/services.sh"
+    "$runner" "Health library" health check_library cc-health.sh
+    "$runner" "Health foundation" health bash "$PROJECT_ROOT/tests/health.sh"
     "$runner" "HTTP library" http check_library cc-http.sh
     "$runner" "HTTP interfaces" http bash "$PROJECT_ROOT/tests/http.sh"
     "$runner" "Data library" data check_library cc-data.sh

@@ -74,17 +74,6 @@ _cc_log_available() {
     command -v "$log_program" >/dev/null 2>&1
 }
 
-# Read-only, bounded system-log query for diagnostic consumers.  Callers pass
-# an explicit time window and record limit; this helper never escalates.
-_cc_log_since() {
-    [ "$#" -eq 2 ] || return 2
-    local since="$1" limit="$2" log_program
-    [[ "$limit" =~ ^[1-9][0-9]*$ ]] || return 2
-    log_program="$(_cc_system_log_program)" || return 1
-    command -v "$log_program" >/dev/null 2>&1 || return 1
-    "$log_program" --no-pager -o short-iso --since "$since" -n "$limit"
-}
-
 _cc_service_exists() {
     [ "$#" -eq 2 ] || return 2
     local scope="$1" unit="$2" manager state
@@ -325,32 +314,35 @@ _cc_log_scope_args() {
     fi
 }
 
-_cc_log_since() {
-    [ "$#" -eq 3 ] || return 2
-    local log_program
-    local -a scope_args=() limit_args=()
+# Canonical read-only journal contract.  All consumers must provide an explicit
+# scope, time window, and positive record limit.  It never escalates and never
+# permits an unlimited scan.
+_cc_log_query() {
+    [ "$#" -ge 3 ] && [ "$#" -le 5 ] || return 2
+    local scope="$1" since="$2" limit="$3" unit="${4:-}" priority="${5:-}" log_program
+    local -a scope_args=() query_args=()
+    [ -n "$since" ] && [[ "$limit" =~ ^[1-9][0-9]*$ ]] || return 2
     log_program="$(_cc_system_log_program)" || return 1
-    _cc_log_scope_args "$1" scope_args || return $?
-    if [ "$3" != "all" ]; then
-        [[ "$3" =~ ^[0-9]+$ ]] || return 2
-        limit_args=(-n "$3")
-    fi
-    "$log_program" "${scope_args[@]}" --since "$2" --no-pager --output=short-iso "${limit_args[@]}"
+    command -v "$log_program" >/dev/null 2>&1 || return 1
+    _cc_log_scope_args "$scope" scope_args || return $?
+    query_args=("${scope_args[@]}" --since "$since" --no-pager --output=short-iso -n "$limit")
+    [ -z "$unit" ] || query_args+=(--unit "$unit")
+    [ -z "$priority" ] || query_args+=(--priority "$priority")
+    "$log_program" "${query_args[@]}"
 }
+
+_cc_log_since() { [ "$#" -eq 3 ] || return 2; _cc_log_query "$1" "$2" "$3"; }
 
 _cc_log_unit() {
     [ "$#" -eq 4 ] || return 2
-    local log_program
-    local -a scope_args=()
-    log_program="$(_cc_system_log_program)" || return 1
-    _cc_log_scope_args "$1" scope_args || return $?
-    "$log_program" "${scope_args[@]}" --unit "$2" --since "$3" --no-pager --output=short-iso -n "$4"
+    _cc_log_query "$1" "$3" "$4" "$2"
 }
 
 _cc_log_boot() {
     [ "$#" -eq 3 ] || return 2
     local log_program
     local -a scope_args=()
+    [[ "$3" =~ ^[1-9][0-9]*$ ]] || return 2
     log_program="$(_cc_system_log_program)" || return 1
     _cc_log_scope_args "$1" scope_args || return $?
     "$log_program" "${scope_args[@]}" --boot "$2" --no-pager --output=short-iso -n "$3"
@@ -358,9 +350,113 @@ _cc_log_boot() {
 
 _cc_log_priority() {
     [ "$#" -eq 4 ] || return 2
-    local log_program
+    _cc_log_query "$1" "$3" "$4" "" "$2"
+}
+
+# Normalized TSV service record:
+# scope, unit, description, load_state, active_state, sub_state,
+# enabled_state, unit_type, pid, restart_count, collection_state, where, what
+_cc_service_unit_type() { case "$1" in *.*) printf '%s\n' "${1##*.}";; *) printf '%s\n' unknown;; esac; }
+
+_cc_service_enabled_state() {
+    [ "$#" -eq 2 ] || return 2
+    local scope="$1" unit="$2" manager output rc=0
     local -a scope_args=()
-    log_program="$(_cc_system_log_program)" || return 1
-    _cc_log_scope_args "$1" scope_args || return $?
-    "$log_program" "${scope_args[@]}" --priority "$2" --since "$3" --no-pager --output=short-iso -n "$4"
+    manager="$(_cc_service_manager)" || return 1
+    [ "$(cc_platform_init_system)" = systemd ] || return 1
+    _cc_service_scope_args "$scope" scope_args || return $?
+    output="$("$manager" "${scope_args[@]}" is-enabled "$unit" 2>/dev/null)" || rc=$?
+    output="${output%%$'\n'*}"
+    case "$output" in enabled|enabled-runtime|linked|linked-runtime|alias|static|indirect|generated|disabled|masked|masked-runtime) printf '%s\n' "$output";; *) [ "$rc" -eq 0 ] && printf '%s\n' enabled || printf '%s\n' unknown;; esac
+}
+
+_cc_service_record_tsv() {
+    [ "$#" -eq 2 ] || return 2
+    local scope="$1" unit="$2" manager description load active sub enabled pid restarts collection=available where what
+    local -a scope_args=()
+    _cc_service_validate_scope "$scope" || return $?
+    if [ "$(cc_platform_init_system)" != systemd ]; then
+        printf '%s\t%s\tunknown\tunknown\tunknown\tunknown\tunknown\t%s\tunknown\tunknown\tunsupported\n' "$scope" "$unit" "$(_cc_service_unit_type "$unit")"
+        return 0
+    fi
+    manager="$(_cc_service_manager)" || { printf '%s\t%s\tunknown\tunknown\tunknown\tunknown\tunknown\t%s\tunknown\tunknown\trestricted\n' "$scope" "$unit" "$(_cc_service_unit_type "$unit")"; return 0; }
+    _cc_service_scope_args "$scope" scope_args || return $?
+    # systemctl --value omits properties whose values are empty.  Query each
+    # property separately so an empty MainPID or NRestarts cannot shift Where
+    # and What into the wrong columns.
+    description="$("$manager" "${scope_args[@]}" show --property=Description --value "$unit" 2>/dev/null || true)"
+    load="$("$manager" "${scope_args[@]}" show --property=LoadState --value "$unit" 2>/dev/null || true)"
+    active="$("$manager" "${scope_args[@]}" show --property=ActiveState --value "$unit" 2>/dev/null || true)"
+    sub="$("$manager" "${scope_args[@]}" show --property=SubState --value "$unit" 2>/dev/null || true)"
+    pid="$("$manager" "${scope_args[@]}" show --property=MainPID --value "$unit" 2>/dev/null || true)"
+    restarts="$("$manager" "${scope_args[@]}" show --property=NRestarts --value "$unit" 2>/dev/null || true)"
+    where="$("$manager" "${scope_args[@]}" show --property=Where --value "$unit" 2>/dev/null || true)"
+    what="$("$manager" "${scope_args[@]}" show --property=What --value "$unit" 2>/dev/null || true)"
+    [ -n "$load" ] || collection=restricted
+    description="${description:-unknown}"; load="${load:-unknown}"; active="${active:-unknown}"; sub="${sub:-unknown}"; pid="${pid:-unknown}"; restarts="${restarts:-unknown}"
+    if [ "$load" = not-found ]; then collection=available; active=inactive; sub=dead; fi
+    enabled="$(_cc_service_enabled_state "$scope" "$unit" 2>/dev/null || printf unknown)"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$scope" "$unit" "${description//$'\t'/ }" "$load" "$active" "$sub" "$enabled" "$(_cc_service_unit_type "$unit")" "$pid" "$restarts" "$collection" "$where" "$what"
+}
+
+# Classify a failed unit without changing the raw failed-unit inventory.
+#
+# A Snap revision mount is ignored only when systemd identifies it as the
+# canonical generated unit and its exact backing revision image is gone.  A
+# name prefix alone is deliberately insufficient: live or malformed Snap
+# mounts remain unknown/actionable to health callers.
+_cc_service_failed_unit_classification() {
+    [ "$#" -eq 8 ] || return 2
+    local scope="$1" unit="$2" description="$3" load="$4" active="$5" sub="$6" where="$7" what="$8"
+    local snap revision snaps_dir decoded_unit
+    [ "$scope" = system ] && [ "$(cc_platform_init_system)" = systemd ] || { printf '%s\n' actionable; return 0; }
+    [ "$(_cc_service_unit_type "$unit")" = mount ] || { printf '%s\n' actionable; return 0; }
+    # Mount unit names use systemd escaping (for example, \x2d for a hyphen).
+    # Decode through systemd rather than trying to reverse that escaping here.
+    command -v systemd-escape >/dev/null 2>&1 || { printf '%s\n' unknown; return 0; }
+    decoded_unit="$(systemd-escape --unescape "$unit" 2>/dev/null || true)"
+    if [[ ! "$decoded_unit" =~ ^snap/([A-Za-z0-9][A-Za-z0-9+_.-]*)/([0-9]+)\.mount$ ]]; then
+        printf '%s\n' actionable
+        return 0
+    fi
+    snap="${BASH_REMATCH[1]}"; revision="${BASH_REMATCH[2]}"
+    [ "$description" = "Mount unit for $snap, revision $revision" ] && [ "$load" = loaded ] && [ "$active" = failed ] && [ "$sub" = failed ] || { printf '%s\n' unknown; return 0; }
+    snaps_dir="${CC_SERVICE_SNAPD_SNAPS_DIR:-/var/lib/snapd/snaps}"
+    if [ "$where" = "/snap/$snap/$revision" ] && [ "$what" = "$snaps_dir/${snap}_${revision}.snap" ] && [ ! -e "$what" ]; then
+        printf '%s\n' ignored-stale-snap
+    else
+        printf '%s\n' unknown
+    fi
+}
+
+# TSV: scope, unit, description, load_state, active_state, sub_state,
+# enabled_state, unit_type, pid, restart_count, collection_state, where, what
+_cc_service_failed_records_tsv() {
+    [ "$#" -eq 1 ] || return 2
+    local scope="$1" manager line unit
+    local -a scope_args=()
+    [ "$(cc_platform_init_system)" = systemd ] || return 1
+    manager="$(_cc_service_manager)" || return 1
+    _cc_service_scope_args "$scope" scope_args || return $?
+    while IFS= read -r line; do
+        unit="${line%%[[:space:]]*}"; [ -n "$unit" ] || continue
+        _cc_service_record_tsv "$scope" "$unit"
+    done < <("$manager" "${scope_args[@]}" list-units --state=failed --all --no-legend --plain 2>/dev/null)
+}
+
+# Normalized TSV timer record: scope, unit, next_run, last_run, activates,
+# active_state, enabled_state, collection_state. Callers request named timers;
+# broad timer enumeration remains presentation-specific and bounded by systemd.
+_cc_timer_record_tsv() {
+    [ "$#" -eq 2 ] || return 2
+    local scope="$1" unit="$2" manager output next last activates active enabled collection=available
+    local -a scope_args=() values=()
+    if [ "$(cc_platform_init_system)" != systemd ]; then printf '%s\t%s\tunknown\tunknown\tunknown\tunknown\tunknown\tunsupported\n' "$scope" "$unit"; return 0; fi
+    manager="$(_cc_service_manager)" || { printf '%s\t%s\tunknown\tunknown\tunknown\tunknown\tunknown\trestricted\n' "$scope" "$unit"; return 0; }
+    _cc_service_scope_args "$scope" scope_args || return $?
+    output="$("$manager" "${scope_args[@]}" show --property=NextElapseUSecRealtime --property=LastTriggerUSec --property=Triggers --property=ActiveState --value "$unit" 2>/dev/null)" || true
+    mapfile -t values <<<"$output"; next="${values[0]:-unknown}"; last="${values[1]:-unknown}"; activates="${values[2]:-unknown}"; active="${values[3]:-unknown}"
+    [ -n "$output" ] || collection=restricted
+    enabled="$(_cc_service_enabled_state "$scope" "$unit" 2>/dev/null || printf unknown)"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$scope" "$unit" "$next" "$last" "$activates" "$active" "$enabled" "$collection"
 }

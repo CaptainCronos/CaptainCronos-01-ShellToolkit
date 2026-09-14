@@ -39,6 +39,7 @@ Important libraries:
 - `cc-kernel.sh` — kernel discovery, ordering, classification, ownership, and reboot-state inspection
 - `cc-network.sh` — semantic, platform-aware network-state inspection
 - `cc-services.sh` — scoped service lifecycle, timer, and system-log operations
+- `cc-health.sh` — bounded read-only resource, systemd, policy, and composed health findings
 - `cc-http.sh` — semantic file downloads and HTTP/API requests
 - `cc-data.sh` — compatible JSON/YAML validation, queries, and YAML mutation
 - `cc-deps.sh` — semantic capability and literal executable dependency checks

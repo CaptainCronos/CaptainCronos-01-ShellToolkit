@@ -874,6 +874,49 @@ Switches:
   --version......... Show toolkit version information.
 ~~~
 
+## cc health
+
+~~~text
+Usage:
+  cc health [status]
+  cc health system
+  cc health resources
+  cc health services
+  cc health timers
+  cc health diagnose
+
+All health inspection is local, read-only, bounded, and unprivileged. Status
+does not perform external probes, broad SMART inspection, journal scans, or
+service mutation. Diagnose reads bounded journal context for failed units.
+~~~
+
+### Switch discovery
+
+~~~text
+Command: cc health
+
+Usage:
+  cc health [status
+
+system
+
+Switches:
+  No command-specific switches.
+  --help, -h........ Show contextual command help.
+  --version......... Show toolkit version information.
+
+Subcommands:
+  status........... Show concise bounded local health summary.
+  system........... Show host/system facts and health findings.
+  resources........ Show normalized local resource observations.
+  services......... Show failed service observations and related findings.
+  timers........... Show policy-selected timer observations.
+  diagnose......... Show bounded local journal evidence for failed units.
+
+Discovery:
+  cc health <subcommand> switches
+~~~
+
 ## cc helpme-refresh
 
 ~~~text

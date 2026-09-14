@@ -1,5 +1,7 @@
 # Developer Documentation
 
+- [System and Service Health Monitoring](Health-Monitoring.md)
+
 Ecosystem engineering policy lives in `CaptainCronos-02-Engineering-Manual`.
 The documents here define ShellToolkit-specific architecture, interfaces,
 workflow additions, and validation requirements. The Engineering Manual takes

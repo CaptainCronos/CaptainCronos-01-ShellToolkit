@@ -38,6 +38,17 @@ requires an explicit `system` or `user` scope. Queries remain unprivileged,
 system mutations apply privilege escalation in the library, and user mutations
 never add `sudo`.
 
+## Health Policy
+
+`config/health-policy.conf` is a repository-owned declarative TSV catalog for
+explicit health expectations. Its schema is
+`selector_type|selector|scope|unit|expectation|severity`; selectors are `role`
+or `profile`, and expectations are `present`, `active`, `enabled`, or `absent`.
+The shipped catalog is intentionally empty: installed packages and services do
+not become expected-active implicitly. `cc health` is local, read-only, and
+unprivileged; `cc health diagnose` uses the configured journal interface only
+with an explicit bounded time window and record count.
+
 HTTP behavior is implemented in `lib/cc-http.sh`. File acquisition resolves the
 `download` capability (`wget` by default); API-style requests resolve `http-api`
 (`curl` by default). The two interfaces are selected by operation semantics, not

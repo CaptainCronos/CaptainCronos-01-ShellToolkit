@@ -11,7 +11,7 @@ fi
 
 cc_storage_log_since_tsv() {
     [ "$#" -eq 1 ] || return 2
-    _cc_log_since "$1" "${CC_STORAGE_LOG_LIMIT:-1000}"
+    _cc_log_since system "$1" "${CC_STORAGE_LOG_LIMIT:-1000}"
 }
 
 # finding: state, code, layer, subject, message, evidence_source, observed_at

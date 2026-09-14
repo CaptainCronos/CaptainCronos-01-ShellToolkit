@@ -116,6 +116,7 @@ drives|flat-no-switches|cc drives|Show physical devices, filesystems, labels, us
 env|namespace-with-switches|cc env [subcommand] [switches]|Inspect or repair host identity, shell files, and PATH health.|namespace
 framework|namespace|cc framework [subcommand]|Inspect or verify framework milestone status.|namespace
 host|namespace-with-switches|cc host [status|facts|capabilities|requirements] [switches]|Show composed host awareness and role requirements.|namespace
+health|namespace|cc health [status|system|resources|services|timers|diagnose]|Inspect bounded local system and service health read-only.|namespace
 gitflow|interactive|cc gitflow [REPOSITORY]|Launch the interactive Captain Cronos Git assistant.|any
 helpme-refresh|flat-with-switches|cc helpme-refresh [switches]|Preview or replace the installed helpme function.|none
 init|interactive|cc init [switches]|Initialize a portable host identity, optionally interactively.|none
@@ -354,6 +355,12 @@ host|status|Show concise composed host status.|host/status
 host|facts|Show normalized observed and configured host facts.|host/facts
 host|capabilities|Show unified capability resolution.|host/capabilities
 host|requirements|Show configured-role semantic requirement resolution.|host/requirements
+health|status|Show concise bounded local health summary.|health/status
+health|system|Show host/system facts and health findings.|health/system
+health|resources|Show normalized local resource observations.|health/resources
+health|services|Show failed service observations and related findings.|health/services
+health|timers|Show policy-selected timer observations.|health/timers
+health|diagnose|Show bounded local journal evidence for failed units.|health/diagnose
 kernel|status|Show kernel state and boot filesystem usage.|kernel/status
 kernel|help|Show kernel namespace help.|kernel/help
 kernel|list|List installed kernels and protection state.|kernel/list

@@ -27,6 +27,7 @@ source "$TOOLKIT_ROOT/lib/cc-config.sh"
 source "$TOOLKIT_ROOT/lib/cc-requirements.sh"
 source "$TOOLKIT_ROOT/lib/cc-network.sh"
 source "$TOOLKIT_ROOT/lib/cc-storage.sh"
+source "$TOOLKIT_ROOT/lib/cc-health.sh"
 cc_context_init "$TOOLKIT_ROOT" "${CURRENT_REPO:-$ORIGINAL_PWD}"
 
 FULL=0
@@ -145,6 +146,25 @@ doctor_storage_check() {
     fi
 }
 
+doctor_resource_check() {
+    local name value unit state source observed zombies=0 reboot=unknown
+    cc_log "Checking bounded local resource health..."
+    while IFS=$'\t' read -r name value unit state source observed; do
+        case "$name" in
+            uptime) printf '%-18s %s %s\n' "Uptime:" "$value" "$unit" ;;
+            load_1m) printf '%-18s %s\n' "Load (1m):" "$value" ;;
+            memory_available) printf '%-18s %s %s\n' "Memory available:" "$value" "$unit" ;;
+            swap_used) printf '%-18s %s %s\n' "Swap used:" "$value" "$unit" ;;
+            zombie_count) zombies="$value" ;;
+            reboot_state) reboot="$value" ;;
+        esac
+    done < <(cc_health_resources_tsv)
+    if [[ "$zombies" =~ ^[1-9][0-9]*$ ]]; then
+        WARNINGS=$((WARNINGS + 1)); cc_status_line "Zombie processes" WARN
+    else cc_status_line "Zombie processes" PASS; fi
+    if [ "$reboot" = required ]; then WARNINGS=$((WARNINGS + 1)); cc_status_line "Reboot state" WARN; else cc_status_line "Reboot state" PASS; fi
+}
+
 doctor_main() {
     FULL=0
     WARNINGS=0
@@ -239,10 +259,9 @@ fi
 
 echo
 cc_log "Checking host basics..."
-printf '%-18s %s\n' "Hostname:" "$(hostname 2>/dev/null || echo unknown)"
-printf '%-18s %s\n' "Kernel:" "$(uname -r 2>/dev/null || echo unknown)"
-printf '%-18s %s\n' "Uptime:" "$(uptime -p 2>/dev/null || echo unknown)"
-printf '%-18s %s\n' "Load:" "$(awk '{print $1" "$2" "$3}' /proc/loadavg 2>/dev/null || echo unknown)"
+printf '%-18s %s\n' "Hostname:" "$(cc_host_hostname)"
+printf '%-18s %s\n' "Kernel:" "$(cc_platform_kernel)"
+doctor_resource_check
 
 if [ "${CC_DOCTOR_SKIP_KERNEL:-0}" != 1 ]; then
     doctor_kernel_check
